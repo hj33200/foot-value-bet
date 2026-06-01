@@ -401,7 +401,7 @@ function toggleDatePicker() {
 function renderCalendar() {
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
+  const firstDay = (new Date(year, month, 1).getDay() - 1 + 7) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   document.getElementById('monthYear').textContent = currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const grid = document.getElementById('calendarGrid');
