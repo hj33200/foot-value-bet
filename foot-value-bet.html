@@ -1412,7 +1412,7 @@ function viewAnalytics(){
 function viewDashboard(){
   const leagueOpts='<option value="all">Tous les championnats</option>'+
     Object.entries(LEAGUES).map(([k,v])=>`<option value="${k}" ${state.filterLeague===k?'selected':''}>${v.name}</option>`).join('');
-  const matches=MATCHES.filter(m=>state.loadedMatches.includes(m.id) &&
+  const matches=MATCHES.filter(m=>
     (state.filterLeague==='all'||m.lg===state.filterLeague));
   const cards=matches.length?matches.map(matchCard).join(''):
     `<div class="empty" style="grid-column:1/-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><div>Aucun match pour ce filtre.</div></div>`;
@@ -2237,7 +2237,6 @@ async function loadDashboardMatches() {
     }));
     
     MATCHES.splice(0, MATCHES.length, ...newMatches);
-    state.loadedMatches = newMatches.map(m => m.id);
     matchCache = {};
     state.footballDataReady = true;
     toast(newMatches.length + ' match(s)');
