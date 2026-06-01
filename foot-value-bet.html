@@ -1125,6 +1125,14 @@ const FOOTBALL_API = {
       const json = await res.json();
       const matches = json.response || [];
       
+      console.log('🔍 API Response:', json);
+      console.log('📊 Matches trouvés:', matches.length, 'matches');
+      
+      if (matches.length === 0) {
+        console.warn('⚠️ Aucun match trouvé pour team', teamId);
+        return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
+      }
+      
       // Calculer les stats
       let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
       let form = '';
