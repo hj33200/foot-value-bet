@@ -2098,6 +2098,7 @@ const FOOTBALL_API = {
     }
     
     const json = await res.json();
+    console.log('🔍 Raw API response:', json);
     console.log('✓ Matches loaded:', json.response?.length || 0, 'matches');
     
     const allMatches = json.response.map(m => ({
