@@ -1106,7 +1106,8 @@ const FOOTBALL_API = {
     if (!apiKey) throw new Error('Cle API non configuree');
     
     try {
-      const url = this.BASE + '?endpoint=fixtures&team=' + teamId + '&season=' + season + '&last=5';
+      // Récupérer les 5 derniers matchs toutes compétitions confondues (sans season)
+      const url = this.BASE + '?endpoint=fixtures&team=' + teamId + '&last=5';
       console.log('📡 Fetching team form:', url);
       
       const res = await fetch(url, {
