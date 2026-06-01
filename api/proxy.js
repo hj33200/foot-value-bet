@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   const { endpoint, league, season, date } = req.query;
-  const API_KEY = 'fa96c57b2732lcef9fc4cae58aa3fe13';
+  const API_KEY = 'fa96c57b27321cef9fc4cae58aa3fe13';
   
   try {
     let url = `https://v3.football.api-sports.io/${endpoint}?league=${league}&season=${season}`;
