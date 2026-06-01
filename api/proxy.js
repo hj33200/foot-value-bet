@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-  // Handle OPTIONS preflight
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -17,15 +16,14 @@ export default async function handler(req, res) {
     
     const response = await fetch(url, {
       headers: { 
-        'x-Apisports-key': API_KEY
+        'x-apisports-key': API_KEY,
+        'User-Agent': 'CustomProxy/1.0'
       }
     });
     
     const data = await response.json();
     
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-apisports-key');
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
