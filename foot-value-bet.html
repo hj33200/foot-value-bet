@@ -533,7 +533,7 @@ function buildModel(home,away,homeForm,awayForm,rng){
   // Form multiplier: 1.0 + (win_rate - 55%) × 0.6
   const calcFormMult = (form) => {
     if (!form) return 1.0;
-    const points = form.split('').reduce((s,c) => s + (c==='W'?3:c==='D'?1:0), 0);
+    const points = form.split('').reduce((s,c) => s + (c==='V'?3:c==='D'?1:0), 0);
     const winRate = points / 15; // Max 15 points in 5 matches
     return 1.0 + (winRate - 0.55) * 0.6;
   };
@@ -601,12 +601,23 @@ function buildStats(team, form, kind){
   const gf = team.gf, ga = team.ga;
   const strength = (gf / matches) / 2.2; // normalized by Ligue 1 avg
   
-  // Real stats from Ligue 1 data
-  const w_rate = strength * 0.65 + 0.15; // Strength to win rate
-  const wins = Math.round(matches * w_rate);
-  const d_rate = 0.25 * (1 - strength);
-  const draws = Math.round(matches * d_rate);
-  const losses = matches - wins - draws;
+  // Essayer d'utiliser les vraies stats si disponibles
+  let wins = 0, draws = 0, losses = 0;
+  const realStats = FOOTBALL_API.getTeamStats(team.id);
+  
+  if (realStats) {
+    wins = realStats.wins;
+    draws = realStats.draws;
+    losses = realStats.losses;
+    console.log(`✓ Stats réelles pour ${team.name}: ${wins}V-${draws}D-${losses}L`);
+  } else {
+    // Fallback: calculer à partir des stats du standing
+    const w_rate = strength * 0.65 + 0.15;
+    wins = Math.round(matches * w_rate);
+    const d_rate = 0.25 * (1 - strength);
+    draws = Math.round(matches * d_rate);
+    losses = matches - wins - draws;
+  }
   
   const rankGen = Math.max(1, Math.min(18, Math.round(10 - strength * 12)));
   const rankSide = Math.max(1, Math.min(18, rankGen + (kind === 'home' ? -1 : 1)));
@@ -938,8 +949,257 @@ function buildMarkets(m,model){
   return list;
 }
 
+/* ============================================================
+   API-FOOTBALL.COM via VERCEL PROXY
+   Cache: Standings 24h, Matches 2h | ~7 requests/day
+   ============================================================ */
+
+const FOOTBALL_API = {
+  BASE: 'https://foot-value-bet.vercel.app/api/proxy',
+  LEAGUES: {
+    'l1': { id: 61, name: 'Ligue 1' },
+    'pl': { id: 39, name: 'Premier League' },
+    'll': { id: 140, name: 'La Liga' },
+    'sa': { id: 135, name: 'Serie A' },
+    'bl': { id: 78, name: 'Bundesliga' },
+    'cl': { id: 2, name: 'Champions League', multiGroup: true },
+    'wc': { id: 1, name: 'Coupe du Monde', multiGroup: true },
+  },
+  cache: { standings: {}, matches: {}, teamStats: {} },
+
+  getApiKey() { return state?.settings?.apiKey || ''; },
+  isCacheValid(t, h) { return t && Date.now() - t < h * 60 * 60 * 1000; },
+
+  async fetchStandings(leagueKey) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) throw new Error('Cle API non configuree');
+    const leagueId = this.LEAGUES[leagueKey]?.id;
+    if (!leagueId) throw new Error('Ligue inconnue: ' + leagueKey);
+    
+    if (this.cache.standings[leagueKey]?.data && this.isCacheValid(this.cache.standings[leagueKey].timestamp, 24)) {
+      return this.cache.standings[leagueKey].data;
+    }
+    
+    const season = (leagueKey === 'wc') ? '2026' : '2024'; const url = this.BASE + '?endpoint=standings&league=' + leagueId + '&season=' + season;
+    console.log('📡 Fetching:', url);
+    
+    const res = await fetch(url, {
+      headers: {
+        'x-apisports-key': apiKey
+      }
+    });
+    
+    console.log('Response status:', res.status, res.statusText);
+    
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('Error response:', text);
+      if (res.status === 403) throw new Error('Cle API invalide ou limite atteinte (403)');
+      if (res.status === 429) throw new Error('Trop de requetes - attends quelques minutes (429)');
+      if (res.status === 500) throw new Error('Serveur indisponible (500)');
+      throw new Error('HTTP ' + res.status + ': ' + res.statusText);
+    }
+    
+    const json = await res.json();
+    console.log('✓ Standings loaded:', leagueKey, 'Teams:', json.response[0]?.league?.standings[0]?.length || 0);
+    
+    const standings = json.response[0].league.standings[0];
+    const data = {
+      teams: standings.map(row => ({
+        id: row.team.id.toString(),
+        name: row.team.name,
+        short: row.team.name.substring(0,3).toUpperCase(),
+        gf: row.all.goals.for,
+        ga: row.all.goals.against,
+        played: row.all.played,
+        form: row.form ? row.form.split('') : [],
+      })),
+    };
+    
+    this.cache.standings[leagueKey] = { data, timestamp: Date.now() };
+    return data;
+  },
+
+  async fetchMatchesByDate(leagueKey, dateStr) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) throw new Error('API key missing');
+    const leagueId = this.LEAGUES[leagueKey]?.id;
+    
+    const cacheKey = leagueKey + '_all';
+    if (this.cache.matches[cacheKey]?.data && this.isCacheValid(this.cache.matches[cacheKey].timestamp, 2)) {
+      return dateStr ? this.cache.matches[cacheKey].data.filter(m => m.dateISO === dateStr) : this.cache.matches[cacheKey].data;
+    }
+    
+    const year = dateStr ? parseInt(dateStr.substring(0, 4)) : new Date().getFullYear();
+    const season = (leagueKey === 'wc') ? '2026' : (year - 1);
+    const url = this.BASE + '?endpoint=fixtures&league=' + leagueId + '&season=' + season + (dateStr ? '&date=' + dateStr : '');
+    console.log('📡 Fetching matches:', url);
+    
+    const res = await fetch(url, {
+      headers: {
+        'x-apisports-key': apiKey
+      }
+    });
+    
+    console.log('Response status:', res.status);
+    
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('Error response:', text);
+      throw new Error('HTTP ' + res.status);
+    }
+    
+    const json = await res.json();
+    console.log('🔍 Raw API response:', json);
+    console.log('✓ Matches loaded:', json.response?.length || 0, 'matches');
+    
+    const allMatches = json.response.map(m => ({
+      id: m.fixture.id.toString(),
+      homeTeamId: m.teams.home.id.toString(),
+      homeTeam: m.teams.home.name,
+      homeTeamShort: m.teams.home.name.substring(0,3).toUpperCase(),
+      awayTeamId: m.teams.away.id.toString(),
+      awayTeam: m.teams.away.name,
+      awayTeamShort: m.teams.away.name.substring(0,3).toUpperCase(),
+      date: new Date(m.fixture.date),
+      dateStr: new Date(m.fixture.date).toLocaleDateString('fr-FR'),
+      dateISO: m.fixture.date.slice(0,10),
+      time: new Date(m.fixture.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      status: m.fixture.status,
+      score: m.goals,
+    }));
+    
+    this.cache.matches[cacheKey] = { data: allMatches, timestamp: Date.now() };
+    
+    // Charger les stats des équipes de manière asynchrone (non-bloquant)
+    if (!this.cache.teamStats[allMatches[0]?.homeTeamId]) {
+      console.log('📊 Chargement des stats en arrière-plan...');
+      this.loadTeamsStats(leagueKey).catch(e => console.warn('Stats non chargées:', e));
+    }
+    
+    return dateStr ? allMatches.filter(m => m.dateISO === dateStr) : allMatches;
+  },
+
+  async initAllStandings() {
+    try {
+      showLoadingOverlay('Initialisation des standings...');
+      for (const leagueKey of Object.keys(this.LEAGUES)) {
+        if (this.LEAGUES[leagueKey].multiGroup) continue;
+        try { 
+          await this.fetchStandings(leagueKey);
+        } catch (e) { 
+          console.warn('Skip ' + leagueKey); 
+        }
+      }
+      hideLoadingOverlay();
+      state.footballDataReady = true;
+      console.log('✅ Standings chargés!');
+    } catch (err) {
+      hideLoadingOverlay();
+    }
+  },
+
+  async fetchTeamStats(teamId, season) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) throw new Error('Cle API non configuree');
+    
+    try {
+      const url = this.BASE + '?endpoint=fixtures&team=' + teamId + '&season=' + season + '&last=5';
+      console.log('📡 Fetching team form:', url);
+      
+      const res = await fetch(url, {
+        headers: {
+          'x-apisports-key': apiKey
+        }
+      });
+      
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      
+      const json = await res.json();
+      const matches = json.response || [];
+      
+      // Calculer les stats
+      let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
+      let form = '';
+      
+      matches.forEach(m => {
+        const homeGoals = m.goals.home;
+        const awayGoals = m.goals.away;
+        const isHome = m.teams.home.id == teamId;
+        const myGoals = isHome ? homeGoals : awayGoals;
+        const oppGoals = isHome ? awayGoals : homeGoals;
+        
+        gf += myGoals;
+        ga += oppGoals;
+        
+        if (myGoals > oppGoals) {
+          wins++;
+          form = 'V' + form;
+        } else if (myGoals === oppGoals) {
+          draws++;
+          form = 'D' + form;
+        } else {
+          losses++;
+          form = 'L' + form;
+        }
+      });
+      
+      console.log('✓ Team stats:', {wins, draws, losses, gf, ga, form});
+      return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
+      
+    } catch (err) {
+      console.error('❌ Error fetching team stats:', err);
+      return null;
+    }
+  },
+
+  async loadTeamsStats(leagueKey) {
+    try {
+      const league = this.LEAGUES[leagueKey];
+      if (!league) return;
+      
+      console.log('📊 Chargement des stats des équipes:', leagueKey);
+      
+      // Récupérer d'abord les standings pour avoir les équipes
+      const standings = await this.fetchStandings(leagueKey);
+      if (!standings?.teams) return;
+      
+      const season = (leagueKey === 'wc') ? '2026' : '2024';
+      
+      // Charger les stats pour chaque équipe
+      for (const team of standings.teams) {
+        if (this.cache.teamStats[team.id]) continue;
+        
+        const stats = await this.fetchTeamStats(team.id, season);
+        if (stats) {
+          this.cache.teamStats[team.id] = {
+            ...stats,
+            teamName: team.name,
+            timestamp: Date.now()
+          };
+          console.log(`✓ ${team.name}:`, stats.form);
+        }
+      }
+      
+      console.log('✓ Stats chargées!');
+    } catch (err) {
+      console.error('Erreur chargement stats:', err);
+    }
+  },
+
+  getTeamStats(teamId) {
+    return this.cache.teamStats[teamId] || null;
+  },
+
+  getTeamData(teamName, leagueKey) {
+    const cached = this.cache.standings[leagueKey];
+    return cached?.data?.teams?.find(t => t.name === teamName) || null;
+  },
+};
+
 /* ---------- assemble full match data (cached) ---------- */
 let matchCache={};
+
 function getMatchData(id){
   if(matchCache[id])return matchCache[id];
   const m=MATCHES.find(x=>x.id===id);
@@ -948,19 +1208,25 @@ function getMatchData(id){
   const seed = hashStr(m.id + m.home.id + m.away.id);
   const rng = mulberry32(seed);
   
-  // Generate form from real stats (W/D/L ratio)
+  // Generate form from REAL stats via cache
   const calcForm = (team) => {
-    const matches = team.matches || 34;
-    const gf = team.gf, ga = team.ga;
-    const gd = gf - ga;
-    const avgGoals = gf / matches;
+    // Essayer d'obtenir les vraies stats du cache
+    const realStats = FOOTBALL_API.getTeamStats(team.id);
+    if (realStats && realStats.form) {
+      console.log(`✓ Vraies stats pour ${team.name}:`, realStats.form);
+      return realStats.form;
+    }
     
-    // Estimate form: good teams more likely W
-    const strength = avgGoals / 2.2; // 2.2 is Ligue 1 average
+    // Fallback: générer à partir des stats du standings
+    const matches = team.matches || 34;
+    const gf = team.gf || 0, ga = team.ga || 0;
+    const avgGoals = matches > 0 ? gf / matches : 0;
+    const strength = avgGoals / 2.2; // 2.2 is average
+    
     let form = '';
     for(let i = 0; i < 5; i++) {
       const r = Math.random();
-      if(r < 0.30 + strength * 0.3) form += 'W';
+      if(r < 0.30 + strength * 0.3) form += 'V';
       else if(r < 0.55 + strength * 0.25) form += 'D';
       else form += 'L';
     }
@@ -1015,7 +1281,7 @@ const state={
     freshBet({matchId:'m2',date:'20/05/2026',matchName:'AS Monaco — Olympique Marseille',league:'Ligue 1',market:'Handicap asiatique',sel:'ASM -0.5',cote:2.10,stake:18,est:0.49,value:0.49*2.10-1,conf:5,status:'annule',note:'Match reporté.'}),
   ],
   settings:{
-    apiKey:'',currency:'EUR',bankroll:1000,
+    apiKey:'',currency:'EUR',bankroll:0,
     bookmakers:['Winabet','BetClever','UniBetX'],
     bookmakersAll:['Winabet','BetClever','UniBetX','OddsMax','ProntoBet','GreenBook'],
     favLeagues:['l1','ll'],
@@ -1435,7 +1701,7 @@ function viewDashboard(){
         ${iconSvg('M21 12a9 9 0 11-9-9')}<span style="margin-left:0">Charger les matchs</span></button></div>
   </div>
   <div class="section-title"><span class="dot"></span>Matchs disponibles
-    <span class="hint">${matches.length} match(s) · données fictives</span></div>
+    <span class="hint">${matches.length} match(s)</span></div>
   <div class="match-grid stagger">${cards}</div>`;
 }
 function matchCard(m){
@@ -1996,150 +2262,6 @@ function toast(msg,err){
 
 /* ---------- boot ---------- */
 render();
-/* ============================================================
-   API-FOOTBALL.COM via GOOGLE APPS SCRIPT
-   Cache: Standings 24h, Matches 2h | ~7 requests/day
-   ============================================================ */
-
-const FOOTBALL_API = {
-  BASE: 'https://foot-value-bet.vercel.app/api/proxy',
-  LEAGUES: {
-    'l1': { id: 61, name: 'Ligue 1' },
-    'pl': { id: 39, name: 'Premier League' },
-    'll': { id: 140, name: 'La Liga' },
-    'sa': { id: 135, name: 'Serie A' },
-    'bl': { id: 78, name: 'Bundesliga' },
-    'cl': { id: 2, name: 'Champions League', multiGroup: true },
-    'wc': { id: 1, name: 'Coupe du Monde', multiGroup: true },
-  },
-  cache: { standings: {}, matches: {} },
-
-  getApiKey() { return state?.settings?.apiKey || ''; },
-  // ⚠️ CHANGE BASE URL ABOVE to your Google Apps Script URL!
-  isCacheValid(t, h) { return t && Date.now() - t < h * 60 * 60 * 1000; },
-
-  async fetchStandings(leagueKey) {
-    const apiKey = this.getApiKey();
-    if (!apiKey) throw new Error('Cle API non configuree');
-    const leagueId = this.LEAGUES[leagueKey]?.id;
-    if (!leagueId) throw new Error('Ligue inconnue: ' + leagueKey);
-    
-    if (this.cache.standings[leagueKey]?.data && this.isCacheValid(this.cache.standings[leagueKey].timestamp, 24)) {
-      return this.cache.standings[leagueKey].data;
-    }
-    
-    const season = (leagueKey === 'wc') ? '2026' : '2024'; const url = this.BASE + '?endpoint=standings&league=' + leagueId + '&season=' + season;
-    console.log('📡 Fetching:', url);
-    
-    const res = await fetch(url, {
-      headers: {
-        'x-apisports-key': apiKey
-      }
-    });
-    
-    console.log('Response status:', res.status, res.statusText);
-    
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('Error response:', text);
-      if (res.status === 403) throw new Error('Cle API invalide ou limite atteinte (403)');
-      if (res.status === 429) throw new Error('Trop de requetes - attends quelques minutes (429)');
-      if (res.status === 500) throw new Error('Serveur indisponible (500)');
-      throw new Error('HTTP ' + res.status + ': ' + res.statusText);
-    }
-    
-    const json = await res.json();
-    console.log('✓ Standings loaded:', leagueKey, 'Teams:', json.response[0]?.league?.standings[0]?.length || 0);
-    
-    const standings = json.response[0].league.standings[0];
-    const data = {
-      teams: standings.map(row => ({
-        id: row.team.id.toString(),
-        name: row.team.name,
-        short: row.team.name.substring(0,3).toUpperCase(),
-        gf: row.all.goals.for,
-        ga: row.all.goals.against,
-        played: row.all.played,
-        form: row.form ? row.form.split('') : [],
-      })),
-    };
-    
-    this.cache.standings[leagueKey] = { data, timestamp: Date.now() };
-    return data;
-  },
-
-  async fetchMatchesByDate(leagueKey, dateStr) {
-    const apiKey = this.getApiKey();
-    if (!apiKey) throw new Error('API key missing');
-    const leagueId = this.LEAGUES[leagueKey]?.id;
-    
-    const cacheKey = leagueKey + '_all';
-    if (this.cache.matches[cacheKey]?.data && this.isCacheValid(this.cache.matches[cacheKey].timestamp, 2)) {
-      return dateStr ? this.cache.matches[cacheKey].data.filter(m => m.dateISO === dateStr) : this.cache.matches[cacheKey].data;
-    }
-    
-    const year = dateStr ? parseInt(dateStr.substring(0, 4)) : new Date().getFullYear();
-    const season = (leagueKey === 'wc') ? '2026' : (year - 1);
-    const url = this.BASE + '?endpoint=fixtures&league=' + leagueId + '&season=' + season + (dateStr ? '&date=' + dateStr : '');
-    console.log('📡 Fetching matches:', url);
-    
-    const res = await fetch(url, {
-      headers: {
-        'x-apisports-key': apiKey
-      }
-    });
-    
-    console.log('Response status:', res.status);
-    
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('Error response:', text);
-      throw new Error('HTTP ' + res.status);
-    }
-    
-    const json = await res.json();
-    console.log('🔍 Raw API response:', json);
-    console.log('✓ Matches loaded:', json.response?.length || 0, 'matches');
-    
-    const allMatches = json.response.map(m => ({
-      id: m.fixture.id.toString(),
-      homeTeamId: m.teams.home.id.toString(),
-      homeTeam: m.teams.home.name,
-      homeTeamShort: m.teams.home.name.substring(0,3).toUpperCase(),
-      awayTeamId: m.teams.away.id.toString(),
-      awayTeam: m.teams.away.name,
-      awayTeamShort: m.teams.away.name.substring(0,3).toUpperCase(),
-      date: new Date(m.fixture.date),
-      dateStr: new Date(m.fixture.date).toLocaleDateString('fr-FR'),
-      dateISO: m.fixture.date.slice(0,10),
-      time: new Date(m.fixture.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      status: m.fixture.status,
-      score: m.goals,
-    }));
-    
-    this.cache.matches[cacheKey] = { data: allMatches, timestamp: Date.now() };
-    return dateStr ? allMatches.filter(m => m.dateISO === dateStr) : allMatches;
-  },
-
-  async initAllStandings() {
-    try {
-      showLoadingOverlay('Initialisation des standings...');
-      for (const leagueKey of Object.keys(this.LEAGUES)) {
-        if (this.LEAGUES[leagueKey].multiGroup) continue;
-        try { await this.fetchStandings(leagueKey); } catch (e) { console.warn('Skip ' + leagueKey); }
-      }
-      hideLoadingOverlay();
-      state.footballDataReady = true;
-    } catch (err) {
-      hideLoadingOverlay();
-    }
-  },
-
-  getTeamData(teamName, leagueKey) {
-    const cached = this.cache.standings[leagueKey];
-    return cached?.data?.teams?.find(t => t.name === teamName) || null;
-  },
-};
 
 function showLoadingOverlay(msg) {
   let el = document.getElementById('loading-overlay');
