@@ -2237,6 +2237,7 @@ async function loadDashboardMatches() {
     }));
     
     MATCHES.splice(0, MATCHES.length, ...newMatches);
+    state.loadedMatches = newMatches.map(m => m.id);
     matchCache = {};
     state.footballDataReady = true;
     toast(newMatches.length + ' match(s)');
