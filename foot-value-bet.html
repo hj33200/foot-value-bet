@@ -2078,8 +2078,9 @@ const FOOTBALL_API = {
       return dateStr ? this.cache.matches[cacheKey].data.filter(m => m.dateISO === dateStr) : this.cache.matches[cacheKey].data;
     }
     
-    const season = (leagueKey === 'wc') ? '2026' : '2024';
-    const url = this.BASE + '?endpoint=fixtures&league=' + leagueId + '&season=' + season + (dateStr ? '&from=' + dateStr + '&to=' + dateStr : '');
+    const year = dateStr ? parseInt(dateStr.substring(0, 4)) : new Date().getFullYear();
+    const season = (leagueKey === 'wc') ? '2026' : (year - 1);
+    const url = this.BASE + '?endpoint=fixtures&league=' + leagueId + '&season=' + season + (dateStr ? '&date=' + dateStr : '');
     console.log('📡 Fetching matches:', url);
     
     const res = await fetch(url, {
