@@ -939,7 +939,7 @@ function buildMarkets(m,model){
 }
 
 /* ---------- assemble full match data (cached) ---------- */
-const matchCache={};
+let matchCache={};
 function getMatchData(id){
   if(matchCache[id])return matchCache[id];
   const m=MATCHES.find(x=>x.id===id);
@@ -2002,7 +2002,7 @@ render();
    ============================================================ */
 
 const FOOTBALL_API = {
-  BASE: 'https://foot-value-bet.vercel.app/api/proxy',
+  BASE: 'https://script.google.com/macros/s/AKfycbwnIMUtKaht6WOdwy4gA7yjr-F-B1X7SQTzLLaigmHVSSQK4rEhgoi1NVKWMpoYXikV/exec',
   LEAGUES: {
     'l1': { id: 61, name: 'Ligue 1' },
     'pl': { id: 39, name: 'Premier League' },
