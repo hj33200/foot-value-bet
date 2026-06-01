@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     
     const response = await fetch(url, {
       headers: { 
-        'x-apisports-key': API_KEY
+        'x-Apisports-key': API_KEY
       }
     });
     
