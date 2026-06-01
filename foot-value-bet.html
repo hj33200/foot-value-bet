@@ -1073,10 +1073,13 @@ const FOOTBALL_API = {
     
     this.cache.matches[cacheKey] = { data: allMatches, timestamp: Date.now() };
     
-    // Charger les stats des équipes de manière asynchrone (non-bloquant)
-    if (!this.cache.teamStats[allMatches[0]?.homeTeamId]) {
-      console.log('📊 Chargement des stats en arrière-plan...');
-      this.loadTeamsStats(leagueKey).catch(e => console.warn('Stats non chargées:', e));
+    // Charger UNIQUEMENT les stats des équipes qui jouent ce jour
+    if (allMatches?.length > 0) {
+      const uniqueTeamIds = [...new Set(
+        allMatches.flatMap(m => [m.homeTeamId, m.awayTeamId])
+      )];
+      console.log('⚽ Équipes du jour:', uniqueTeamIds);
+      this.fetchStatsForTeams(uniqueTeamIds).catch(e => console.warn('Stats non chargées:', e));
     }
     
     return allMatches;
@@ -1106,9 +1109,10 @@ const FOOTBALL_API = {
     if (!apiKey) throw new Error('Cle API non configuree');
     
     try {
-      // Récupérer les 5 derniers matchs toutes compétitions confondues (sans season)
-      const url = this.BASE + '?endpoint=fixtures&team=' + teamId + '&last=5';
-      console.log('📡 Fetching team form:', url);
+      // Récupérer TOUS les matchs toutes compétitions confondues
+      // Limiter à 20 pour les équipes nationales (qualifications + amicaux)
+      const url = this.BASE + '?endpoint=fixtures&team=' + teamId + '&last=20';
+      console.log('📡 Fetching team stats:', url);
       
       const res = await fetch(url, {
         headers: {
@@ -1125,6 +1129,7 @@ const FOOTBALL_API = {
       let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
       let form = '';
       
+      // Boucler sur TOUS les matchs pour les stats globales
       matches.forEach(m => {
         const homeGoals = m.goals.home;
         const awayGoals = m.goals.away;
@@ -1137,22 +1142,80 @@ const FOOTBALL_API = {
         
         if (myGoals > oppGoals) {
           wins++;
-          form = 'V' + form;
         } else if (myGoals === oppGoals) {
           draws++;
-          form = 'D' + form;
         } else {
           losses++;
+        }
+      });
+      
+      // Calculer la FORM seulement sur les 5 DERNIERS matchs
+      const last5 = matches.slice(0, 5); // Les 5 derniers (le plus récent est en premier)
+      last5.forEach(m => {
+        const homeGoals = m.goals.home;
+        const awayGoals = m.goals.away;
+        const isHome = m.teams.home.id == teamId;
+        const myGoals = isHome ? homeGoals : awayGoals;
+        const oppGoals = isHome ? awayGoals : homeGoals;
+        
+        if (myGoals > oppGoals) {
+          form = 'V' + form;
+        } else if (myGoals === oppGoals) {
+          form = 'D' + form;
+        } else {
           form = 'L' + form;
         }
       });
       
-      console.log('✓ Team stats:', {wins, draws, losses, gf, ga, form});
+      console.log('✓ Team stats (tous matchs):', {wins, draws, losses, gf, ga, totalMatches: matches.length});
+      console.log('✓ Form (5 derniers):', form);
       return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
       
     } catch (err) {
       console.error('❌ Error fetching team stats:', err);
       return null;
+    }
+  },
+
+  async waitForTeamStats(teamIds = [], maxWaitMs = 5000) {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < maxWaitMs) {
+      const allLoaded = teamIds.every(id => this.cache.teamStats[id]);
+      if (allLoaded) {
+        console.log('✓ Toutes les stats chargées!');
+        return true;
+      }
+      await new Promise(r => setTimeout(r, 100)); // Attendre 100ms avant de revérifier
+    }
+    
+    console.warn('⏱️ Timeout: Stats non complètement chargées après', maxWaitMs, 'ms');
+    return false;
+  },
+
+  async fetchStatsForTeams(teamIds = []) {
+    if (!teamIds?.length) return;
+    
+    try {
+      console.log('📊 Chargement stats pour les équipes du match:', teamIds);
+      
+      for (const teamId of teamIds) {
+        if (this.cache.teamStats[teamId]) {
+          console.log(`✓ Stats en cache pour: ${teamId}`);
+          continue;
+        }
+        
+        const stats = await this.fetchTeamStats(teamId);
+        if (stats) {
+          this.cache.teamStats[teamId] = {
+            ...stats,
+            timestamp: Date.now()
+          };
+          console.log(`✓ Stats chargées pour team ${teamId}:`, stats.form);
+        }
+      }
+    } catch (err) {
+      console.error('Erreur chargement stats équipes:', err);
     }
   },
 
