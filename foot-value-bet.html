@@ -1025,9 +1025,11 @@ const FOOTBALL_API = {
     if (!apiKey) throw new Error('API key missing');
     const leagueId = this.LEAGUES[leagueKey]?.id;
     
-    const cacheKey = leagueKey + '_all';
+    // Inclure la date dans la clé de cache pour chaque date = cache séparé
+    const cacheKey = leagueKey + '_' + (dateStr || 'all');
     if (this.cache.matches[cacheKey]?.data && this.isCacheValid(this.cache.matches[cacheKey].timestamp, 2)) {
-      return dateStr ? this.cache.matches[cacheKey].data.filter(m => m.dateISO === dateStr) : this.cache.matches[cacheKey].data;
+      console.log('✓ Cache hit for:', cacheKey);
+      return this.cache.matches[cacheKey].data;
     }
     
     const year = dateStr ? parseInt(dateStr.substring(0, 4)) : new Date().getFullYear();
@@ -1077,7 +1079,7 @@ const FOOTBALL_API = {
       this.loadTeamsStats(leagueKey).catch(e => console.warn('Stats non chargées:', e));
     }
     
-    return dateStr ? allMatches.filter(m => m.dateISO === dateStr) : allMatches;
+    return allMatches;
   },
 
   async initAllStandings() {
