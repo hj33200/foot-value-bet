@@ -2199,7 +2199,7 @@ async function loadDashboardMatches() {
   const dateISO = state.filterDate; // Already in ISO format (YYYY-MM-DD)
   try {
     showLoadingOverlay('Chargement des matchs...');
-    const allMatches = await FOOTBALL_API.fetchMatchesByDate(leagueKey, null);
+    const allMatches = await FOOTBALL_API.fetchMatchesByDate(leagueKey, dateISO);
     const teamStats = computeStatsFromMatches(allMatches);
     let standings = null;
     if (!FOOTBALL_API.LEAGUES[leagueKey].multiGroup) {
