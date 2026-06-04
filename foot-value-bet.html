@@ -1113,6 +1113,7 @@ const FOOTBALL_API = {
       // Limiter à 20 pour les équipes nationales (qualifications + amicaux)
       const url = this.BASE + '?endpoint=fixtures&team=' + teamId + '&last=20';
       console.log('📡 Fetching team stats:', url);
+      console.log('   Team ID:', teamId);
       
       const res = await fetch(url, {
         headers: {
@@ -1125,11 +1126,11 @@ const FOOTBALL_API = {
       const json = await res.json();
       const matches = json.response || [];
       
-      console.log('🔍 API Response:', json);
+      console.log('📊 API Response pour team', teamId, ':', json);
       console.log('📊 Matches trouvés:', matches.length, 'matches');
       
       if (matches.length === 0) {
-        console.warn('⚠️ Aucun match trouvé pour team', teamId);
+        console.warn('⚠️ ZÉRO match pour team', teamId, '- Parameters:', json.parameters);
         return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
       }
       
@@ -1213,13 +1214,16 @@ const FOOTBALL_API = {
           continue;
         }
         
+        console.log(`⏳ Chargement stats team ${teamId}...`);
         const stats = await this.fetchTeamStats(teamId);
         if (stats) {
           this.cache.teamStats[teamId] = {
             ...stats,
             timestamp: Date.now()
           };
-          console.log(`✓ Stats chargées pour team ${teamId}:`, stats.form);
+          console.log(`✓ Stats chargées pour team ${teamId}:`, stats.form, `(${stats.totalMatches} matchs)`);
+        } else {
+          console.warn(`⚠️ Pas de stats pour team ${teamId}`);
         }
       }
     } catch (err) {
