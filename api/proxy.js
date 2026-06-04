@@ -6,13 +6,19 @@ export default async function handler(req, res) {
     res.status(200).end();
     return;
   }
-
   const { endpoint, league, season, date } = req.query;
   const API_KEY = 'fa96c57b27321cef9fc4cae58aa3fe13';
   
   try {
-    let url = `https://v3.football.api-sports.io/${endpoint}?league=${league}&season=${season}`;
-    if (date) url += `&date=${date}`;
+    // Construire l'URL en excluant les paramètres undefined
+    let url = `https://v3.football.api-sports.io/${endpoint}?`;
+    const params = [];
+    
+    if (league !== undefined && league !== 'undefined') params.push(`league=${league}`);
+    if (season !== undefined && season !== 'undefined') params.push(`season=${season}`);
+    if (date !== undefined && date !== 'undefined') params.push(`date=${date}`);
+    
+    url += params.join('&');
     
     const response = await fetch(url, {
       headers: { 
