@@ -1109,9 +1109,10 @@ const FOOTBALL_API = {
     if (!apiKey) throw new Error('Cle API non configuree');
     
     try {
-      // Récupérer TOUS les matchs toutes compétitions confondues
-      // Limiter à 20 pour les équipes nationales (qualifications + amicaux)
-      const url = this.BASE + '?endpoint=fixtures&team=' + teamId + '&last=20';
+      // Récupérer les matchs de qualification + Coupe du Monde
+      // Plage: 2023-01-01 à 2026-06-30 (couvre toutes les confédérations + WC)
+      const url = this.BASE + '?endpoint=fixtures&team=' + teamId + 
+        '&from=2023-01-01&to=2026-06-30';
       console.log('📡 Fetching team stats:', url);
       console.log('   Team ID:', teamId);
       
