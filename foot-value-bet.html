@@ -603,6 +603,10 @@ function buildStats(team, form, kind){
   if (realStats && realStats.totalMatches > 0) {
     console.log(`✓ Stats réelles pour ${team.name} (10 derniers): ${realStats.wins}V-${realStats.draws}D-${realStats.losses}L, ${realStats.gf}GF-${realStats.ga}GA`);
     
+    // ✅ UTILISER LA VRAIE FORME DE L'API, pas celle générée!
+    const trueForm = realStats.form || form;
+    console.log(`✓✓✓ VRAIE FORME pour ${team.name}:`, trueForm);
+    
     const matches = 10; // On utilise 10 matchs
     const gf = realStats.gf || 1;
     const ga = realStats.ga || 1;
@@ -625,8 +629,8 @@ function buildStats(team, form, kind){
       rankGen, rankSide,
       cs: Math.max(0, cs),
       bttsPct: clamp(bttsPct, 0, 1),
-      form: form ? form.split('') : ['N','N','N','N','N'],
-      series: form ? form.match(/(.)\1*/g).map(s => s.charAt(0) + s.length).join(' ') : '',
+      form: trueForm.split(''), // ✅ VRAIE FORME!
+      series: trueForm ? trueForm.match(/(.)\1*/g).map(s => s.charAt(0) + s.length).join(' ') : '',
       avgFor: r2(gf / matches),
       avgAga: r2(ga / matches),
     };
@@ -650,6 +654,7 @@ function buildStats(team, form, kind){
   const cs = Math.round((1 - ga/matches/2.2) * matches * 0.3);
   const bttsPct = (gf/matches/2.2) * 0.6;
   
+  console.log(`⚠️ FALLBACK buildStats pour ${team.name}: form=${form}, trueForm=${trueForm}`);
   return {
     played: matches,
     wins, draws, losses,
@@ -1346,11 +1351,14 @@ function getMatchData(id){
   // Generate form from REAL stats via cache
   const calcForm = (team) => {
     // ✅ PRIORITÉ: Essayer d'obtenir les VRAIES stats du cache API
+    console.log(`🔍 Cherche forme pour team ${team.id} (${team.name})`);
     const realStats = FOOTBALL_API.getTeamStats(team.id);
+    console.log(`🔍 Cache teamStats[${team.id}]:`, realStats);
     if (realStats && realStats.form) {
-      console.log(`✓ Vraie forme pour ${team.name}:`, realStats.form);
+      console.log(`✓✓✓ VRAIE FORME TROUVÉE pour ${team.name}:`, realStats.form);
       return realStats.form;
     }
+    console.log(`⚠️ Pas de forme en cache pour ${team.id}, génération aléatoire`);
     
     // Fallback: générer à partir des stats du standings
     const matches = team.matches || 34;
