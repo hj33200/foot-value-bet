@@ -1161,6 +1161,23 @@ const FOOTBALL_API = {
       
       // Calculer la FORM seulement sur les 5 DERNIERS matchs
       const last5 = matches.slice(0, 5); // Les 5 derniers (le plus récent est en premier)
+      
+      // DEBUG: Afficher chaque match des 5 sélectionnés
+      console.log('\n🔍 === 5 MATCHS SÉLECTIONNÉS POUR TEAM ' + teamId + ' ===');
+      last5.forEach((m, idx) => {
+        const homeGoals = m.goals.home;
+        const awayGoals = m.goals.away;
+        const isHome = m.teams.home.id == teamId;
+        const myGoals = isHome ? homeGoals : awayGoals;
+        const oppGoals = isHome ? awayGoals : homeGoals;
+        const result = myGoals > oppGoals ? '✓V' : myGoals < oppGoals ? '✗L' : 'D';
+        const matchDisplay = isHome 
+          ? `${m.teams.home.name} ${myGoals}-${oppGoals} ${m.teams.away.name}`
+          : `${m.teams.away.name} ${myGoals}-${oppGoals} ${m.teams.home.name}`;
+        console.log(`  ${idx + 1}. [${m.fixture.date}] ${matchDisplay} → ${result}`);
+      });
+      console.log('🔍 === FIN ===\n');
+      
       last5.forEach(m => {
         const homeGoals = m.goals.home;
         const awayGoals = m.goals.away;
