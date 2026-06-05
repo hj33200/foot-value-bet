@@ -1109,27 +1109,21 @@ async fetchTeamStats(teamId, season) {
   if (!apiKey) throw new Error('Cle API non configuree');
   
   try {
-    // ✅ Construire l'URL avec season REQUIS
     let url = this.BASE + '?endpoint=fixtures&team=' + teamId;
     
-    // Ajouter season par défaut
-    if (!season) {
-      season = '2024'; // Saison par défaut
-    }
-    url += '&season=' + season;
-    
-    // Pour équipes nationales: ajouter from/to aussi
+    // ✅ CORRECTION: utiliser SOIT season SOIT from/to, pas les deux!
     if (teamId && parseInt(teamId) > 1000) {
+      // Équipes nationales: utiliser from/to SANS season
       url += '&from=2023-01-01&to=2026-06-30';
+    } else {
+      // Clubs: utiliser season
+      url += '&season=2024';
     }
     
     console.log('📡 Fetching team stats:', url);
-    console.log('   Team ID:', teamId, 'Season:', season);
     
     const res = await fetch(url, {
-      headers: {
-        'x-apisports-key': apiKey
-      }
+      headers: { 'x-apisports-key': apiKey }
     });
     
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1140,23 +1134,17 @@ async fetchTeamStats(teamId, season) {
     console.log('📊 Matches trouvés:', matches.length);
     
     if (matches.length === 0) {
-      console.warn('⚠️ ZÉRO match pour team', teamId);
       return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
     }
     
-    let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
-    let form = '';
+    let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0, form = '';
     
     matches.forEach(m => {
-      const homeGoals = m.goals.home;
-      const awayGoals = m.goals.away;
       const isHome = m.teams.home.id == teamId;
-      const myGoals = isHome ? homeGoals : awayGoals;
-      const oppGoals = isHome ? awayGoals : homeGoals;
-      
+      const myGoals = isHome ? m.goals.home : m.goals.away;
+      const oppGoals = isHome ? m.goals.away : m.goals.home;
       gf += myGoals;
       ga += oppGoals;
-      
       if (myGoals > oppGoals) wins++;
       else if (myGoals === oppGoals) draws++;
       else losses++;
@@ -1167,13 +1155,11 @@ async fetchTeamStats(teamId, season) {
       const isHome = m.teams.home.id == teamId;
       const myGoals = isHome ? m.goals.home : m.goals.away;
       const oppGoals = isHome ? m.goals.away : m.goals.home;
-      
       if (myGoals > oppGoals) form = 'V' + form;
       else if (myGoals === oppGoals) form = 'D' + form;
       else form = 'L' + form;
     });
     
-    console.log('✓ Stats:', {wins, draws, losses, gf, ga, form});
     return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
     
   } catch (err) {
