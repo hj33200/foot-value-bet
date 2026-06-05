@@ -5,13 +5,11 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-apisports-key');
   
   if (req.method === 'OPTIONS') return res.status(200).end();
-
   const { endpoint, league, season, date, team, from, to } = req.query;
   const API_KEY = process.env.FOOTBALL_API_KEY || 'fa96c57b27321cef9fc4cae58aa3fe13';
   
   try {
     if (!endpoint) return res.status(400).json({ error: 'Missing endpoint' });
-
     let url = `https://v3.football.api-sports.io/${endpoint}?`;
     const params = [];
     
@@ -21,10 +19,10 @@ export default async function handler(req, res) {
     if (date) params.push(`date=${encodeURIComponent(date)}`);
     if (team) params.push(`team=${encodeURIComponent(team)}`);
     
-    // ✅ IMPORTANT: Pour fixtures avec team, ajouter season par défaut!
-    if (team && !season) {
-      params.push('season=2024');
-    }
+    // ⚠️ NE PAS ajouter season par défaut pour récupérer TOUS les matchs (amicaux + officiels)
+    // if (team && !season) {
+    //   params.push('season=2024');
+    // }
     
     // Ajouter les dates
     if (from) params.push(`from=${encodeURIComponent(from)}`);
