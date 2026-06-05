@@ -1109,16 +1109,22 @@ async fetchTeamStats(teamId, season) {
   if (!apiKey) throw new Error('Cle API non configuree');
   
   try {
-    // ✅ CORRECTION: construire l'URL en nettoyant les paramètres
+    // ✅ Construire l'URL avec season REQUIS
     let url = this.BASE + '?endpoint=fixtures&team=' + teamId;
     
-    // N'ajouter from/to QUE pour les équipes nationales (ID > 1000)
+    // Ajouter season par défaut
+    if (!season) {
+      season = '2024'; // Saison par défaut
+    }
+    url += '&season=' + season;
+    
+    // Pour équipes nationales: ajouter from/to aussi
     if (teamId && parseInt(teamId) > 1000) {
       url += '&from=2023-01-01&to=2026-06-30';
     }
     
     console.log('📡 Fetching team stats:', url);
-    console.log('   Team ID:', teamId);
+    console.log('   Team ID:', teamId, 'Season:', season);
     
     const res = await fetch(url, {
       headers: {
@@ -1131,39 +1137,16 @@ async fetchTeamStats(teamId, season) {
     const json = await res.json();
     const matches = json.response || [];
     
-    console.log('📊 API Response pour team', teamId, ':', json);
-    console.log('📊 Matches trouvés:', matches.length, 'matches');
+    console.log('📊 Matches trouvés:', matches.length);
     
     if (matches.length === 0) {
-      console.warn('⚠️ ZÉRO match pour team', teamId, '- Parameters:', json.parameters);
-      
-      // ✅ Fallback: utiliser les stats du standing plutôt que {0,0,0}
-      const standingKey = Object.keys(this.cache.standings)[0];
-      if (standingKey) {
-        const standing = this.cache.standings[standingKey]?.data?.teams?.find(t => t.id === teamId);
-        if (standing) {
-          console.log('✓ Utilisant les stats du standing:', standing);
-          return {
-            wins: Math.round(standing.played * 0.4),
-            draws: Math.round(standing.played * 0.25),
-            losses: Math.round(standing.played * 0.35),
-            gf: standing.gf || 0,
-            ga: standing.ga || 0,
-            form: standing.form?.join('') || 'NNNNN',
-            totalMatches: standing.played || 0
-          };
-        }
-      }
-      
-      console.warn('⚠️ Pas de données pour team', teamId);
+      console.warn('⚠️ ZÉRO match pour team', teamId);
       return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
     }
     
-    // Calculer les stats
     let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
     let form = '';
     
-    // Boucler sur TOUS les matchs pour les stats globales
     matches.forEach(m => {
       const homeGoals = m.goals.home;
       const awayGoals = m.goals.away;
@@ -1174,42 +1157,30 @@ async fetchTeamStats(teamId, season) {
       gf += myGoals;
       ga += oppGoals;
       
-      if (myGoals > oppGoals) {
-        wins++;
-      } else if (myGoals === oppGoals) {
-        draws++;
-      } else {
-        losses++;
-      }
+      if (myGoals > oppGoals) wins++;
+      else if (myGoals === oppGoals) draws++;
+      else losses++;
     });
     
-    // Calculer la FORM seulement sur les 5 DERNIERS matchs
     const last5 = matches.slice(0, 5);
     last5.forEach(m => {
-      const homeGoals = m.goals.home;
-      const awayGoals = m.goals.away;
       const isHome = m.teams.home.id == teamId;
-      const myGoals = isHome ? homeGoals : awayGoals;
-      const oppGoals = isHome ? awayGoals : homeGoals;
+      const myGoals = isHome ? m.goals.home : m.goals.away;
+      const oppGoals = isHome ? m.goals.away : m.goals.home;
       
-      if (myGoals > oppGoals) {
-        form = 'V' + form;
-      } else if (myGoals === oppGoals) {
-        form = 'D' + form;
-      } else {
-        form = 'L' + form;
-      }
+      if (myGoals > oppGoals) form = 'V' + form;
+      else if (myGoals === oppGoals) form = 'D' + form;
+      else form = 'L' + form;
     });
     
-    console.log('✓ Team stats (tous matchs):', {wins, draws, losses, gf, ga, totalMatches: matches.length});
-    console.log('✓ Form (5 derniers):', form);
+    console.log('✓ Stats:', {wins, draws, losses, gf, ga, form});
     return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
     
   } catch (err) {
-    console.error('❌ Error fetching team stats:', err);
+    console.error('❌ Error:', err);
     return null;
   }
-},
+}
 
   async waitForTeamStats(teamIds = [], maxWaitMs = 5000) {
     const startTime = Date.now();
