@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     let url = `https://v3.football.api-sports.io/${endpoint}?`;
     const params = [];
     
-    // ✅ Ajouter TOUS les paramètres, pas juste league et season
+    // ✅ Passer TOUS les paramètres
     if (league !== undefined && league !== 'undefined') params.push(`league=${league}`);
     if (season !== undefined && season !== 'undefined') params.push(`season=${season}`);
     if (date !== undefined && date !== 'undefined') params.push(`date=${date}`);
@@ -24,8 +24,6 @@ export default async function handler(req, res) {
     
     url += params.join('&');
     
-    console.log('📡 Proxy URL:', url);
-    
     const response = await fetch(url, {
       headers: { 
         'x-apisports-key': API_KEY,
@@ -34,7 +32,6 @@ export default async function handler(req, res) {
     });
     
     const data = await response.json();
-    
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.json(data);
   } catch (err) {
