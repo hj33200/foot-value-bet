@@ -1109,7 +1109,7 @@ const FOOTBALL_API = {
         allMatches.flatMap(m => [m.homeTeamId, m.awayTeamId])
       )];
       console.log('⚽ Équipes du jour:', uniqueTeamIds);
-      this.fetchStatsForTeams(uniqueTeamIds).catch(e => console.warn('Stats non chargées:', e));
+      await this.fetchStatsForTeams(uniqueTeamIds).catch(e => console.warn('Stats non chargées:', e));
     }
     
     return allMatches;
