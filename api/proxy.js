@@ -44,11 +44,16 @@ export default async function handler(req, res) {
       }
       
       // Dédupliquer par fixture.id
-      const uniqueMatches = Array.from(
+      let uniqueMatches = Array.from(
         new Map(allMatches.map(m => [m.fixture.id, m])).values()
       );
       
-      console.log(`✅ Total: ${uniqueMatches.length} matchs uniques`);
+      // ✅ TRIER par date (du plus ancien au plus récent)
+      uniqueMatches.sort((a, b) => 
+        new Date(a.fixture.date) - new Date(b.fixture.date)
+      );
+      
+      console.log(`✅ Total: ${uniqueMatches.length} matchs uniques (triés par date)`);
       return res.status(200).json({
         get: 'fixtures',
         paging: { current: 1, total: 1 },
