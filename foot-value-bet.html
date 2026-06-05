@@ -1128,24 +1128,42 @@ const FOOTBALL_API = {
       const matches = json.response || [];
       
       console.log('📊 API Response pour team', teamId, ':', json);
-      console.log('📊 Matches trouvés:', matches.length, 'matches');
+      console.log('📊 Matches trouvés:', matches.length, 'matches (incluant non-joués)');
       
       if (matches.length === 0) {
         console.warn('⚠️ ZÉRO match pour team', teamId, '- Parameters:', json.parameters);
         return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
       }
       
+      // ✅ FILTRER: Garder seulement les matchs avec résultats (pas null-null)
+      const matchesWithResults = matches.filter(m => 
+        m.goals.home !== null && m.goals.away !== null
+      );
+      console.log('📊 Matches avec résultats:', matchesWithResults.length);
+      
+      if (matchesWithResults.length === 0) {
+        console.warn('⚠️ ZÉRO match avec résultats pour team', teamId);
+        return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
+      }
+      
+      // Trier les matchs par date (ancien → récent)
+      const sortedByDate = matchesWithResults.sort((a, b) => 
+        new Date(a.fixture.date) - new Date(b.fixture.date)
+      );
+      
+      // Calculer les stats sur les 10 DERNIERS matchs
+      const last10 = sortedByDate.slice(-10); // Les 10 derniers matchs
+      const last5 = last10.slice(-5); // Les 5 derniers PARMI les 10
+      
       // Calculer les stats
       let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
       let form = '';
       
-      // Boucler sur TOUS les matchs pour les stats globales
-      matches.forEach(m => {
-        const homeGoals = m.goals.home;
-        const awayGoals = m.goals.away;
+      // Calculer les stats sur les 10 derniers matchs
+      last10.forEach(m => {
         const isHome = m.teams.home.id == teamId;
-        const myGoals = isHome ? homeGoals : awayGoals;
-        const oppGoals = isHome ? awayGoals : homeGoals;
+        const myGoals = isHome ? m.goals.home : m.goals.away;
+        const oppGoals = isHome ? m.goals.away : m.goals.home;
         
         gf += myGoals;
         ga += oppGoals;
@@ -1156,42 +1174,6 @@ const FOOTBALL_API = {
           draws++;
         } else {
           losses++;
-        }
-      });
-      
-      // Calculer les stats sur les 10 DERNIERS matchs
-      // ⚠️ IMPORTANT: L'API ne retourne PAS les matchs triés!
-      // Il faut TRIER par date avant
-      const sortedByDate = matches.sort((a, b) => 
-        new Date(a.fixture.date) - new Date(b.fixture.date)
-      );
-      const last10 = sortedByDate.slice(-10); // Les 10 derniers matchs
-      const last5 = last10.slice(-5); // Les 5 derniers PARMI les 10
-      
-      // Réinitialiser les stats
-      wins = 0;
-      draws = 0;
-      losses = 0;
-      gf = 0;
-      ga = 0;
-      
-      // Recalculer les stats sur les 10 derniers matchs
-      last10.forEach(m => {
-        if (m.goals.home !== null && m.goals.away !== null) {
-          const isHome = m.teams.home.id == teamId;
-          const myGoals = isHome ? m.goals.home : m.goals.away;
-          const oppGoals = isHome ? m.goals.away : m.goals.home;
-          
-          gf += myGoals;
-          ga += oppGoals;
-          
-          if (myGoals > oppGoals) {
-            wins++;
-          } else if (myGoals === oppGoals) {
-            draws++;
-          } else {
-            losses++;
-          }
         }
       });
       
