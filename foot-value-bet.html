@@ -1345,10 +1345,10 @@ function getMatchData(id){
   
   // Generate form from REAL stats via cache
   const calcForm = (team) => {
-    // Essayer d'obtenir les vraies stats du cache
+    // ✅ PRIORITÉ: Essayer d'obtenir les VRAIES stats du cache API
     const realStats = FOOTBALL_API.getTeamStats(team.id);
     if (realStats && realStats.form) {
-      console.log(`✓ Vraies stats pour ${team.name}:`, realStats.form);
+      console.log(`✓ Vraie forme pour ${team.name}:`, realStats.form);
       return realStats.form;
     }
     
