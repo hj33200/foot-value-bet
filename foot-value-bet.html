@@ -1105,48 +1105,46 @@ const FOOTBALL_API = {
   },
 
   async fetchTeamStats(teamId, season) {
-    const apiKey = this.getApiKey();
-    if (!apiKey) throw new Error('Cle API non configuree');
+  const apiKey = this.getApiKey();
+  if (!apiKey) throw new Error('Cle API non configuree');
+  
+  try {
+    // Date d'aujourd'hui dynamiquement
+    const today = new Date().toISOString().split('T')[0];
+    const url = this.BASE + '?endpoint=fixtures&team=' + teamId + 
+      '&from=2023-01-01&to=' + today;
+    console.log('📡 Fetching team stats:', url);
+    console.log('   Team ID:', teamId);
     
-    try {
-      // Récupérer les matchs de qualification + Coupe du Monde
-      // Plage: 2023-01-01 à 2026-06-30 (couvre toutes les confédérations + WC)
-      const today = new Date().toISOString().split('T')[0]; // Date d'aujourd'hui en YYYY-MM-DD
-const url = this.BASE + '?endpoint=fixtures&team=' + teamId + 
-  '&from=2023-01-01&to=' + today;
-      console.log('📡 Fetching team stats:', url);
-      console.log('   Team ID:', teamId);
-      
-      const res = await fetch(url, {
-        headers: {
-          'x-apisports-key': apiKey
-        }
-      });
-      
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      
-      const json = await res.json();
-      const matches = json.response || [];
-      
-      console.log('📊 API Response pour team', teamId, ':', json);
-      console.log('📊 Matches trouvés:', matches.length, 'matches');
-      
-      if (matches.length === 0) {
-        console.warn('⚠️ ZÉRO match pour team', teamId, '- Parameters:', json.parameters);
-        return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
+    const res = await fetch(url, {
+      headers: {
+        'x-apisports-key': apiKey
       }
-      
-      // Calculer les stats
-      let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
-      let form = '';
-      
-      // Boucler sur TOUS les matchs pour les stats globales
-      matches.forEach(m => {
-        const homeGoals = m.goals.home;
-        const awayGoals = m.goals.away;
+    });
+    
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    
+    const json = await res.json();
+    const matches = json.response || [];
+    
+    console.log('📊 API Response pour team', teamId, ':', json);
+    console.log('📊 Matches trouvés:', matches.length, 'matches');
+    
+    if (matches.length === 0) {
+      console.warn('⚠️ ZÉRO match pour team', teamId);
+      return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
+    }
+    
+    // Calculer les stats
+    let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
+    let form = '';
+    
+    // Boucler sur TOUS les matchs pour les stats globales
+    matches.forEach(m => {
+      if (m.goals.home !== null && m.goals.away !== null) {
         const isHome = m.teams.home.id == teamId;
-        const myGoals = isHome ? homeGoals : awayGoals;
-        const oppGoals = isHome ? awayGoals : homeGoals;
+        const myGoals = isHome ? m.goals.home : m.goals.away;
+        const oppGoals = isHome ? m.goals.away : m.goals.home;
         
         gf += myGoals;
         ga += oppGoals;
@@ -1158,35 +1156,34 @@ const url = this.BASE + '?endpoint=fixtures&team=' + teamId +
         } else {
           losses++;
         }
-      });
+      }
+    });
+    
+    // Calculer la FORM: 5 DERNIERS matchs avec résultats
+    const last5 = matches.filter(m => m.goals.home !== null && m.goals.away !== null).slice(-5);
+    last5.forEach(m => {
+      const isHome = m.teams.home.id == teamId;
+      const myGoals = isHome ? m.goals.home : m.goals.away;
+      const oppGoals = isHome ? m.goals.away : m.goals.home;
       
-      // Calculer la FORM seulement sur les 5 DERNIERS matchs
-      const last5 = matches.filter(m => m.goals.home !== null && m.goals.away !== null).slice(-5);
-      last5.forEach(m => {
-        const homeGoals = m.goals.home;
-        const awayGoals = m.goals.away;
-        const isHome = m.teams.home.id == teamId;
-        const myGoals = isHome ? homeGoals : awayGoals;
-        const oppGoals = isHome ? awayGoals : homeGoals;
-        
-        if (myGoals > oppGoals) {
-          form = 'V' + form;
-        } else if (myGoals === oppGoals) {
-          form = 'D' + form;
-        } else {
-          form = 'L' + form;
-        }
-      });
-      
-      console.log('✓ Team stats (tous matchs):', {wins, draws, losses, gf, ga, totalMatches: matches.length});
-      console.log('✓ Form (5 derniers):', form);
-      return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
-      
-    } catch (err) {
-      console.error('❌ Error fetching team stats:', err);
-      return null;
-    }
-  },
+      if (myGoals > oppGoals) {
+        form = form + 'V';
+      } else if (myGoals === oppGoals) {
+        form = form + 'D';
+      } else {
+        form = form + 'L';
+      }
+    });
+    
+    console.log('✓ Team stats (tous matchs):', {wins, draws, losses, gf, ga, totalMatches: matches.length});
+    console.log('✓ Form (5 derniers):', form);
+    return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
+    
+  } catch (err) {
+    console.error('❌ Error fetching team stats:', err);
+    return null;
+  }
+},
 
   async waitForTeamStats(teamIds = [], maxWaitMs = 5000) {
     const startTime = Date.now();
