@@ -1111,8 +1111,9 @@ const FOOTBALL_API = {
     try {
       // Récupérer les matchs de qualification + Coupe du Monde
       // Plage: 2023-01-01 à 2026-06-30 (couvre toutes les confédérations + WC)
-      const url = this.BASE + '?endpoint=fixtures&team=' + teamId + 
-        '&from=2023-01-01&to=2026-06-30';
+      const today = new Date().toISOString().split('T')[0]; // Date d'aujourd'hui en YYYY-MM-DD
+const url = this.BASE + '?endpoint=fixtures&team=' + teamId + 
+  '&from=2023-01-01&to=' + today;
       console.log('📡 Fetching team stats:', url);
       console.log('   Team ID:', teamId);
       
