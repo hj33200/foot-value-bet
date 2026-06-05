@@ -654,7 +654,7 @@ function buildStats(team, form, kind){
   const cs = Math.round((1 - ga/matches/2.2) * matches * 0.3);
   const bttsPct = (gf/matches/2.2) * 0.6;
   
-  console.log(`⚠️ FALLBACK buildStats pour ${team.name}: form=${form}, trueForm=${trueForm}`);
+  console.log(`⚠️ FALLBACK buildStats pour ${team.name}: form=${form}`);
   return {
     played: matches,
     wins, draws, losses,
