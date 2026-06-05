@@ -10,26 +10,66 @@ export default async function handler(req, res) {
   
   try {
     if (!endpoint) return res.status(400).json({ error: 'Missing endpoint' });
+    
+    // 🔥 SPÉCIAL: Pour fixtures avec team, faire PLUSIEURS requêtes (toutes les saisons)
+    if (endpoint === 'fixtures' && team && !season) {
+      console.log(`📡 Mode MULTI-SEASON pour team ${team}`);
+      const seasons = ['2023', '2024', '2025', '2026'];
+      let allMatches = [];
+      
+      for (const s of seasons) {
+        const url = `https://v3.football.api-sports.io/fixtures?team=${encodeURIComponent(team)}&season=${s}&from=${encodeURIComponent(from || '2023-01-01')}&to=${encodeURIComponent(to || '2026-06-30')}`;
+        console.log(`  📡 Saison ${s}: ${url}`);
+        
+        try {
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: { 
+              'x-apisports-key': API_KEY,
+              'User-Agent': 'Foot-Value-Bet-Proxy/2.0'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const matches = data.response || [];
+            console.log(`    ✅ ${matches.length} matchs trouvés pour saison ${s}`);
+            allMatches = allMatches.concat(matches);
+          } else {
+            console.warn(`    ⚠️ HTTP ${response.status} pour saison ${s}`);
+          }
+        } catch (err) {
+          console.warn(`    ⚠️ Erreur saison ${s}:`, err.message);
+        }
+      }
+      
+      // Dédupliquer par fixture.id
+      const uniqueMatches = Array.from(
+        new Map(allMatches.map(m => [m.fixture.id, m])).values()
+      );
+      
+      console.log(`✅ Total: ${uniqueMatches.length} matchs uniques`);
+      return res.status(200).json({
+        get: 'fixtures',
+        paging: { current: 1, total: 1 },
+        parameters: { team, from, to, seasons: seasons.join(',') },
+        response: uniqueMatches,
+        results: uniqueMatches.length
+      });
+    }
+    
+    // Mode standard pour les autres requêtes
     let url = `https://v3.football.api-sports.io/${endpoint}?`;
     const params = [];
     
-    // Ajouter les paramètres standards
     if (league) params.push(`league=${encodeURIComponent(league)}`);
     if (season) params.push(`season=${encodeURIComponent(season)}`);
     if (date) params.push(`date=${encodeURIComponent(date)}`);
     if (team) params.push(`team=${encodeURIComponent(team)}`);
-    
-    // ⚠️ NE PAS ajouter season par défaut pour récupérer TOUS les matchs (amicaux + officiels)
-    // if (team && !season) {
-    //   params.push('season=2024');
-    // }
-    
-    // Ajouter les dates
     if (from) params.push(`from=${encodeURIComponent(from)}`);
     if (to) params.push(`to=${encodeURIComponent(to)}`);
     
     url += params.join('&');
-    
     console.log(`📡 ${url}`);
     
     const response = await fetch(url, {
