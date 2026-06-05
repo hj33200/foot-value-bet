@@ -597,27 +597,52 @@ function buildModel(home,away,homeForm,awayForm,rng){
 }
 
 function buildStats(team, form, kind){
-  const matches = team.matches || 34;
-  const gf = team.gf, ga = team.ga;
-  const strength = (gf / matches) / 2.2; // normalized by Ligue 1 avg
-  
-  // Essayer d'utiliser les vraies stats si disponibles
-  let wins = 0, draws = 0, losses = 0;
+  // Essayer d'utiliser les vraies stats de l'API (10 derniers matchs)
   const realStats = FOOTBALL_API.getTeamStats(team.id);
   
-  if (realStats) {
-    wins = realStats.wins;
-    draws = realStats.draws;
-    losses = realStats.losses;
-    console.log(`✓ Stats réelles pour ${team.name}: ${wins}V-${draws}D-${losses}L`);
-  } else {
-    // Fallback: calculer à partir des stats du standing
-    const w_rate = strength * 0.65 + 0.15;
-    wins = Math.round(matches * w_rate);
-    const d_rate = 0.25 * (1 - strength);
-    draws = Math.round(matches * d_rate);
-    losses = matches - wins - draws;
+  if (realStats && realStats.totalMatches > 0) {
+    console.log(`✓ Stats réelles pour ${team.name} (10 derniers): ${realStats.wins}V-${realStats.draws}D-${realStats.losses}L, ${realStats.gf}GF-${realStats.ga}GA`);
+    
+    const matches = 10; // On utilise 10 matchs
+    const gf = realStats.gf || 1;
+    const ga = realStats.ga || 1;
+    const wins = realStats.wins || 0;
+    const draws = realStats.draws || 0;
+    const losses = realStats.losses || 0;
+    
+    // Calculer clean sheets et BTTS depuis les matchs réels
+    // Approximation: CS = matches où on n'a pas encaissé
+    const cs = Math.round((ga === 0) ? matches : (matches * (1 - ga/matches/2.5)));
+    const bttsPct = (gf > 0 && ga > 0) ? 0.5 : 0.2;
+    
+    const rankGen = Math.max(1, Math.min(18, Math.round(10 - (gf/matches)/2.2 * 12)));
+    const rankSide = Math.max(1, Math.min(18, rankGen + (kind === 'home' ? -1 : 1)));
+    
+    return {
+      played: matches,
+      wins, draws, losses,
+      gf, ga, gd: gf - ga,
+      rankGen, rankSide,
+      cs: Math.max(0, cs),
+      bttsPct: clamp(bttsPct, 0, 1),
+      form: form ? form.split('') : ['N','N','N','N','N'],
+      series: form ? form.match(/(.)\1*/g).map(s => s.charAt(0) + s.length).join(' ') : '',
+      avgFor: r2(gf / matches),
+      avgAga: r2(ga / matches),
+    };
   }
+  
+  // Fallback: calculer à partir des stats du standing (ancienne méthode)
+  const matches = team.matches || 34;
+  const gf = team.gf, ga = team.ga;
+  const strength = (gf / matches) / 2.2;
+  
+  let wins = 0, draws = 0, losses = 0;
+  const w_rate = strength * 0.65 + 0.15;
+  wins = Math.round(matches * w_rate);
+  const d_rate = 0.25 * (1 - strength);
+  draws = Math.round(matches * d_rate);
+  losses = matches - wins - draws;
   
   const rankGen = Math.max(1, Math.min(18, Math.round(10 - strength * 12)));
   const rankSide = Math.max(1, Math.min(18, rankGen + (kind === 'home' ? -1 : 1)));
