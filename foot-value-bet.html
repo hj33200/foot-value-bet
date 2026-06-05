@@ -1160,20 +1160,28 @@ const FOOTBALL_API = {
     });
     
     // Calculer la FORM: 5 DERNIERS matchs avec résultats
-    const last5 = matches.filter(m => m.goals.home !== null && m.goals.away !== null).slice(-5);
-    last5.forEach(m => {
-      const isHome = m.teams.home.id == teamId;
-      const myGoals = isHome ? m.goals.home : m.goals.away;
-      const oppGoals = isHome ? m.goals.away : m.goals.home;
-      
-      if (myGoals > oppGoals) {
-        form = form + 'V';
-      } else if (myGoals === oppGoals) {
-        form = form + 'D';
-      } else {
-        form = form + 'L';
-      }
-    });
+    // Trier les matchs par date (du plus ancien au plus récent)
+const sortedMatches = matches.filter(m => m.goals.home !== null && m.goals.away !== null)
+  .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+
+// Prendre les 5 derniers
+const last5 = sortedMatches.slice(-5);
+
+// Calculer la forme
+let form = '';
+last5.forEach(m => {
+  const isHome = m.teams.home.id == teamId;
+  const myGoals = isHome ? m.goals.home : m.goals.away;
+  const oppGoals = isHome ? m.goals.away : m.goals.home;
+  
+  if (myGoals > oppGoals) {
+    form = form + 'V';
+  } else if (myGoals === oppGoals) {
+    form = form + 'D';
+  } else {
+    form = form + 'L';
+  }
+});
     
     console.log('✓ Team stats (tous matchs):', {wins, draws, losses, gf, ga, totalMatches: matches.length});
     console.log('✓ Form (5 derniers):', form);
