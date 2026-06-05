@@ -1,41 +1,38 @@
 export default async function handler(req, res) {
-  // ✅ CORS Headers
+  // ✅ CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-apisports-key');
   
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { endpoint, league, season, date, team, from, to } = req.query;
   const API_KEY = process.env.FOOTBALL_API_KEY || 'fa96c57b27321cef9fc4cae58aa3fe13';
   
   try {
-    if (!endpoint) {
-      return res.status(400).json({ error: 'Missing endpoint' });
-    }
+    if (!endpoint) return res.status(400).json({ error: 'Missing endpoint' });
 
     let url = `https://v3.football.api-sports.io/${endpoint}?`;
     const params = [];
     
+    // Ajouter les paramètres standards
     if (league) params.push(`league=${encodeURIComponent(league)}`);
     if (season) params.push(`season=${encodeURIComponent(season)}`);
     if (date) params.push(`date=${encodeURIComponent(date)}`);
     if (team) params.push(`team=${encodeURIComponent(team)}`);
     
-    // Pour fixtures avec team ET dates
-    if (team && from && to) {
-      params.push(`from=${encodeURIComponent(from)}`);
-      params.push(`to=${encodeURIComponent(to)}`);
-    } else {
-      if (from) params.push(`from=${encodeURIComponent(from)}`);
-      if (to) params.push(`to=${encodeURIComponent(to)}`);
+    // ✅ IMPORTANT: Pour fixtures avec team, ajouter season par défaut!
+    if (team && !season) {
+      params.push('season=2024');
     }
+    
+    // Ajouter les dates
+    if (from) params.push(`from=${encodeURIComponent(from)}`);
+    if (to) params.push(`to=${encodeURIComponent(to)}`);
     
     url += params.join('&');
     
-    console.log(`[${new Date().toISOString()}] 📡 ${url}`);
+    console.log(`📡 ${url}`);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -46,13 +43,8 @@ export default async function handler(req, res) {
     });
     
     if (!response.ok) {
-      const text = await response.text();
-      console.error(`❌ HTTP ${response.status}:`, text.substring(0, 300));
-      
-      return res.status(response.status).json({ 
-        error: `API returned ${response.status}`,
-        details: text
-      });
+      console.error(`❌ HTTP ${response.status}`);
+      return res.status(response.status).json({ error: `HTTP ${response.status}` });
     }
     
     const data = await response.json();
