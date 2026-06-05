@@ -33,9 +33,9 @@ export default async function handler(req, res) {
     if (date) params.push(`date=${encodeURIComponent(date)}`);
     if (team) params.push(`team=${encodeURIComponent(team)}`);
     
-    // Les paramètres from/to: API-Football les accepte nativement
-    if (from) params.push(`from=${encodeURIComponent(from)}`);
-    if (to) params.push(`to=${encodeURIComponent(to)}`);
+    // ✅ IMPORTANT: Convertir from/to en dateFrom/dateTo pour l'API-Football
+    if (from) params.push(`dateFrom=${encodeURIComponent(from)}`);
+    if (to) params.push(`dateTo=${encodeURIComponent(to)}`);
     
     url += params.join('&');
     
