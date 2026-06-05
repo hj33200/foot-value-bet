@@ -1159,42 +1159,74 @@ const FOOTBALL_API = {
         }
       });
       
-      // Calculer la FORM seulement sur les 5 DERNIERS matchs
-      const last5 = matches.slice(0, 5); // Les 5 derniers (le plus récent est en premier)
+      // Calculer les stats sur les 10 DERNIERS matchs
+      // ⚠️ IMPORTANT: L'API ne retourne PAS les matchs triés!
+      // Il faut TRIER par date avant
+      const sortedByDate = matches.sort((a, b) => 
+        new Date(a.fixture.date) - new Date(b.fixture.date)
+      );
+      const last10 = sortedByDate.slice(-10); // Les 10 derniers matchs
+      const last5 = last10.slice(-5); // Les 5 derniers PARMI les 10
       
-      // DEBUG: Afficher chaque match des 5 sélectionnés
-      console.log('\n🔍 === 5 MATCHS SÉLECTIONNÉS POUR TEAM ' + teamId + ' ===');
-      last5.forEach((m, idx) => {
-        const homeGoals = m.goals.home;
-        const awayGoals = m.goals.away;
+      // Réinitialiser les stats
+      wins = 0;
+      draws = 0;
+      losses = 0;
+      gf = 0;
+      ga = 0;
+      
+      // Recalculer les stats sur les 10 derniers matchs
+      last10.forEach(m => {
+        if (m.goals.home !== null && m.goals.away !== null) {
+          const isHome = m.teams.home.id == teamId;
+          const myGoals = isHome ? m.goals.home : m.goals.away;
+          const oppGoals = isHome ? m.goals.away : m.goals.home;
+          
+          gf += myGoals;
+          ga += oppGoals;
+          
+          if (myGoals > oppGoals) {
+            wins++;
+          } else if (myGoals === oppGoals) {
+            draws++;
+          } else {
+            losses++;
+          }
+        }
+      });
+      
+      // DEBUG: Afficher les 10 derniers matchs
+      console.log('\n📊 === 10 DERNIERS MATCHS POUR TEAM ' + teamId + ' ===');
+      last10.forEach((m, idx) => {
         const isHome = m.teams.home.id == teamId;
-        const myGoals = isHome ? homeGoals : awayGoals;
-        const oppGoals = isHome ? awayGoals : homeGoals;
+        const myGoals = isHome ? m.goals.home : m.goals.away;
+        const oppGoals = isHome ? m.goals.away : m.goals.home;
         const result = myGoals > oppGoals ? '✓V' : myGoals < oppGoals ? '✗L' : 'D';
         const matchDisplay = isHome 
           ? `${m.teams.home.name} ${myGoals}-${oppGoals} ${m.teams.away.name}`
           : `${m.teams.away.name} ${myGoals}-${oppGoals} ${m.teams.home.name}`;
-        console.log(`  ${idx + 1}. [${m.fixture.date}] ${matchDisplay} → ${result}`);
+        const marker = idx >= 5 ? '→ ' : '  '; // Marquer les 5 derniers
+        console.log(`${marker}${idx + 1}. [${m.fixture.date.slice(0,10)}] ${matchDisplay} → ${result}`);
       });
-      console.log('🔍 === FIN ===\n');
+      console.log('📊 === FIN (→ = les 5 derniers) ===\n');
       
+      // Calculer la FORM sur les 5 derniers
+      form = '';
       last5.forEach(m => {
-        const homeGoals = m.goals.home;
-        const awayGoals = m.goals.away;
         const isHome = m.teams.home.id == teamId;
-        const myGoals = isHome ? homeGoals : awayGoals;
-        const oppGoals = isHome ? awayGoals : homeGoals;
+        const myGoals = isHome ? m.goals.home : m.goals.away;
+        const oppGoals = isHome ? m.goals.away : m.goals.home;
         
         if (myGoals > oppGoals) {
-          form = 'V' + form;
+          form = form + 'V';
         } else if (myGoals === oppGoals) {
-          form = 'D' + form;
+          form = form + 'D';
         } else {
-          form = 'L' + form;
+          form = form + 'L';
         }
       });
       
-      console.log('✓ Team stats (tous matchs):', {wins, draws, losses, gf, ga, totalMatches: matches.length});
+      console.log('✓ Stats sur les 10 derniers:', {wins, draws, losses, gf, ga});
       console.log('✓ Form (5 derniers):', form);
       return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
       
