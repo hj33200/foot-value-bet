@@ -1105,45 +1105,47 @@ const FOOTBALL_API = {
   },
 
   async fetchTeamStats(teamId, season) {
-  const apiKey = this.getApiKey();
-  if (!apiKey) throw new Error('Cle API non configuree');
-  
-  try {
-    // Date d'aujourd'hui dynamiquement
-    const today = new Date().toISOString().split('T')[0];
-    const url = this.BASE + '?endpoint=fixtures&team=' + teamId + 
-      '&from=2023-01-01&to=' + today;
-    console.log('📡 Fetching team stats:', url);
-    console.log('   Team ID:', teamId);
+    const apiKey = this.getApiKey();
+    if (!apiKey) throw new Error('Cle API non configuree');
     
-    const res = await fetch(url, {
-      headers: {
-        'x-apisports-key': apiKey
+    try {
+      // Récupérer les matchs de qualification + Coupe du Monde
+      // Plage: 2023-01-01 à 2026-06-30 (couvre toutes les confédérations + WC)
+      const url = this.BASE + '?endpoint=fixtures&team=' + teamId + 
+        '&from=2023-01-01&to=2026-06-30';
+      console.log('📡 Fetching team stats:', url);
+      console.log('   Team ID:', teamId);
+      
+      const res = await fetch(url, {
+        headers: {
+          'x-apisports-key': apiKey
+        }
+      });
+      
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      
+      const json = await res.json();
+      const matches = json.response || [];
+      
+      console.log('📊 API Response pour team', teamId, ':', json);
+      console.log('📊 Matches trouvés:', matches.length, 'matches');
+      
+      if (matches.length === 0) {
+        console.warn('⚠️ ZÉRO match pour team', teamId, '- Parameters:', json.parameters);
+        return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
       }
-    });
-    
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    
-    const json = await res.json();
-    const matches = json.response || [];
-    
-    console.log('📊 API Response pour team', teamId, ':', json);
-    console.log('📊 Matches trouvés:', matches.length, 'matches');
-    
-    if (matches.length === 0) {
-      console.warn('⚠️ ZÉRO match pour team', teamId);
-      return { wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, form: 'NNNNN', totalMatches: 0 };
-    }
-    
-    // Calculer les stats
-    let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
-    
-    // Boucler sur TOUS les matchs pour les stats globales
-    matches.forEach(m => {
-      if (m.goals.home !== null && m.goals.away !== null) {
+      
+      // Calculer les stats
+      let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
+      let form = '';
+      
+      // Boucler sur TOUS les matchs pour les stats globales
+      matches.forEach(m => {
+        const homeGoals = m.goals.home;
+        const awayGoals = m.goals.away;
         const isHome = m.teams.home.id == teamId;
-        const myGoals = isHome ? m.goals.home : m.goals.away;
-        const oppGoals = isHome ? m.goals.away : m.goals.home;
+        const myGoals = isHome ? homeGoals : awayGoals;
+        const oppGoals = isHome ? awayGoals : homeGoals;
         
         gf += myGoals;
         ga += oppGoals;
@@ -1155,42 +1157,35 @@ const FOOTBALL_API = {
         } else {
           losses++;
         }
-      }
-    });
-    
-    // Calculer la FORM: 5 DERNIERS matchs avec résultats
-    // Trier les matchs par date (du plus ancien au plus récent)
-const sortedMatches = matches.filter(m => m.goals.home !== null && m.goals.away !== null)
-  .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
-
-// Prendre les 5 derniers
-const last5 = sortedMatches.slice(-5);
-
-// Calculer la forme
-let form = '';
-last5.forEach(m => {
-  const isHome = m.teams.home.id == teamId;
-  const myGoals = isHome ? m.goals.home : m.goals.away;
-  const oppGoals = isHome ? m.goals.away : m.goals.home;
-  
-  if (myGoals > oppGoals) {
-    form = form + 'V';
-  } else if (myGoals === oppGoals) {
-    form = form + 'D';
-  } else {
-    form = form + 'L';
-  }
-});
-    
-    console.log('✓ Team stats (tous matchs):', {wins, draws, losses, gf, ga, totalMatches: matches.length});
-    console.log('✓ Form (5 derniers):', form);
-    return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
-    
-  } catch (err) {
-    console.error('❌ Error fetching team stats:', err);
-    return null;
-  }
-},
+      });
+      
+      // Calculer la FORM seulement sur les 5 DERNIERS matchs
+      const last5 = matches.slice(0, 5); // Les 5 derniers (le plus récent est en premier)
+      last5.forEach(m => {
+        const homeGoals = m.goals.home;
+        const awayGoals = m.goals.away;
+        const isHome = m.teams.home.id == teamId;
+        const myGoals = isHome ? homeGoals : awayGoals;
+        const oppGoals = isHome ? awayGoals : homeGoals;
+        
+        if (myGoals > oppGoals) {
+          form = 'V' + form;
+        } else if (myGoals === oppGoals) {
+          form = 'D' + form;
+        } else {
+          form = 'L' + form;
+        }
+      });
+      
+      console.log('✓ Team stats (tous matchs):', {wins, draws, losses, gf, ga, totalMatches: matches.length});
+      console.log('✓ Form (5 derniers):', form);
+      return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
+      
+    } catch (err) {
+      console.error('❌ Error fetching team stats:', err);
+      return null;
+    }
+  },
 
   async waitForTeamStats(teamIds = [], maxWaitMs = 5000) {
     const startTime = Date.now();
@@ -1866,6 +1861,37 @@ function ord(n){return n+(n===1?'er':'e')}
 
 function statsSection(d){
   const H=d.statsH,A=d.statsA,m=d.meta;
+  
+  // DEBUG: Afficher les 5 derniers matchs de chaque équipe
+  const getLast5Debug = async (teamId) => {
+    const apiKey = state.settings.apiKey;
+    if (!apiKey) return [];
+    const today = new Date().toISOString().split('T')[0];
+    const url = FOOTBALL_API.BASE + '?endpoint=fixtures&team=' + teamId + '&from=2023-01-01&to=' + today;
+    try {
+      const res = await fetch(url, { headers: { 'x-apisports-key': apiKey } });
+      const json = await res.json();
+      const matches = json.response || [];
+      const sortedMatches = matches.filter(m => m.goals.home !== null && m.goals.away !== null)
+        .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+      const last5 = sortedMatches.slice(-5);
+      return last5.map(m => ({
+        date: m.fixture.date.slice(0,10),
+        home: m.teams.home.name,
+        away: m.teams.away.name,
+        hg: m.goals.home,
+        ag: m.goals.away,
+        isHome: m.teams.home.id == teamId,
+        result: m.teams.home.id == teamId 
+          ? (m.goals.home > m.goals.away ? 'V' : m.goals.home < m.goals.away ? 'L' : 'D')
+          : (m.goals.away > m.goals.home ? 'V' : m.goals.away < m.goals.home ? 'L' : 'D')
+      }));
+    } catch (e) {
+      console.error('Debug error:', e);
+      return [];
+    }
+  };
+  
   const barRow=(label,hv,av,fmt)=>{
     const tot=(hv+av)||1;const hp=hv/tot*100;
     return `<div class="srow" style="flex-direction:column;align-items:stretch">
