@@ -1160,7 +1160,7 @@ const FOOTBALL_API = {
       });
       
       // Calculer la FORM seulement sur les 5 DERNIERS matchs
-      const last5 = matches.slice(-5); // ✅ Prend les 5 DERNIERS
+      const last5 = matches.filter(m => m.goals.home !== null && m.goals.away !== null).slice(-5);
       last5.forEach(m => {
         const homeGoals = m.goals.home;
         const awayGoals = m.goals.away;
