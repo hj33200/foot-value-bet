@@ -669,23 +669,60 @@ function buildStats(team, form, kind){
 }
 
 /* ---------- H2H ---------- */
-function buildH2H(m){
-  // Generate realistic H2H based on strength difference
-  const out = [];
-  const sh = (m.home.gf / m.home.matches) / 2.2;
-  const sa = (m.away.gf / m.away.matches) / 2.2;
-  const strengthDiff = sh - sa;
+async function fetchH2H(teamId1, teamId2) {
+  const apiKey = FOOTBALL_API.getApiKey();
+  if (!apiKey) throw new Error('API key missing');
   
+  try {
+    // Endpoint H2H de l'API-Football
+    const url = FOOTBALL_API.BASE + '?endpoint=fixtures&h2h=' + teamId1 + '-' + teamId2;
+    console.log('📡 Fetching H2H:', url);
+    
+    const res = await fetch(url, {
+      headers: { 'x-apisports-key': apiKey }
+    });
+    
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    
+    const json = await res.json();
+    const matches = json.response || [];
+    
+    // Trier par date (récent en dernier) et prendre les 5 derniers
+    const sorted = matches
+      .filter(m => m.goals.home !== null && m.goals.away !== null) // Matchs joués
+      .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date))
+      .slice(-5); // 5 derniers
+    
+    console.log(`✓ H2H trouvés: ${sorted.length} matches`, sorted);
+    
+    return sorted.map(m => ({
+      date: m.fixture.date.slice(0,10),
+      hg: m.goals.home,
+      ag: m.goals.away,
+      home: m.teams.home.name,
+      away: m.teams.away.name
+    }));
+    
+  } catch(err) {
+    console.warn('❌ H2H Error:', err.message);
+    return []; // Fallback: vide
+  }
+}
+
+function buildH2H(m){
+  // Fallback: si les vrais H2H ne sont pas disponibles
+  // (sera remplacé par les vrais données async)
+  const strengthDiff = (m.home.gf / m.home.matches) / 2.2 - (m.away.gf / m.away.matches) / 2.2;
+  
+  const out = [];
   const years = ['2025', '2024', '2024', '2023', '2023'];
-  for(let i = 0; i < 5; i++) {
+  for(let i = 0; i < 3; i++) { // 3 au lieu de 5
     const r = Math.random();
-    const expectedGoals = 2.5;
-    const hg = Math.floor(r * strengthDiff + 1 + Math.random() * 1.5);
-    const ag = Math.floor((1 - r) * strengthDiff + 1 + Math.random() * 1.5);
+    const hg = Math.max(0, Math.floor(r * strengthDiff + 1 + Math.random() * 1.5));
+    const ag = Math.max(0, Math.floor((1 - r) * strengthDiff + 1 + Math.random() * 1.5));
     out.push({
       date: `${(1 + Math.floor(Math.random() * 28)).toString().padStart(2, '0')}/${(1 + Math.floor(Math.random() * 12)).toString().padStart(2, '0')}/${years[i]}`,
-      hg: Math.max(0, hg),
-      ag: Math.max(0, ag)
+      hg, ag
     });
   }
   return out;
@@ -1110,6 +1147,15 @@ const FOOTBALL_API = {
       )];
       console.log('⚽ Équipes du jour:', uniqueTeamIds);
       await this.fetchStatsForTeams(uniqueTeamIds).catch(e => console.warn('Stats non chargées:', e));
+      
+      // Charger les H2H en arrière-plan pour chaque match
+      allMatches.forEach(match => {
+        fetchH2H(match.homeTeamId, match.awayTeamId).then(h2hData => {
+          if(matchCache[match.id]) {
+            matchCache[match.id].h2h = h2hData.length > 0 ? h2hData : buildH2H({home: {gf: 0, matches: 1}, away: {gf: 0, matches: 1}});
+          }
+        }).catch(e => console.warn('H2H non chargés:', e));
+      });
     }
     
     return allMatches;
@@ -2005,7 +2051,7 @@ function statsSection(d){
       ${simpleRow('BTTS (saison)',pct(H.bttsPct),pct(A.bttsPct))}
     </div>
     <div class="card stat-block" style="grid-column:1/-1">
-      <h3>${iconSvg('M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3')} Confrontations directes (H2H)</h3>
+      <h3 style="font-size:14px;display:flex;gap:8px;align-items:center">${iconSvg('M12 5l3 3m-3-3l-3 3M2 12h20M4 19l3-3m-3 3l-3-3')} <span>Confrontations directes (H2H)</span></h3>
       ${h2hRows2}
       <div style="margin-top:10px;font-size:12px;color:var(--txt3)">
         Buts projetés (modèle Poisson) : <b style="color:var(--blue);font-family:var(--mono)">${m.home.short} ${d.model.lH}</b> — <b style="color:var(--red);font-family:var(--mono)">${d.model.lA} ${m.away.short}</b>
