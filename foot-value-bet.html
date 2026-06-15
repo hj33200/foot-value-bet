@@ -1075,6 +1075,29 @@ function buildMarkets(m,model){
     }
   }
   
+  // 🎯 FONCTION: Chercher les vraies cotes pour un marché spécifique chez Unibet
+  const getRealCotes = (marketName) => {
+    if(!realOdds || !realOdds['Unibet'] || !realOdds['Unibet'].markets) return null;
+    return realOdds['Unibet'].markets[marketName] || null;
+  };
+  
+  // Mapper les noms de marchés de notre app avec les noms de l'API-Football
+  const marketMapping = {
+    '1n2': 'Match Winner',
+    'dc': 'Double Chance',
+    'dnb': 'Draw No Bet',
+    'btts': 'Both Teams Score',
+    'tot': 'Goals Over/Under',
+    'tte': 'Home Team Total Goals',  // ou 'Away Team Total Goals'
+    'cs': 'Clean Sheet',
+    'htr': 'First Half Winner',
+    'htft': 'HT/FT Double',
+    'eh': 'Handicap Result',
+    'ah': 'Asian Handicap',
+    'rou': 'Goals Over/Under',  // Résultat + Over/Under
+    'rbtts': 'Both Teams Score'  // Résultat + BTTS
+  };
+  
   // 🎯 FONCTION: Créer une sélection (vraies cotes OU formule de probabilité)
   const mkSmart = (label, est, idx, rngLocal, marketId) => {
     const opt = {};
