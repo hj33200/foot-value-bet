@@ -2099,9 +2099,16 @@ function matchCard(m){
   
   if(realOdds && realOdds['Unibet'] && realOdds['Unibet'].markets?.['Match Winner']) {
     const cotes = realOdds['Unibet'].markets['Match Winner'];
-    o1 = cotes[0]?.odd?.toFixed(2) || mkQuick(md.pH);
-    ox = cotes[1]?.odd?.toFixed(2) || mkQuick(md.pD);
-    o2 = cotes[2]?.odd?.toFixed(2) || mkQuick(md.pA);
+    try {
+      o1 = parseFloat(cotes[0]?.odd)?.toFixed(2) || mkQuick(md.pH);
+      ox = parseFloat(cotes[1]?.odd)?.toFixed(2) || mkQuick(md.pD);
+      o2 = parseFloat(cotes[2]?.odd)?.toFixed(2) || mkQuick(md.pA);
+    } catch(e) {
+      console.warn('Erreur parsing cotes:', e);
+      o1 = mkQuick(md.pH);
+      ox = mkQuick(md.pD);
+      o2 = mkQuick(md.pA);
+    }
   } else {
     // Fallback sur les cotes du modèle
     o1 = mkQuick(md.pH);
