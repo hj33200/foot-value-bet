@@ -2100,9 +2100,13 @@ function matchCard(m){
   if(realOdds && realOdds['Unibet'] && realOdds['Unibet'].markets?.['Match Winner']) {
     const cotes = realOdds['Unibet'].markets['Match Winner'];
     try {
-      o1 = parseFloat(cotes[0]?.odd)?.toFixed(2) || mkQuick(md.pH);
-      ox = parseFloat(cotes[1]?.odd)?.toFixed(2) || mkQuick(md.pD);
-      o2 = parseFloat(cotes[2]?.odd)?.toFixed(2) || mkQuick(md.pA);
+      const v1 = parseFloat(cotes[0]?.odd);
+      const vx = parseFloat(cotes[1]?.odd);
+      const v2 = parseFloat(cotes[2]?.odd);
+      
+      o1 = !isNaN(v1) ? v1.toFixed(2) : mkQuick(md.pH);
+      ox = !isNaN(vx) ? vx.toFixed(2) : mkQuick(md.pD);
+      o2 = !isNaN(v2) ? v2.toFixed(2) : mkQuick(md.pA);
     } catch(e) {
       console.warn('Erreur parsing cotes:', e);
       o1 = mkQuick(md.pH);
