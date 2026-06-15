@@ -2050,13 +2050,13 @@ function statsSection(d){
       ${simpleRow('Clean sheets',H.cs,A.cs)}
       ${simpleRow('BTTS (saison)',pct(H.bttsPct),pct(A.bttsPct))}
     </div>
-    <div class="card stat-block" style="grid-column:1/-1;padding:6px;min-height:auto;display:contents">
-      <h3 style="font-size:12px;margin-bottom:2px;grid-column:1/-1">Confrontations directes (H2H)</h3>
-      <div style="grid-column:1/-1;padding-bottom:4px">
+    <div class="card stat-block" style="grid-column:1/-1;padding:10px">
+      <h3 style="font-size:12px;margin-bottom:6px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Confrontations directes (H2H)</h3>
+      <div style="display:grid;gap:0">
         ${h2hRows2}
-        <div style="margin-top:3px;font-size:11px;color:var(--txt3)">
-          Buts projetés (modèle Poisson) : <b style="color:var(--blue);font-family:var(--mono);font-size:12px">${m.home.short} ${d.model.lH}</b> — <b style="color:var(--red);font-family:var(--mono);font-size:12px">${d.model.lA} ${m.away.short}</b>
-        </div>
+      </div>
+      <div style="margin-top:6px;font-size:11px;color:var(--txt3)">
+        Buts projetés (modèle Poisson): <b style="color:var(--blue);font-family:var(--mono);font-size:12px">${m.home.short} ${d.model.lH}</b> — <b style="color:var(--red);font-family:var(--mono);font-size:12px">${d.model.lA} ${m.away.short}</b>
       </div>
     </div>
   </div>`;
