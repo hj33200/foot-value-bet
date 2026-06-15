@@ -1459,16 +1459,8 @@ const state={
   loadedMatches:MATCHES.map(m=>m.id),
   collapsed:{},
   pendingBet:null,
-  bets:[
-    freshBet({matchId:'m1',matchName:'Paris Saint-Germain — Olympique Lyonnais',league:'Ligue 1',market:'Résultat (1N2)',sel:'Paris Saint-Germain',cote:1.78,stake:25,est:0.62,value:0.62*1.78-1,conf:7,status:'attente',note:'PSG solide à domicile, value claire sur le favori.'}),
-    freshBet({matchId:'m1',matchName:'Paris Saint-Germain — Olympique Lyonnais',league:'Ligue 1',market:'Total de buts',sel:'Plus de 2.5 buts',cote:1.95,stake:15,est:0.57,value:0.57*1.95-1,conf:6,status:'attente',note:'Attaque PSG prolifique.'}),
-  ],
-  history:[
-    freshBet({matchId:'m4',date:'24/05/2026',matchName:'Barcelona — Real Madrid',league:'La Liga',market:'Résultat (1N2)',sel:'Barcelona',cote:1.65,stake:30,est:0.66,value:0.66*1.65-1,conf:8,status:'gagne',note:'Domination attendue, value confirmée.'}),
-    freshBet({matchId:'m3',date:'22/05/2026',matchName:'Manchester United — Liverpool',league:'Premier League',market:'BTTS',sel:'Oui',cote:1.72,stake:20,est:0.58,value:0.58*1.72-1,conf:6,status:'perdu',note:'0-0, ratés des deux côtés.'}),
-    freshBet({matchId:'m6',date:'21/05/2026',matchName:'Bayern Munich — Borussia Dortmund',league:'Bundesliga',market:'Double chance',sel:'1X — Bayern ou nul',cote:1.40,stake:35,est:0.74,value:0.74*1.40-1,conf:7,status:'gagne',note:'Couverture sûre, bon rendement.'}),
-    freshBet({matchId:'m2',date:'20/05/2026',matchName:'AS Monaco — Olympique Marseille',league:'Ligue 1',market:'Handicap asiatique',sel:'ASM -0.5',cote:2.10,stake:18,est:0.49,value:0.49*2.10-1,conf:5,status:'annule',note:'Match reporté.'}),
-  ],
+  bets:[],
+  history:[],
   settings:{
     apiKey: localStorage.getItem('foot-value-bet-apiKey') || '',
     currency:'EUR',
