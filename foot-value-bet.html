@@ -2845,6 +2845,38 @@ function computeStatsFromMatches(matches) {
   return stats;
 }
 
+// 🎯 Charger les vraies cotes 1X2 pour tous les matchs du dashboard
+async function loadRealOddsForDashboard() {
+  if(!MATCHES || MATCHES.length === 0) return;
+  
+  console.log(`📡 Chargement des vraies cotes 1X2 pour ${MATCHES.length} matchs...`);
+  
+  // Charger les cotes en parallèle (max 5 à la fois pour ne pas surcharger)
+  const batchSize = 5;
+  for(let i = 0; i < MATCHES.length; i += batchSize) {
+    const batch = MATCHES.slice(i, i + batchSize);
+    const promises = batch.map(m => {
+      if(m.id && !window.REAL_ODDS_CACHE?.[m.id]) {
+        return fetchOddsFromAPIFootball(m.id)
+          .then(odds => {
+            if(odds) {
+              if(!window.REAL_ODDS_CACHE) window.REAL_ODDS_CACHE = {};
+              window.REAL_ODDS_CACHE[m.id] = odds;
+              console.log(`✅ Cotes chargées pour ${m.home.name} vs ${m.away.name}`);
+            }
+          })
+          .catch(err => console.warn(`⚠️ Erreur cotes ${m.id}:`, err));
+      }
+    });
+    
+    await Promise.all(promises);
+  }
+  
+  // Re-rendre le dashboard avec les vraies cotes
+  render();
+  console.log(`✅ Toutes les cotes chargées!`);
+}
+
 async function loadDashboardMatches() {
   const leagueKey = state.filterLeague === 'all' ? 'l1' : state.filterLeague;
   const dateISO = state.filterDate; // Already in ISO format (YYYY-MM-DD)
@@ -2890,7 +2922,8 @@ async function loadDashboardMatches() {
     matchCache = {};
     state.footballDataReady = true;
     toast(newMatches.length + ' match(s)');
-    render();
+    // Charger les vraies cotes 1X2 en arrière-plan
+    loadRealOddsForDashboard();
   } catch (err) {
     hideLoadingOverlay();
     console.error('Load error:', err);
