@@ -5,11 +5,34 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-apisports-key');
   
   if (req.method === 'OPTIONS') return res.status(200).end();
-  const { endpoint, league, season, date, team, from, to } = req.query;
+  const { endpoint, league, season, date, team, from, to, fixture } = req.query;
   const API_KEY = process.env.FOOTBALL_API_KEY || 'fa96c57b27321cef9fc4cae58aa3fe13';
   
   try {
     if (!endpoint) return res.status(400).json({ error: 'Missing endpoint' });
+    
+    // 📊 Endpoint ODDS
+    if (endpoint === 'odds' && fixture) {
+      const url = `https://v3.football.api-sports.io/odds?fixture=${encodeURIComponent(fixture)}`;
+      console.log(`📡 Odds pour fixture ${fixture}: ${url}`);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 
+          'x-apisports-key': API_KEY,
+          'User-Agent': 'Foot-Value-Bet-Proxy/2.0'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error(`❌ HTTP ${response.status}`);
+        return res.status(response.status).json({ error: `HTTP ${response.status}` });
+      }
+      
+      const data = await response.json();
+      console.log(`✅ ${data.response?.length || 0} cotes trouvées`);
+      return res.status(200).json(data);
+    }
     
     // 🔥 SPÉCIAL: Pour fixtures avec team, faire PLUSIEURS requêtes (toutes les saisons)
     if (endpoint === 'fixtures' && team && !season) {
