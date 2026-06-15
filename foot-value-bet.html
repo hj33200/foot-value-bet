@@ -525,8 +525,103 @@ const MATCHES=[
 ];
 
 /* ---------- match model (Poisson) ---------- */
-// 🎯 MODÈLE AVANCÉ: Calculer les probabilités avec TOUTES les données réelles
-function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
+// 📊 Récupérer les STATISTICS avancées (xG, possession, tirs, etc.)
+async function getAdvancedStats(fixtureId) {
+  try {
+    const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=statistics&fixture=${fixtureId}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    if (!data.response || data.response.length < 2) return null;
+    
+    const homeStats = data.response[0]?.statistics || [];
+    const awayStats = data.response[1]?.statistics || [];
+    
+    // Extraire xG, possession, tirs
+    const getStatValue = (stats, key) => {
+      const stat = stats.find(s => s.type?.toLowerCase() === key.toLowerCase());
+      return stat ? parseFloat(stat.value) : null;
+    };
+    
+    return {
+      homeXG: getStatValue(homeStats, 'expected_goals') || 0,
+      homeShots: getStatValue(homeStats, 'shots on goal') || 0,
+      homePossession: getStatValue(homeStats, 'ball possession') || 50,
+      awayXG: getStatValue(awayStats, 'expected_goals') || 0,
+      awayShots: getStatValue(awayStats, 'shots on goal') || 0,
+      awayPossession: getStatValue(awayStats, 'ball possession') || 50,
+    };
+  } catch(e) {
+    console.warn('Erreur getAdvancedStats:', e);
+    return null;
+  }
+}
+
+// 🔄 Récupérer l'HISTORIQUE DIRECT (H2H) entre 2 équipes
+async function getH2HHistory(homeId, awayId) {
+  try {
+    const h2hString = `${homeId}-${awayId}`;
+    const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=h2h&h2h=${h2hString}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    if (!data.response || data.response.length === 0) return null;
+    
+    const matches = data.response;
+    let homeWins = 0, draws = 0, awayWins = 0;
+    let homeGF = 0, homeGA = 0;
+    
+    matches.forEach(m => {
+      const hg = m.goals?.home || 0;
+      const ag = m.goals?.away || 0;
+      homeGF += hg;
+      homeGA += ag;
+      
+      if (hg > ag) homeWins++;
+      else if (hg < ag) awayWins++;
+      else draws++;
+    });
+    
+    return {
+      totalMatches: matches.length,
+      homeWins,
+      draws,
+      awayWins,
+      homeGF,
+      homeGA,
+      homeAvgGoals: matches.length > 0 ? homeGF / matches.length : 0,
+      awayAvgGoals: matches.length > 0 ? homeGA / matches.length : 0,
+    };
+  } catch(e) {
+    console.warn('Erreur getH2HHistory:', e);
+    return null;
+  }
+}
+
+// 🏆 Récupérer INFO ÉQUIPES (ranking FIFA, blessures, etc.)
+async function getTeamInfo(teamId) {
+  try {
+    const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=teams&team=${teamId}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    if (!data.response || data.response.length === 0) return null;
+    
+    const team = data.response[0];
+    return {
+      fifaRanking: team.venue?.capacity ? team.id : null, // Placeholder
+      founded: team.founded,
+      venue: team.venue?.name,
+      manager: team.coach?.name,
+    };
+  } catch(e) {
+    console.warn('Erreur getTeamInfo:', e);
+    return null;
+  }
+}
   console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS ===`);
   console.log(`🏠 Home: ${home.name} (id: ${home.id})`);
   console.log(`✈️ Away: ${away.name} (id: ${away.id})`);
@@ -574,19 +669,17 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
     if(!form || form.length === 0) return 1.0;
     
     // Pondération: le plus récent a le poids le plus élevé
-    // Dernier match: poids 5, avant-dernier: 4, etc.
     let weightedPoints = 0;
     let totalWeight = 0;
     
     for(let i = 0; i < form.length; i++) {
-      const weight = (form.length - i); // Plus récent = poids plus élevé
+      const weight = (form.length - i);
       const points = form[i]==='V' ? 3 : form[i]==='D' ? 1 : 0;
       weightedPoints += points * weight;
-      totalWeight += 3 * weight; // Max 3 points par match
+      totalWeight += 3 * weight;
     }
     
     const avgPercentage = weightedPoints / totalWeight;
-    // Form mult: 1.5 si 100% wins, 1.0 si 50%, 0.5 si 0% wins
     const formMult = 0.5 + avgPercentage;
     
     return formMult;
@@ -605,7 +698,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   const homeAdvantage = 1.0; // Terrain neutre
   
-  let lambdaHome = (homeOffense * homeFormMult) / (awayDefense + 0.1); // +0.1 pour éviter division par 0
+  let lambdaHome = (homeOffense * homeFormMult) / (awayDefense + 0.1);
   let lambdaAway = (awayOffense * awayFormMult) / (homeDefense + 0.1);
   
   // Appliquer le home advantage
@@ -622,7 +715,194 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   return { lambdaHome, lambdaAway, homeFormMult, awayFormMult };
 }
 
-function buildModel(home,away,homeForm,awayForm,rng){
+// 📊 Récupérer les STATISTICS avancées (xG, possession, tirs, etc.)
+async function getAdvancedStats(fixtureId) {
+  try {
+    const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=statistics&fixture=${fixtureId}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    if (!data.response || data.response.length < 2) return null;
+    
+    const homeStats = data.response[0]?.statistics || [];
+    const awayStats = data.response[1]?.statistics || [];
+    
+    // Extraire xG, possession, tirs
+    const getStatValue = (stats, key) => {
+      const stat = stats.find(s => s.type?.toLowerCase() === key.toLowerCase());
+      return stat ? parseFloat(stat.value) : null;
+    };
+    
+    return {
+      homeXG: getStatValue(homeStats, 'expected_goals') || 0,
+      homeShots: getStatValue(homeStats, 'shots on goal') || 0,
+      homePossession: getStatValue(homeStats, 'ball possession') || 50,
+      awayXG: getStatValue(awayStats, 'expected_goals') || 0,
+      awayShots: getStatValue(awayStats, 'shots on goal') || 0,
+      awayPossession: getStatValue(awayStats, 'ball possession') || 50,
+    };
+  } catch(e) {
+    console.warn('Erreur getAdvancedStats:', e);
+    return null;
+  }
+}
+
+// 🔄 Récupérer l'HISTORIQUE DIRECT (H2H) entre 2 équipes
+async function getH2HHistory(homeId, awayId) {
+  try {
+    const h2hString = `${homeId}-${awayId}`;
+    const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=h2h&h2h=${h2hString}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    if (!data.response || data.response.length === 0) return null;
+    
+    const matches = data.response;
+    let homeWins = 0, draws = 0, awayWins = 0;
+    let homeGF = 0, homeGA = 0;
+    
+    matches.forEach(m => {
+      const hg = m.goals?.home || 0;
+      const ag = m.goals?.away || 0;
+      homeGF += hg;
+      homeGA += ag;
+      
+      if (hg > ag) homeWins++;
+      else if (hg < ag) awayWins++;
+      else draws++;
+    });
+    
+    return {
+      totalMatches: matches.length,
+      homeWins,
+      draws,
+      awayWins,
+      homeGF,
+      homeGA,
+      homeAvgGoals: matches.length > 0 ? homeGF / matches.length : 0,
+      awayAvgGoals: matches.length > 0 ? homeGA / matches.length : 0,
+    };
+  } catch(e) {
+    console.warn('Erreur getH2HHistory:', e);
+    return null;
+  }
+}
+
+// 🏆 Récupérer INFO ÉQUIPES (ranking FIFA, blessures, etc.)
+async function getTeamInfo(teamId) {
+  try {
+    const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=teams&team=${teamId}`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    if (!data.response || data.response.length === 0) return null;
+    
+    const team = data.response[0];
+    return {
+      fifaRanking: team.venue?.capacity ? team.id : null,
+      founded: team.founded,
+      venue: team.venue?.name,
+      manager: team.coach?.name,
+    };
+  } catch(e) {
+    console.warn('Erreur getTeamInfo:', e);
+    return null;
+  }
+}
+
+// 🎯 MODÈLE AVANCÉ: Calculer les probabilités avec TOUTES les données réelles
+function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
+  console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS ===`);
+  console.log(`🏠 Home: ${home.name} (id: ${home.id})`);
+  console.log(`✈️ Away: ${away.name} (id: ${away.id})`);
+  
+  // Récupérer les vraies stats
+  const homeStats = FOOTBALL_API.getTeamStats(home.id) || {};
+  const awayStats = FOOTBALL_API.getTeamStats(away.id) || {};
+  
+  // Fallback sur les stats de base si pas de vraies stats
+  const homeGF = homeStats.gf || home.gf || 1;
+  const homeGA = homeStats.ga || home.ga || 1;
+  const homeMatches = homeStats.matches || home.matches || 1;
+  
+  const awayGF = awayStats.gf || away.gf || 1;
+  const awayGA = awayStats.ga || away.ga || 1;
+  const awayMatches = awayStats.matches || away.matches || 1;
+  
+  // 1️⃣ FORCES OFFENSIVES/DÉFENSIVES
+  const homeOffense = homeGF / homeMatches;
+  const homeDefense = homeGA / homeMatches;
+  const awayOffense = awayGF / awayMatches;
+  const awayDefense = awayGA / awayMatches;
+  
+  console.log(`\n⚔️ FORCES:`);
+  console.log(`  ${home.name} - Attaque: ${homeOffense.toFixed(2)}/match, Défense: ${homeDefense.toFixed(2)}/match`);
+  console.log(`  ${away.name} - Attaque: ${awayOffense.toFixed(2)}/match, Défense: ${awayDefense.toFixed(2)}/match`);
+  
+  // 2️⃣ RATIO DE VICTOIRES
+  const calcWinRate = (form) => {
+    if(!form) return 0.5;
+    const points = form.split('').reduce((s,c) => s + (c==='V'?3:c==='D'?1:0), 0);
+    const maxPoints = form.length * 3;
+    return maxPoints > 0 ? points / maxPoints : 0.5;
+  };
+  
+  const homeWinRate = calcWinRate(homeForm);
+  const awayWinRate = calcWinRate(awayForm);
+  
+  console.log(`\n🏆 TAUX DE VICTOIRES:`);
+  console.log(`  ${home.name}: ${(homeWinRate*100).toFixed(1)}%`);
+  console.log(`  ${away.name}: ${(awayWinRate*100).toFixed(1)}%`);
+  
+  // 3️⃣ FORM MULTIPLIER AMÉLIORÉ
+  const calcAdvancedFormMult = (form) => {
+    if(!form || form.length === 0) return 1.0;
+    
+    let weightedPoints = 0;
+    let totalWeight = 0;
+    
+    for(let i = 0; i < form.length; i++) {
+      const weight = (form.length - i);
+      const points = form[i]==='V' ? 3 : form[i]==='D' ? 1 : 0;
+      weightedPoints += points * weight;
+      totalWeight += 3 * weight;
+    }
+    
+    const avgPercentage = weightedPoints / totalWeight;
+    const formMult = 0.5 + avgPercentage;
+    
+    return formMult;
+  };
+  
+  const homeFormMult = calcAdvancedFormMult(homeForm);
+  const awayFormMult = calcAdvancedFormMult(awayForm);
+  
+  console.log(`\n📈 MULTIPLICATEUR DE FORME (pondéré):`);
+  console.log(`  ${home.name}: ${homeFormMult.toFixed(3)}`);
+  console.log(`  ${away.name}: ${awayFormMult.toFixed(3)}`);
+  
+  // 4️⃣ LAMBDAS POISSON AVANCÉES
+  const homeAdvantage = 1.0; // Terrain neutre
+  
+  let lambdaHome = (homeOffense * homeFormMult) / (awayDefense + 0.1);
+  let lambdaAway = (awayOffense * awayFormMult) / (homeDefense + 0.1);
+  
+  lambdaHome *= homeAdvantage;
+  
+  lambdaHome = clamp(lambdaHome, 0.3, 5.0);
+  lambdaAway = clamp(lambdaAway, 0.3, 5.0);
+  
+  console.log(`\n🎲 LAMBDAS POISSON FINALES:`);
+  console.log(`  ${home.name}: ${lambdaHome.toFixed(3)}`);
+  console.log(`  ${away.name}: ${lambdaAway.toFixed(3)}`);
+  
+  return { lambdaHome, lambdaAway, homeFormMult, awayFormMult };
+}
+
+
   // 🎯 UTILISER LE MODÈLE AVANCÉ POUR CALCULER LES LAMBDAS
   const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm);
   let lH = advanced.lambdaHome;
