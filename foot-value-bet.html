@@ -220,16 +220,15 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .odds-grid.c3{grid-template-columns:repeat(3,1fr)}
 .odds-grid.c4{grid-template-columns:repeat(4,1fr)}
 .odd-btn{
-  background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;text-align:left;transition:.15s;position:relative;overflow:hidden;
+  background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;text-align:left;transition:.15s;position:relative;overflow:visible;
 }
 .odd-btn:hover{border-color:var(--accent);background:var(--panel2);transform:translateY(-2px)}
 .odd-btn .ob-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
 .odd-btn .ob-sel{font-weight:700;font-size:13px;color:var(--txt);line-height:1.2}
-.odd-btn .ob-cote{font-family:var(--mono);font-weight:700;font-size:17px}
-.ob-cote-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.real-badge{font-size:10px;font-weight:700;color:var(--green);background:rgba(39,209,124,0.15);padding:2px 6px;border-radius:4px;text-transform:uppercase}
-.btn-edit{background:transparent;border:none;padding:4px 6px;cursor:pointer;font-size:12px;opacity:0.5;transition:.2s;border-radius:6px;display:inline-flex;align-items:center;justify-content:center}
-.btn-edit:hover{opacity:1;color:var(--accent)}
+.odd-btn .ob-cote-display{font-family:var(--mono);font-weight:700;font-size:24px;margin:12px 0 8px;position:relative}
+.btn-edit{background:transparent;border:none;padding:4px 6px;cursor:pointer;font-size:14px;opacity:0;transition:.2s;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;position:absolute;top:0;right:0}
+.odd-btn:hover .btn-edit{opacity:0.6}
+.odd-btn:hover .btn-edit:hover{opacity:1;color:var(--accent)}
 .odd-btn .ob-stats{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10.5px;color:var(--txt3)}
 .odd-btn .ob-stats .v{font-weight:700;margin-left:auto}
 .voyant{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
@@ -701,7 +700,7 @@ async function fetchOddsFromAPIFootball(fixtureId) {
       return null;
     }
     
-    // Regrouper les cotes par bookmaker
+    // Regrouper les cotes par bookmaker et par marché
     const oddsMap = {};
     oddsData.forEach(bet => {
       const bookmaker = bet.bookmaker.name;
@@ -715,19 +714,20 @@ async function fetchOddsFromAPIFootball(fixtureId) {
         };
       }
       
-      // Récupérer les marchés (1X2 = cotes standard)
+      // Récupérer TOUS les marchés disponibles
       bet.bets.forEach(betMarket => {
-        if(betMarket.name === '1X2') {
-          oddsMap[bookmaker].markets['1X2'] = betMarket.values.map(v => ({
-            odd: v.odd,
-            value: v.value,
-            betName: betMarket.name
-          }));
-        }
+        const marketName = betMarket.name;
+        // Récupérer les cotes pour ce marché
+        oddsMap[bookmaker].markets[marketName] = betMarket.values.map(v => ({
+          odd: v.odd,
+          value: v.value,
+          name: v.value // Nom de la sélection (Home/Draw/Away ou Over/Under, etc.)
+        }));
+        console.log(`  📌 Marché ${marketName}:`, oddsMap[bookmaker].markets[marketName]);
       });
     });
     
-    console.log(`✅ Cotes API-Football récupérées:`, oddsMap);
+    console.log(`✅ Cotes API-Football récupérées (tous les marchés):`, oddsMap);
     return oddsMap;
     
   } catch(err) {
@@ -2039,22 +2039,42 @@ async function openDetail(id){
   state.selectedMatchId = id;
   const m = MATCHES.find(x => x.id === id);
   
-  // Récupérer les vraies cotes en premier
-  if(m && m.fixtureId) {
-    console.log(`📡 Chargement des vraies cotes pour fixture ${m.fixtureId}...`);
-    const realOdds = await fetchOddsFromAPIFootball(m.fixtureId);
-    if(realOdds) {
-      console.log(`✅ Vraies cotes reçues:`, realOdds);
-      // Stocker les cotes dans un cache pour getMatchData
-      if(!window.REAL_ODDS_CACHE) window.REAL_ODDS_CACHE = {};
-      window.REAL_ODDS_CACHE[id] = realOdds;
-    }
-  }
-  
-  // Invalider le cache pour forcer la reconstruction des marchés
+  // Invalider immédiatement le cache
   delete matchCache[id];
   
+  // Aller à la page Détail
   go('detail');
+  
+  // Récupérer les vraies cotes EN ARRIÈRE-PLAN
+  if(m && m.fixtureId) {
+    console.log(`📡 Chargement des vraies cotes pour fixture ${m.fixtureId}...`);
+    
+    // Afficher un spinner de chargement
+    showLoadingOverlay('Chargement cotes réelles...');
+    
+    try {
+      const realOdds = await fetchOddsFromAPIFootball(m.fixtureId);
+      hideLoadingOverlay();
+      
+      if(realOdds) {
+        console.log(`✅ Vraies cotes reçues:`, realOdds);
+        // Stocker les cotes dans le cache global
+        if(!window.REAL_ODDS_CACHE) window.REAL_ODDS_CACHE = {};
+        window.REAL_ODDS_CACHE[id] = realOdds;
+        
+        // Invalider le cache et forcer le re-render
+        delete matchCache[id];
+        render();
+        toast('✅ Cotes réelles chargées');
+      } else {
+        toast('⚠️ Cotes réelles non disponibles');
+      }
+    } catch(err) {
+      hideLoadingOverlay();
+      console.error('❌ Erreur lors du chargement des cotes:', err);
+      toast('❌ Erreur cotes');
+    }
+  }
 }
 
 /* ============================================================
@@ -2216,26 +2236,21 @@ function oddButton(mk,s,i){
   if(s.color==='gray'||s.cote==null){
     return `<div class="odd-btn gray">
       <div class="ob-top"><span class="ob-sel">${s.sel}</span><span class="voyant v-gray"></span></div>
-      <div class="ob-stats">Données insuffisantes</div></div>`;
+      <div class="ob-stats">N/A</div></div>`;
   }
   const vTxt=(s.value>=0?'+':'')+(s.value*100).toFixed(1)+'%';
-  const realBadge = s.realCote ? '<span class="real-badge">API</span>' : '';
-  const editBtn = `<button class="btn-edit" onclick="editOddCote('${mk.id}',${i}); event.stopPropagation()" title="Éditer la cote">✏️</button>`;
-  return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i})'>
+  return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i}); event.stopPropagation();'>
     <div class="ob-top">
       <span class="ob-sel">${s.sel}</span>
       <span class="voyant v-${s.color}"></span>
     </div>
-    <div class="ob-cote-row">
-      <span class="ob-cote">${s.cote.toFixed(2)}</span>
-      ${realBadge}
-      ${editBtn}
-    </div>
+    <div class="ob-cote-display">${s.cote.toFixed(2)}</div>
     <div class="ob-stats">
-      <span title="Probabilité estimée (modèle)">est ${(s.est*100).toFixed(0)}%</span>
-      <span title="Probabilité implicite">imp ${(s.implied*100).toFixed(0)}%</span>
-      <span class="v" title="Value">${vTxt}</span>
+      <span>imp ${(s.implied*100).toFixed(0)}%</span>
+      <span>est ${(s.est*100).toFixed(0)}%</span>
+      <span class="v">${vTxt}</span>
     </div>
+    <button class="btn-edit" onclick="editOddCote('${mk.id}',${i}); event.stopPropagation();" title="Éditer la cote">✏️</button>
   </button>`;
 }
 function toggleMarket(id){state.collapsed[id]=!state.collapsed[id];const el=document.getElementById('mk-'+id);if(el)el.classList.toggle('collapsed')}
