@@ -2050,10 +2050,10 @@ function statsSection(d){
       ${simpleRow('Clean sheets',H.cs,A.cs)}
       ${simpleRow('BTTS (saison)',pct(H.bttsPct),pct(A.bttsPct))}
     </div>
-    <div class="card stat-block" style="grid-column:1/-1">
-      <h3 style="font-size:14px;display:flex;gap:8px;align-items:center">${iconSvg('M12 5l3 3m-3-3l-3 3M2 12h20M4 19l3-3m-3 3l-3-3')} <span>Confrontations directes (H2H)</span></h3>
+    <div class="card stat-block" style="grid-column:1/-1;padding:12px">
+      <h3 style="font-size:14px;display:flex;gap:8px;align-items:center;margin-bottom:8px">${iconSvg('M12 5l3 3m-3-3l-3 3M2 12h20M4 19l3-3m-3 3l-3-3')} <span>Confrontations directes (H2H)</span></h3>
       ${h2hRows2}
-      <div style="margin-top:10px;font-size:12px;color:var(--txt3)">
+      <div style="margin-top:8px;font-size:12px;color:var(--txt3)">
         Buts projetés (modèle Poisson) : <b style="color:var(--blue);font-family:var(--mono)">${m.home.short} ${d.model.lH}</b> — <b style="color:var(--red);font-family:var(--mono)">${d.model.lA} ${m.away.short}</b>
       </div>
     </div>
