@@ -525,33 +525,112 @@ const MATCHES=[
 ];
 
 /* ---------- match model (Poisson) ---------- */
-function buildModel(home,away,homeForm,awayForm,rng){
-  // FORMULA 2 (VALIDATED): λ = (GF/matches) / (GA/matches of opponent) × HA × Form_Multiplier
+// 🎯 MODÈLE AVANCÉ: Calculer les probabilités avec TOUTES les données réelles
+function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
+  console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS ===`);
+  console.log(`🏠 Home: ${home.name} (id: ${home.id})`);
+  console.log(`✈️ Away: ${away.name} (id: ${away.id})`);
   
-  // Calculate goals per match from real stats
-  const gfH = home.gf / home.matches;  // Goals for per match
-  const gaA = away.ga / away.matches;  // Goals against per match
-  const gfA = away.gf / away.matches;
-  const gaH = home.ga / home.matches;
+  // Récupérer les vraies stats
+  const homeStats = FOOTBALL_API.getTeamStats(home.id) || {};
+  const awayStats = FOOTBALL_API.getTeamStats(away.id) || {};
   
-  // Form multiplier: 1.0 + (win_rate - 55%) × 0.6
-  const calcFormMult = (form) => {
-    if (!form) return 1.0;
+  // Fallback sur les stats de base si pas de vraies stats
+  const homeGF = homeStats.gf || home.gf || 1;
+  const homeGA = homeStats.ga || home.ga || 1;
+  const homeMatches = homeStats.matches || home.matches || 1;
+  
+  const awayGF = awayStats.gf || away.gf || 1;
+  const awayGA = awayStats.ga || away.ga || 1;
+  const awayMatches = awayStats.matches || away.matches || 1;
+  
+  // 1️⃣ FORCES OFFENSIVES/DÉFENSIVES
+  const homeOffense = homeGF / homeMatches;  // Buts marqués par match
+  const homeDefense = homeGA / homeMatches;  // Buts encaissés par match
+  const awayOffense = awayGF / awayMatches;
+  const awayDefense = awayGA / awayMatches;
+  
+  console.log(`\n⚔️ FORCES:`);
+  console.log(`  ${home.name} - Attaque: ${homeOffense.toFixed(2)}/match, Défense: ${homeDefense.toFixed(2)}/match`);
+  console.log(`  ${away.name} - Attaque: ${awayOffense.toFixed(2)}/match, Défense: ${awayDefense.toFixed(2)}/match`);
+  
+  // 2️⃣ RATIO DE VICTOIRES
+  const calcWinRate = (form) => {
+    if(!form) return 0.5;
     const points = form.split('').reduce((s,c) => s + (c==='V'?3:c==='D'?1:0), 0);
-    const winRate = points / 15; // Max 15 points in 5 matches
-    return 1.0 + (winRate - 0.55) * 0.6;
+    const maxPoints = form.length * 3;
+    return maxPoints > 0 ? points / maxPoints : 0.5;
   };
   
-  const formMultH = calcFormMult(homeForm);
-  const formMultA = calcFormMult(awayForm);
+  const homeWinRate = calcWinRate(homeForm);
+  const awayWinRate = calcWinRate(awayForm);
   
-  // Lambdas with home advantage 1.14
-  let lH = (gfH / gaA) * 1.14 * formMultH;
-  let lA = (gfA / gaH) * formMultA;
+  console.log(`\n🏆 TAUX DE VICTOIRES:`);
+  console.log(`  ${home.name}: ${(homeWinRate*100).toFixed(1)}%`);
+  console.log(`  ${away.name}: ${(awayWinRate*100).toFixed(1)}%`);
   
-  // Clamp to reasonable ranges
-  lH = clamp(lH, 0.3, 4.0);
-  lA = clamp(lA, 0.3, 4.0);
+  // 3️⃣ FORM MULTIPLIER AMÉLIORÉ (poids plus élevé pour les derniers matchs)
+  const calcAdvancedFormMult = (form) => {
+    if(!form || form.length === 0) return 1.0;
+    
+    // Pondération: le plus récent a le poids le plus élevé
+    // Dernier match: poids 5, avant-dernier: 4, etc.
+    let weightedPoints = 0;
+    let totalWeight = 0;
+    
+    for(let i = 0; i < form.length; i++) {
+      const weight = (form.length - i); // Plus récent = poids plus élevé
+      const points = form[i]==='V' ? 3 : form[i]==='D' ? 1 : 0;
+      weightedPoints += points * weight;
+      totalWeight += 3 * weight; // Max 3 points par match
+    }
+    
+    const avgPercentage = weightedPoints / totalWeight;
+    // Form mult: 1.5 si 100% wins, 1.0 si 50%, 0.5 si 0% wins
+    const formMult = 0.5 + avgPercentage;
+    
+    return formMult;
+  };
+  
+  const homeFormMult = calcAdvancedFormMult(homeForm);
+  const awayFormMult = calcAdvancedFormMult(awayForm);
+  
+  console.log(`\n📈 MULTIPLICATEUR DE FORME (pondéré):`);
+  console.log(`  ${home.name}: ${homeFormMult.toFixed(3)}`);
+  console.log(`  ${away.name}: ${awayFormMult.toFixed(3)}`);
+  
+  // 4️⃣ LAMBDAS POISSON AVANCÉES
+  // Lambda = (Force offensive × Multiplicateur) / (Force défensive de l'opponent)
+  // Terrain neutre (Coupe du Monde): home advantage = 1.0
+  
+  const homeAdvantage = 1.0; // Terrain neutre
+  
+  let lambdaHome = (homeOffense * homeFormMult) / (awayDefense + 0.1); // +0.1 pour éviter division par 0
+  let lambdaAway = (awayOffense * awayFormMult) / (homeDefense + 0.1);
+  
+  // Appliquer le home advantage
+  lambdaHome *= homeAdvantage;
+  
+  // Clamper dans une plage raisonnable
+  lambdaHome = clamp(lambdaHome, 0.3, 5.0);
+  lambdaAway = clamp(lambdaAway, 0.3, 5.0);
+  
+  console.log(`\n🎲 LAMBDAS POISSON (Expected Goals):`);
+  console.log(`  ${home.name} (avec avantage domicile): ${lambdaHome.toFixed(3)}`);
+  console.log(`  ${away.name}: ${lambdaAway.toFixed(3)}`);
+  
+  return { lambdaHome, lambdaAway, homeFormMult, awayFormMult };
+}
+
+function buildModel(home,away,homeForm,awayForm,rng){
+  // 🎯 UTILISER LE MODÈLE AVANCÉ POUR CALCULER LES LAMBDAS
+  const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm);
+  let lH = advanced.lambdaHome;
+  let lA = advanced.lambdaAway;
+  const formMultH = advanced.homeFormMult;
+  const formMultA = advanced.awayFormMult;
+  
+  console.log(`\n✅ Lambdas finales: lH=${lH.toFixed(3)}, lA=${lA.toFixed(3)}\n`);
   
   const CAP = 7;
   const FM = Array.from({length:13}, () => new Array(13).fill(0));
