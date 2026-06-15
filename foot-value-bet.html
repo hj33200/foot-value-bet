@@ -2092,7 +2092,23 @@ function viewDashboard(){
 }
 function matchCard(m){
   const d=getMatchData(m.id);const md=d.model;
-  const o1=mkQuick(md.pH),ox=mkQuick(md.pD),o2=mkQuick(md.pA);
+  
+  // Chercher les vraies cotes Unibet pour 1X2
+  let o1, ox, o2;
+  const realOdds = window.REAL_ODDS_CACHE?.[m.id];
+  
+  if(realOdds && realOdds['Unibet'] && realOdds['Unibet'].markets?.['Match Winner']) {
+    const cotes = realOdds['Unibet'].markets['Match Winner'];
+    o1 = cotes[0]?.odd?.toFixed(2) || mkQuick(md.pH);
+    ox = cotes[1]?.odd?.toFixed(2) || mkQuick(md.pD);
+    o2 = cotes[2]?.odd?.toFixed(2) || mkQuick(md.pA);
+  } else {
+    // Fallback sur les cotes du modèle
+    o1 = mkQuick(md.pH);
+    ox = mkQuick(md.pD);
+    o2 = mkQuick(md.pA);
+  }
+  
   return `
   <div class="card match-card" onclick="openDetailWrapper('${m.id}')">
     <div class="mc-top">
