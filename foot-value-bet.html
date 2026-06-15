@@ -684,14 +684,15 @@ async function fetchOddsFromAPIFootball(fixtureId) {
   }
   
   try {
-    const url = `https://v3.football.api-sports.io/odds?fixture=${fixtureId}&apiKey=${apiKey}`;
-    console.log(`📡 Appel API URL:`, url);
+    // ✅ Utiliser le PROXY Vercel au lieu d'appeler l'API directement (problème CORS)
+    const url = `${location.origin}/api/proxy?endpoint=odds&fixture=${fixtureId}&apiKey=${apiKey}`;
+    console.log(`📡 Appel PROXY URL:`, url);
     
     const res = await fetch(url);
     console.log(`📨 Réponse HTTP:`, res.status, res.statusText);
     
     if(!res.ok) {
-      console.error(`❌ API-Football HTTP ${res.status}`);
+      console.error(`❌ API HTTP ${res.status}`);
       const errorText = await res.text();
       console.error(`Erreur détail:`, errorText);
       return null;
