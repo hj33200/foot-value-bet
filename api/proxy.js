@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-apisports-key');
   
   if (req.method === 'OPTIONS') return res.status(200).end();
-  const { endpoint, league, season, date, team, from, to, fixture } = req.query;
+  const { endpoint, league, season, date, team, from, to, fixture, h2h, player } = req.query;
   const API_KEY = process.env.FOOTBALL_API_KEY || 'fa96c57b27321cef9fc4cae58aa3fe13';
   
   try {
@@ -31,6 +31,75 @@ export default async function handler(req, res) {
       
       const data = await response.json();
       console.log(`✅ ${data.response?.length || 0} cotes trouvées`);
+      return res.status(200).json(data);
+    }
+    
+    // 📈 Endpoint STATISTICS (xG, possession, tirs, etc.)
+    if (endpoint === 'statistics' && fixture) {
+      const url = `https://v3.football.api-sports.io/statistics?fixture=${encodeURIComponent(fixture)}`;
+      console.log(`📡 Statistics pour fixture ${fixture}: ${url}`);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 
+          'x-apisports-key': API_KEY,
+          'User-Agent': 'Foot-Value-Bet-Proxy/2.0'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error(`❌ HTTP ${response.status}`);
+        return res.status(response.status).json({ error: `HTTP ${response.status}` });
+      }
+      
+      const data = await response.json();
+      console.log(`✅ Statistics trouvées`);
+      return res.status(200).json(data);
+    }
+    
+    // 🔄 Endpoint H2H (Historique direct entre 2 équipes)
+    if (endpoint === 'h2h' && h2h) {
+      const url = `https://v3.football.api-sports.io/fixtures/headtohead?h2h=${encodeURIComponent(h2h)}&last=${encodeURIComponent('20')}`;
+      console.log(`📡 H2H pour ${h2h}: ${url}`);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 
+          'x-apisports-key': API_KEY,
+          'User-Agent': 'Foot-Value-Bet-Proxy/2.0'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error(`❌ HTTP ${response.status}`);
+        return res.status(response.status).json({ error: `HTTP ${response.status}` });
+      }
+      
+      const data = await response.json();
+      console.log(`✅ ${data.response?.length || 0} matchs H2H trouvés`);
+      return res.status(200).json(data);
+    }
+    
+    // 🏆 Endpoint TEAMS (Info équipes, ranking FIFA, blessures)
+    if (endpoint === 'teams' && team) {
+      const url = `https://v3.football.api-sports.io/teams?id=${encodeURIComponent(team)}`;
+      console.log(`📡 Team info pour ${team}: ${url}`);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 
+          'x-apisports-key': API_KEY,
+          'User-Agent': 'Foot-Value-Bet-Proxy/2.0'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error(`❌ HTTP ${response.status}`);
+        return res.status(response.status).json({ error: `HTTP ${response.status}` });
+      }
+      
+      const data = await response.json();
+      console.log(`✅ Team info trouvée`);
       return res.status(200).json(data);
     }
     
