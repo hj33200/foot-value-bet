@@ -2017,7 +2017,7 @@ function matchCard(m){
   const d=getMatchData(m.id);const md=d.model;
   const o1=mkQuick(md.pH),ox=mkQuick(md.pD),o2=mkQuick(md.pA);
   return `
-  <div class="card match-card" onclick="openDetail('${m.id}')">
+  <div class="card match-card" onclick="openDetailWrapper('${m.id}')">
     <div class="mc-top">
       <span class="mc-league">${flag(m.lg)} ${LEAGUES[m.lg].name}</span>
       ${statusTag(m.status)}
@@ -2033,7 +2033,7 @@ function matchCard(m){
       <div class="mc-odd"><span>2</span><b>${o2}</b></div>
     </div>
     <div class="mc-foot">
-      <button class="btn btn-primary btn-sm" style="flex:1" onclick="event.stopPropagation();openDetail('${m.id}')">
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="event.stopPropagation();openDetailWrapper('${m.id}')">
         Voir l'analyse ${iconSvg('M5 12h14M13 5l7 7-7 7')}</button>
     </div>
   </div>`;
@@ -2042,6 +2042,11 @@ function mkQuick(p){return r2(1/(p*1.06)).toFixed(2)}
 function loadMatches(){
   loadDashboardMatches();
 }
+function openDetailWrapper(id) {
+  // Wrapper pour appeler la fonction async sans problème
+  openDetail(id).catch(err => console.error('Erreur openDetail:', err));
+}
+
 async function openDetail(id){
   console.log(`🔍 openDetail appelée pour match ID: ${id}`);
   state.selectedMatchId = id;
