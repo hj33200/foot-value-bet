@@ -684,8 +684,8 @@ async function fetchOddsFromAPIFootball(fixtureId) {
   }
   
   try {
-    // ✅ Utiliser le PROXY Vercel au lieu d'appeler l'API directement (problème CORS)
-    const url = `${location.origin}/api/proxy?endpoint=odds&fixture=${fixtureId}&apiKey=${apiKey}`;
+    // ✅ Utiliser l'URL Vercel (hardcodée) au lieu de location.origin
+    const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=odds&fixture=${fixtureId}`;
     console.log(`📡 Appel PROXY URL:`, url);
     
     const res = await fetch(url);
