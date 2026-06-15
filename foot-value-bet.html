@@ -2053,7 +2053,8 @@ async function openDetail(id){
   const m = MATCHES.find(x => x.id === id);
   
   console.log(`📋 Match trouvé:`, m);
-  const fixtureId = m?.fixture?.id;
+  // L'ID du match EST le fixtureId de l'API-Football
+  const fixtureId = m?.id || m?.fixture?.id;
   console.log(`📌 fixtureId: ${fixtureId}`);
   
   // Invalider immédiatement le cache
