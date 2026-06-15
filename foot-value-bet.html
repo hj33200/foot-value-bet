@@ -226,7 +226,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .odd-btn .ob-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
 .odd-btn .ob-sel{font-weight:700;font-size:13px;color:var(--txt);line-height:1.2}
 .odd-btn .ob-cote-display{font-family:var(--mono);font-weight:700;font-size:24px;margin:12px 0 8px;position:relative}
-.btn-edit{background:transparent;border:none;padding:4px 6px;cursor:pointer;font-size:14px;opacity:0;transition:.2s;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;position:absolute;top:0;right:0}
+.btn-edit{background:transparent;border:none;padding:4px 6px;cursor:pointer;font-size:14px;opacity:0;transition:.2s;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;position:absolute;top:0;right:0;user-select:none}
 .odd-btn:hover .btn-edit{opacity:0.6}
 .odd-btn:hover .btn-edit:hover{opacity:1;color:var(--accent)}
 .odd-btn .ob-stats{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10.5px;color:var(--txt3)}
@@ -2250,7 +2250,7 @@ function oddButton(mk,s,i){
       <span>est ${(s.est*100).toFixed(0)}%</span>
       <span class="v">${vTxt}</span>
     </div>
-    <button class="btn-edit" onclick="editOddCote('${mk.id}',${i}); event.stopPropagation();" title="Éditer la cote">✏️</button>
+    <div class="btn-edit" onclick="editOddCote('${mk.id}',${i}); event.stopPropagation();" title="Éditer la cote">✏️</div>
   </button>`;
 }
 function toggleMarket(id){state.collapsed[id]=!state.collapsed[id];const el=document.getElementById('mk-'+id);if(el)el.classList.toggle('collapsed')}
