@@ -226,6 +226,9 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .odd-btn .ob-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
 .odd-btn .ob-sel{font-weight:700;font-size:13px;color:var(--txt);line-height:1.2}
 .odd-btn .ob-cote{font-family:var(--mono);font-weight:700;font-size:17px}
+.real-badge{font-size:10px;font-weight:700;color:var(--green);background:rgba(39,209,124,0.15);padding:2px 6px;border-radius:4px;text-transform:uppercase}
+.btn-edit{background:transparent;border:none;padding:4px 6px;cursor:pointer;font-size:12px;opacity:0.5;transition:.2s;border-radius:6px;display:inline-flex;align-items:center;justify-content:center}
+.btn-edit:hover{opacity:1;color:var(--accent)}
 .odd-btn .ob-stats{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10.5px;color:var(--txt3)}
 .odd-btn .ob-stats .v{font-weight:700;margin-left:auto}
 .voyant{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
@@ -668,6 +671,70 @@ function buildStats(team, form, kind){
   };
 }
 
+/* ---------- API-Football Odds Integration ---------- */
+
+async function fetchOddsFromAPIFootball(fixtureId) {
+  const apiKey = state.settings.apiKey;
+  if(!apiKey) {
+    console.warn('⚠️ Clé API-Football non configurée');
+    return null;
+  }
+  
+  try {
+    console.log(`📡 Récupération cotes API-Football pour fixture: ${fixtureId}`);
+    
+    // Appel à l'endpoint odds d'API-Football
+    const url = `https://v3.football.api-sports.io/odds?fixture=${fixtureId}&apiKey=${apiKey}`;
+    const res = await fetch(url);
+    
+    if(!res.ok) {
+      console.error(`❌ API-Football HTTP ${res.status}`);
+      return null;
+    }
+    
+    const data = await res.json();
+    const oddsData = data.response || [];
+    
+    if(oddsData.length === 0) {
+      console.warn(`⚠️ Aucune cote trouvée pour fixture ${fixtureId}`);
+      return null;
+    }
+    
+    // Regrouper les cotes par bookmaker
+    const oddsMap = {};
+    oddsData.forEach(bet => {
+      const bookmaker = bet.bookmaker.name;
+      const update = bet.update;
+      
+      if(!oddsMap[bookmaker]) {
+        oddsMap[bookmaker] = {
+          bookmaker: bookmaker,
+          update: update,
+          markets: {}
+        };
+      }
+      
+      // Récupérer les marchés (1X2 = cotes standard)
+      bet.bets.forEach(betMarket => {
+        if(betMarket.name === '1X2') {
+          oddsMap[bookmaker].markets['1X2'] = betMarket.values.map(v => ({
+            odd: v.odd,
+            value: v.value,
+            betName: betMarket.name
+          }));
+        }
+      });
+    });
+    
+    console.log(`✅ Cotes API-Football récupérées:`, oddsMap);
+    return oddsMap;
+    
+  } catch(err) {
+    console.error('❌ Erreur API-Football Odds:', err.message);
+    return null;
+  }
+}
+
 /* ---------- H2H ---------- */
 async function fetchH2H(teamId1, teamId2) {
   const apiKey = FOOTBALL_API.getApiKey();
@@ -917,30 +984,80 @@ function voyantColor(value,est){
   if(value>=state.settings.yellowMin) return 'yellow';
   return 'red';
 }
-function mkSel(label,est,rng,opt){
-  opt=opt||{};
-  if(est==null||(opt.allowGray && rng()<opt.grayChance)){
-    return {sel:label,cote:null,implied:null,est:null,value:null,kelly:null,color:'gray'};
+function mkSel(label, est, rng, opt) {
+  opt = opt || {};
+  if(est == null || (opt.allowGray && rng() < opt.grayChance)) {
+    return {sel: label, cote: null, implied: null, est: null, value: null, kelly: null, color: 'gray'};
   }
-  est=clamp(est,0.005,0.985);
-  // bookmaker margin per selection (some negative => positive value)
-  const margin=opt.fixedMargin!=null?opt.fixedMargin:(-0.09 + rng()*0.21);
-  let cote=r2(1/(est*(1+margin)));
-  cote=Math.max(1.02,cote);
-  const implied=1/cote;
-  const value=est*cote-1;
-  const kelly=((cote-1)*est-(1-est))/(cote-1);
-  return {sel:label,cote,implied,est,value,kelly,color:voyantColor(value,est)};
+  est = clamp(est, 0.005, 0.985);
+  
+  // ✅ PRIORITÉ: Utiliser la VRAIE cote de l'API si disponible
+  // ❌ SINON: Générer une cote fictive (fallback)
+  let cote = opt.realCote ? opt.realCote : (() => {
+    const margin = opt.fixedMargin != null ? opt.fixedMargin : (-0.09 + rng() * 0.21);
+    return r2(1 / (est * (1 + margin)));
+  })();
+  
+  cote = Math.max(1.02, cote);
+  const implied = 1 / cote;
+  const value = est * cote - 1;
+  const kelly = ((cote - 1) * est - (1 - est)) / (cote - 1);
+  
+  return {
+    sel: label,
+    cote,
+    implied,
+    est,
+    value,
+    kelly,
+    color: voyantColor(value, est),
+    realCote: opt.realCote || null // Indiquer si c'est une vraie cote
+  };
 }
 function buildMarkets(m,model){
   const rng=model.rng;const H=m.home.short,A=m.away.short;
   const FM=model.FM;
   const exact=(i,j)=>FM[i]&&FM[i][j]?FM[i][j]:0;
+  
+  // Récupérer les vraies cotes si disponibles
+  let realOdds = null;
+  if(window.REAL_ODDS_CACHE && window.REAL_ODDS_CACHE[m.id]) {
+    realOdds = window.REAL_ODDS_CACHE[m.id];
+    console.log('📊 Vraies cotes trouvées pour le match:', realOdds);
+  }
+  
+  // Extraire les cotes 1N2 des vraies cotes (utiliser la première qui a le marché 1X2)
+  let realCotes1N2 = null;
+  if(realOdds) {
+    for(const bookmakerName in realOdds) {
+      const bm = realOdds[bookmakerName];
+      if(bm.markets && bm.markets['1X2']) {
+        realCotes1N2 = bm.markets['1X2'];
+        console.log(`📌 Cotes 1N2 trouvées chez ${bookmakerName}:`, realCotes1N2);
+        break;
+      }
+    }
+  }
+  
+  // Fonction pour créer une sélection avec vraie cote si disponible
+  const mkWithRealOdds = (label, est, idx, rngLocal) => {
+    const opt = {};
+    if(realCotes1N2 && realCotes1N2[idx]) {
+      // Utiliser la vraie cote de l'API
+      opt.realCote = parseFloat(realCotes1N2[idx].odd);
+    }
+    return mkSel(label, est, rngLocal, opt);
+  };
+  
   const mk=(l,e,o)=>mkSel(l,e,rng,o);
   const list=[];
 
+  // ✅ MARCHÉ 1N2: Utiliser les vraies cotes
   list.push({id:'1n2',name:'Résultat (1N2)',cols:3,sels:[
-    mk(m.home.name,model.pH),mk('Match nul',model.pD),mk(m.away.name,model.pA)]});
+    mkWithRealOdds(m.home.name, model.pH, 0, rng),
+    mkWithRealOdds('Match nul', model.pD, 1, rng),
+    mkWithRealOdds(m.away.name, model.pA, 2, rng)
+  ]});
 
   list.push({id:'dc',name:'Double chance',cols:3,sels:[
     mk('1X — '+H+' ou nul',model.pH+model.pD),
@@ -1436,6 +1553,7 @@ function getMatchData(id){
     h2h: buildH2H(m),
     markets: buildMarkets(m, model),
   };
+  
   matchCache[id] = data;
   return data;
 }
@@ -1916,7 +2034,27 @@ function mkQuick(p){return r2(1/(p*1.06)).toFixed(2)}
 function loadMatches(){
   loadDashboardMatches();
 }
-function openDetail(id){state.selectedMatchId=id;go('detail')}
+async function openDetail(id){
+  state.selectedMatchId = id;
+  const m = MATCHES.find(x => x.id === id);
+  
+  // Récupérer les vraies cotes en premier
+  if(m && m.fixtureId) {
+    console.log(`📡 Chargement des vraies cotes pour fixture ${m.fixtureId}...`);
+    const realOdds = await fetchOddsFromAPIFootball(m.fixtureId);
+    if(realOdds) {
+      console.log(`✅ Vraies cotes reçues:`, realOdds);
+      // Stocker les cotes dans un cache pour getMatchData
+      if(!window.REAL_ODDS_CACHE) window.REAL_ODDS_CACHE = {};
+      window.REAL_ODDS_CACHE[id] = realOdds;
+    }
+  }
+  
+  // Invalider le cache pour forcer la reconstruction des marchés
+  delete matchCache[id];
+  
+  go('detail');
+}
 
 /* ============================================================
    PAGE: DETAIL MATCH
@@ -1949,8 +2087,8 @@ function viewDetail(){
 
   ${renderTopBets(d)}
 
-  <div class="section-title"><span class="dot"></span>Cotes & Pronostics
-    <span class="hint">${d.markets.length} marchés · cliquez une cote</span></div>
+  <div class="section-title"><span class="dot"></span>Cotes & Analyse
+    <span class="hint">Cotes réelles API-Football · Probabilité estimée du modèle</span></div>
   <div class="card legend">
     <span><i class="voyant v-green"></i> Value positive</span>
     <span><i class="voyant v-yellow"></i> Value faible / neutre</span>
@@ -2080,22 +2218,63 @@ function oddButton(mk,s,i){
       <div class="ob-stats">Données insuffisantes</div></div>`;
   }
   const vTxt=(s.value>=0?'+':'')+(s.value*100).toFixed(1)+'%';
+  const realBadge = s.realCote ? '<span class="real-badge">API</span>' : '';
+  const editBtn = `<button class="btn-edit" onclick="editOddCote('${mk.id}',${i})" title="Éditer la cote">✏️</button>`;
   return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i})'>
     <div class="ob-top">
       <span class="ob-sel">${s.sel}</span>
       <span class="voyant v-${s.color}"></span>
     </div>
-    <div class="ob-top" style="margin-bottom:6px">
+    <div class="ob-top" style="margin-bottom:6px;position:relative;gap:6px">
       <span class="ob-cote">${s.cote.toFixed(2)}</span>
+      ${realBadge}
+      ${editBtn}
     </div>
     <div class="ob-stats">
+      <span title="Probabilité estimée (modèle)">est ${(s.est*100).toFixed(0)}%</span>
       <span title="Probabilité implicite">imp ${(s.implied*100).toFixed(0)}%</span>
-      <span title="Probabilité estimée">est ${(s.est*100).toFixed(0)}%</span>
       <span class="v" title="Value">${vTxt}</span>
     </div>
   </button>`;
 }
 function toggleMarket(id){state.collapsed[id]=!state.collapsed[id];const el=document.getElementById('mk-'+id);if(el)el.classList.toggle('collapsed')}
+
+function editOddCote(marketId, selIdx) {
+  const d = getMatchData(state.selectedMatchId);
+  const mk = d.markets.find(x => x.id === marketId);
+  const s = mk.sels[selIdx];
+  
+  if(!s || s.cote == null) return;
+  
+  const nouvelleCote = prompt(`Éditer la cote pour "${s.sel}"\n\nCote actuelle: ${s.cote.toFixed(2)}\nNouvelle cote:`, s.cote.toFixed(2));
+  
+  if(nouvelleCote === null) return; // Annulé
+  
+  const newCote = parseFloat(nouvelleCote);
+  if(isNaN(newCote) || newCote < 1.01) {
+    alert('❌ Cote invalide! (minimum 1.01)');
+    return;
+  }
+  
+  // Mettre à jour la cote
+  s.cote = newCote;
+  s.implied = 1 / newCote;
+  s.value = s.est * newCote - 1;
+  s.kelly = ((newCote - 1) * s.est - (1 - s.est)) / (newCote - 1);
+  s.color = voyantColor(s.value, s.est);
+  s.coteManuellementModifiee = true;
+  
+  console.log(`✏️ Cote modifiée: ${s.sel}`);
+  console.log(`  Ancienne: ${s.cote.toFixed(2)} → Nouvelle: ${newCote.toFixed(2)}`);
+  console.log(`  Nouvelle value: ${(s.value * 100).toFixed(1)}%`);
+  console.log(`  Nouveau Kelly: ${(s.kelly * 100).toFixed(1)}%`);
+  
+  toast(`✏️ Cote modifiée: ${s.cote.toFixed(2)} • Value: ${(s.value*100).toFixed(1)}%`);
+  
+  // Invalider le cache pour forcer le re-render
+  delete matchCache[state.selectedMatchId];
+  render();
+}
 
 /* ============================================================
    MODAL: Ajouter un pari
@@ -2403,7 +2582,21 @@ function viewSettings(){
     </div>
 
     <div class="card set-block">
-      <h3>Stratégie Kelly</h3>
+      <h3>📊 Cotes API-Football</h3>
+      <div class="desc">✅ Récupère les cotes réelles des bookmakers via API-Football (déjà inclus!).</div>
+      <div style="padding:12px;background:var(--bg2);border-radius:6px;border-left:3px solid var(--green);margin-bottom:10px">
+        <span style="color:var(--green);font-weight:bold">✅ Intégration active</span><br>
+        <span style="font-size:11px;color:var(--txt3)">Les cotes seront automatiquement affichées dans la page Détail Match pour chaque fixture.</span>
+      </div>
+      <div style="font-size:11px;color:var(--txt3);line-height:1.6">
+        <b>Comment ça marche:</b><br>
+        • Quand tu ouvres un match, les cotes des bookmakers s'affichent<br>
+        • Données des 7 derniers jours<br>
+        • Mis à jour toutes les heures environ<br>
+      </div>
+    </div>
+
+    <div class="card set-block">
       <div class="desc">Calcule la mise optimale conseillée selon la value et votre bankroll.</div>
       <div class="toggle-row">
         <div class="tr-lab"><b>Activer Kelly</b><span>Affiche la mise conseillée dans la popup</span></div>
