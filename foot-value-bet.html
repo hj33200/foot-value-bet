@@ -1100,9 +1100,9 @@ function buildMarkets(m,model){
 
   // ✅ MARCHÉ 1N2: Utiliser les vraies cotes Unibet
   list.push({id:'1n2',name:'Résultat (1N2)',cols:3,sels:[
-    mkWithUnibet(m.home.name, model.pH, 0, rng, '1n2'),
-    mkWithUnibet('Match nul', model.pD, 1, rng, '1n2'),
-    mkWithUnibet(m.away.name, model.pA, 2, rng, '1n2')
+    mkSmart(m.home.name, model.pH, 0, rng, '1n2'),
+    mkSmart('Match nul', model.pD, 1, rng, '1n2'),
+    mkSmart(m.away.name, model.pA, 2, rng, '1n2')
   ]});
 
   list.push({id:'dc',name:'Double chance',cols:3,sels:[
