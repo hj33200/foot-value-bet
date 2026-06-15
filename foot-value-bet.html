@@ -1075,55 +1075,72 @@ function buildMarkets(m,model){
     }
   }
   
-  // Fonction pour créer une sélection avec vraie cote si disponible
-  const mkWithRealOdds = (label, est, idx, rngLocal) => {
+  // 🎯 FONCTION: Créer une sélection (vraies cotes OU formule de probabilité)
+  const mkSmart = (label, est, idx, rngLocal, marketId) => {
     const opt = {};
-    if(realCotes1N2 && realCotes1N2[idx]) {
-      // Utiliser la vraie cote de l'API
-      opt.realCote = parseFloat(realCotes1N2[idx].odd);
+    
+    // D'abord chercher les vraies cotes chez Unibet
+    if(marketId) {
+      const marketName = marketMapping[marketId];
+      const realCotes = getRealCotes(marketName);
+      
+      if(realCotes && realCotes[idx]) {
+        opt.realCote = parseFloat(realCotes[idx].odd);
+        console.log(`💰 ${marketName}[${idx}] = ${opt.realCote} chez Unibet`);
+        return mkSel(label, est, rngLocal, opt);
+      }
     }
+    
+    // Sinon utiliser la formule classique
     return mkSel(label, est, rngLocal, opt);
   };
   
   const mk=(l,e,o)=>mkSel(l,e,rng,o);
   const list=[];
 
-  // ✅ MARCHÉ 1N2: Utiliser les vraies cotes
+  // ✅ MARCHÉ 1N2: Utiliser les vraies cotes Unibet
   list.push({id:'1n2',name:'Résultat (1N2)',cols:3,sels:[
-    mkWithRealOdds(m.home.name, model.pH, 0, rng),
-    mkWithRealOdds('Match nul', model.pD, 1, rng),
-    mkWithRealOdds(m.away.name, model.pA, 2, rng)
+    mkWithUnibet(m.home.name, model.pH, 0, rng, '1n2'),
+    mkWithUnibet('Match nul', model.pD, 1, rng, '1n2'),
+    mkWithUnibet(m.away.name, model.pA, 2, rng, '1n2')
   ]});
 
   list.push({id:'dc',name:'Double chance',cols:3,sels:[
-    mk('1X — '+H+' ou nul',model.pH+model.pD),
-    mk('12 — pas de nul',model.pH+model.pA),
-    mk('X2 — nul ou '+A,model.pD+model.pA)]});
+    mkSmart('1X — '+H+' ou nul',model.pH+model.pD,0,rng,'dc'),
+    mkSmart('12 — pas de nul',model.pH+model.pA,1,rng,'dc'),
+    mkSmart('X2 — nul ou '+A,model.pD+model.pA,2,rng,'dc')]});
 
   list.push({id:'dnb',name:'Draw No Bet',cols:2,sels:[
-    mk(H+' (remb. si nul)',model.pH/(model.pH+model.pA)),
-    mk(A+' (remb. si nul)',model.pA/(model.pH+model.pA))]});
+    mkSmart(H+' (remb. si nul)',model.pH/(model.pH+model.pA),0,rng,'dnb'),
+    mkSmart(A+' (remb. si nul)',model.pA/(model.pH+model.pA),1,rng,'dnb')]});
 
   list.push({id:'btts',name:'Les deux équipes marquent (BTTS)',cols:2,sels:[
-    mk('Oui',model.btts),mk('Non',1-model.btts)]});
+    mkSmart('Oui',model.btts,0,rng,'btts'),
+    mkSmart('Non',1-model.btts,1,rng,'btts')]});
 
-  const tg=[];[1.5,2.5,3.5].forEach(t=>{tg.push(mk('Plus de '+t+' buts',model.over[t]));tg.push(mk('Moins de '+t+' buts',1-model.over[t]))});
+  const tg=[];let totIdx=0;[1.5,2.5,3.5].forEach(t=>{tg.push(mkSmart('Plus de '+t+' buts',model.over[t],totIdx++,rng,'tot'));tg.push(mkSmart('Moins de '+t+' buts',1-model.over[t],totIdx++,rng,'tot'))});
   list.push({id:'tot',name:'Total de buts (Over / Under)',cols:2,sels:tg});
 
   list.push({id:'tte',name:'Total buts par équipe',cols:2,sels:[
-    mk(H+' +1.5',model.hOver[1.5]),mk(H+' -1.5',1-model.hOver[1.5]),
-    mk(A+' +1.5',model.aOver[1.5]),mk(A+' -1.5',1-model.aOver[1.5])]});
+    mkSmart(H+' +1.5',model.hOver[1.5],0,rng,'tte'),
+    mkSmart(H+' -1.5',1-model.hOver[1.5],1,rng,'tte'),
+    mkSmart(A+' +1.5',model.aOver[1.5],2,rng,'tte'),
+    mkSmart(A+' -1.5',1-model.aOver[1.5],3,rng,'tte')]});
 
   list.push({id:'cs',name:'Clean sheet (ne pas encaisser)',cols:2,sels:[
-    mk(H+' — oui',model.cs_h),mk(H+' — non',1-model.cs_h),
-    mk(A+' — oui',model.cs_a),mk(A+' — non',1-model.cs_a)]});
+    mkSmart(H+' — oui',model.cs_h,0,rng,'cs'),
+    mkSmart(H+' — non',1-model.cs_h,1,rng,'cs'),
+    mkSmart(A+' — oui',model.cs_a,2,rng,'cs'),
+    mkSmart(A+' — non',1-model.cs_a,3,rng,'cs')]});
 
   const scores=[[1,0],[2,0],[2,1],[3,1],[1,1],[2,2],[0,0],[0,1],[1,2],[0,2]];
   list.push({id:'score',name:'Score exact',cols:3,sels:scores.map(([i,j])=>
     mk(i+' - '+j,exact(i,j),{allowGray:true,grayChance:0.08}))});
 
   list.push({id:'htr',name:'Résultat à la mi-temps (1N2)',cols:3,sels:[
-    mk(H+' à la pause',model.HT[1]),mk('Nul à la pause',model.HT.N),mk(A+' à la pause',model.HT[2])]});
+    mkSmart(H+' à la pause',model.HT[1],0,rng,'htr'),
+    mkSmart('Nul à la pause',model.HT.N,1,rng,'htr'),
+    mkSmart(A+' à la pause',model.HT[2],2,rng,'htr')]});
 
   const htftLabels={'1/1':H+' / '+H,'1/N':H+' / Nul','1/2':H+' / '+A,'N/1':'Nul / '+H,'N/N':'Nul / Nul','N/2':'Nul / '+A,'2/1':A+' / '+H,'2/N':A+' / Nul','2/2':A+' / '+A};
   list.push({id:'htft',name:'Mi-temps / Fin de match',cols:3,sels:Object.keys(model.HTFT).map(k=>
@@ -1136,8 +1153,12 @@ function buildMarkets(m,model){
     const d=i-1-j; if(d>0)eh_h+=p;else if(d===0)eh_d+=p;else eh_a+=p;
     const d2=i-(j-1); if(d2>0)ea_h+=p;else if(d2===0)ea_d+=p;else ea_a+=p;}
   list.push({id:'eh',name:'Handicap européen',cols:3,sels:[
-    mk(H+' (-1)',eh_h),mk('Nul (-1)',eh_d),mk(A+' (+1)',eh_a),
-    mk(H+' (+1)',ea_a),mk('Nul (+1)',ea_d),mk(A+' (-1)',ea_h)]});
+    mkSmart(H+' (-1)',eh_h,0,rng,'eh'),
+    mkSmart('Nul (-1)',eh_d,1,rng,'eh'),
+    mkSmart(A+' (+1)',eh_a,2,rng,'eh'),
+    mkSmart(H+' (+1)',ea_a,3,rng,'eh'),
+    mkSmart('Nul (+1)',ea_d,4,rng,'eh'),
+    mkSmart(A+' (-1)',ea_h,5,rng,'eh')]});
 
   // Asian handicap
   let ah05_h=0,ah05_a=0,ah1_h=0,ah1_a=0;
@@ -1146,25 +1167,30 @@ function buildMarkets(m,model){
     if(i-1>j){ah1_h+=p}else if(i-1<j){ah1_a+=p} }
   const den1=ah1_h+ah1_a||1;
   list.push({id:'ah',name:'Handicap asiatique',cols:2,sels:[
-    mk(H+' -0.5',ah05_h),mk(A+' +0.5',ah05_a),
-    mk(H+' -1.0',ah1_h/den1),mk(A+' +1.0',ah1_a/den1)]});
+    mkSmart(H+' -0.5',ah05_h,0,rng,'ah'),
+    mkSmart(A+' +0.5',ah05_a,1,rng,'ah'),
+    mkSmart(H+' -1.0',ah1_h/den1,2,rng,'ah'),
+    mkSmart(A+' +1.0',ah1_a/den1,3,rng,'ah')]});
 
   // Result + Over/Under 2.5
   let r1o=0,r1u=0,rNo=0,rNu=0,r2o=0,r2u=0;
   for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;const o=(i+j)>2.5;
     if(i>j){o?r1o+=p:r1u+=p}else if(i<j){o?r2o+=p:r2u+=p}else{o?rNo+=p:rNu+=p}}
   list.push({id:'rou',name:'Résultat + Over/Under 2.5',cols:2,sels:[
-    mk(H+' & +2.5',r1o),mk(H+' & -2.5',r1u),
-    mk('Nul & +2.5',rNo),mk('Nul & -2.5',rNu),
-    mk(A+' & +2.5',r2o),mk(A+' & -2.5',r2u)]});
+    mkSmart(H+' & +2.5',r1o,0,rng,'rou'),
+    mkSmart(H+' & -2.5',r1u,1,rng,'rou'),
+    mkSmart('Nul & +2.5',rNo,2,rng,'rou'),
+    mkSmart('Nul & -2.5',rNu,3,rng,'rou'),
+    mkSmart(A+' & +2.5',r2o,4,rng,'rou'),
+    mkSmart(A+' & -2.5',r2u,5,rng,'rou')]});
 
   // Result + BTTS
   let r1b=0,r1n=0,rNb=0,rNn=0,r2b=0,r2n=0;
   for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;const b=(i>0&&j>0);
     if(i>j){b?r1b+=p:r1n+=p}else if(i<j){b?r2b+=p:r2n+=p}else{b?rNb+=p:rNn+=p}}
   list.push({id:'rbtts',name:'Résultat + BTTS',cols:2,sels:[
-    mk(H+' & BTTS Oui',r1b),mk(H+' & BTTS Non',r1n),
-    mk('Nul & BTTS Oui',rNb),mk(A+' & BTTS Oui',r2b),mk(A+' & BTTS Non',r2n)]});
+    mkSmart(H+' & BTTS Oui',r1b,0,rng,'rbtts'),mkSmart(H+' & BTTS Non',r1n,1,rng,'rbtts'),
+    mkSmart('Nul & BTTS Oui',rNb,2,rng,'rbtts'),mkSmart(A+' & BTTS Oui',r2b,3,rng,'rbtts'),mkSmart(A+' & BTTS Non',r2n,4,rng,'rbtts')]});
 
   return list;
 }
