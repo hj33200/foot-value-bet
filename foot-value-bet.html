@@ -676,25 +676,32 @@ function buildStats(team, form, kind){
 
 async function fetchOddsFromAPIFootball(fixtureId) {
   const apiKey = state.settings.apiKey;
+  console.log(`🔑 Clé API trouvée:`, apiKey ? '✅ OUI' : '❌ NON');
+  
   if(!apiKey) {
-    console.warn('⚠️ Clé API-Football non configurée');
+    console.error('❌❌❌ Clé API-Football NON CONFIGURÉE!');
     return null;
   }
   
   try {
-    console.log(`📡 Récupération cotes API-Football pour fixture: ${fixtureId}`);
-    
-    // Appel à l'endpoint odds d'API-Football
     const url = `https://v3.football.api-sports.io/odds?fixture=${fixtureId}&apiKey=${apiKey}`;
+    console.log(`📡 Appel API URL:`, url);
+    
     const res = await fetch(url);
+    console.log(`📨 Réponse HTTP:`, res.status, res.statusText);
     
     if(!res.ok) {
       console.error(`❌ API-Football HTTP ${res.status}`);
+      const errorText = await res.text();
+      console.error(`Erreur détail:`, errorText);
       return null;
     }
     
     const data = await res.json();
+    console.log(`📦 Données reçues:`, data);
+    
     const oddsData = data.response || [];
+    console.log(`📊 Nombre d'éléments:`, oddsData.length);
     
     if(oddsData.length === 0) {
       console.warn(`⚠️ Aucune cote trouvée pour fixture ${fixtureId}`);
@@ -718,21 +725,20 @@ async function fetchOddsFromAPIFootball(fixtureId) {
       // Récupérer TOUS les marchés disponibles
       bet.bets.forEach(betMarket => {
         const marketName = betMarket.name;
-        // Récupérer les cotes pour ce marché
         oddsMap[bookmaker].markets[marketName] = betMarket.values.map(v => ({
           odd: v.odd,
           value: v.value,
-          name: v.value // Nom de la sélection (Home/Draw/Away ou Over/Under, etc.)
+          name: v.value
         }));
-        console.log(`  📌 Marché ${marketName}:`, oddsMap[bookmaker].markets[marketName]);
+        console.log(`  📌 ${bookmaker} - Marché ${marketName}:`, oddsMap[bookmaker].markets[marketName]);
       });
     });
     
-    console.log(`✅ Cotes API-Football récupérées (tous les marchés):`, oddsMap);
+    console.log(`✅✅✅ Cotes finales:`, oddsMap);
     return oddsMap;
     
   } catch(err) {
-    console.error('❌ Erreur API-Football Odds:', err.message);
+    console.error('❌❌❌ Erreur EXCEPTION API-Football Odds:', err);
     return null;
   }
 }
@@ -2037,8 +2043,12 @@ function loadMatches(){
   loadDashboardMatches();
 }
 async function openDetail(id){
+  console.log(`🔍 openDetail appelée pour match ID: ${id}`);
   state.selectedMatchId = id;
   const m = MATCHES.find(x => x.id === id);
+  
+  console.log(`📋 Match trouvé:`, m);
+  console.log(`📌 fixtureId: ${m?.fixtureId}`);
   
   // Invalider immédiatement le cache
   delete matchCache[id];
@@ -2048,17 +2058,20 @@ async function openDetail(id){
   
   // Récupérer les vraies cotes EN ARRIÈRE-PLAN
   if(m && m.fixtureId) {
-    console.log(`📡 Chargement des vraies cotes pour fixture ${m.fixtureId}...`);
+    console.log(`📡 🚀 DÉMARRAGE du chargement des vraies cotes pour fixture ${m.fixtureId}...`);
     
     // Afficher un spinner de chargement
     showLoadingOverlay('Chargement cotes réelles...');
     
     try {
+      console.log(`⏳ Appel à fetchOddsFromAPIFootball(${m.fixtureId})...`);
       const realOdds = await fetchOddsFromAPIFootball(m.fixtureId);
       hideLoadingOverlay();
       
+      console.log(`📊 Résultat fetchOdds:`, realOdds);
+      
       if(realOdds) {
-        console.log(`✅ Vraies cotes reçues:`, realOdds);
+        console.log(`✅✅✅ VRAIES COTES REÇUES:`, realOdds);
         // Stocker les cotes dans le cache global
         if(!window.REAL_ODDS_CACHE) window.REAL_ODDS_CACHE = {};
         window.REAL_ODDS_CACHE[id] = realOdds;
@@ -2068,13 +2081,16 @@ async function openDetail(id){
         render();
         toast('✅ Cotes réelles chargées');
       } else {
+        console.warn(`⚠️⚠️⚠️ Cotes réelles NULL`);
         toast('⚠️ Cotes réelles non disponibles');
       }
     } catch(err) {
       hideLoadingOverlay();
-      console.error('❌ Erreur lors du chargement des cotes:', err);
+      console.error('❌❌❌ Erreur lors du chargement des cotes:', err);
       toast('❌ Erreur cotes');
     }
+  } else {
+    console.warn(`⚠️ Pas de fixtureId trouvé pour ce match!`);
   }
 }
 
