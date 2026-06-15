@@ -711,27 +711,37 @@ async function fetchOddsFromAPIFootball(fixtureId) {
     
     // Regrouper les cotes par bookmaker et par marché
     const oddsMap = {};
-    oddsData.forEach(bet => {
-      const bookmaker = bet.bookmaker.name;
-      const update = bet.update;
+    
+    // La vraie structure: oddsData[0].bookmakers[]
+    const fixtureOdds = oddsData[0];
+    const bookmakers = fixtureOdds?.bookmakers || [];
+    
+    console.log(`📊 ${bookmakers.length} bookmakers trouvés`);
+    
+    bookmakers.forEach(bookmaker => {
+      const bookmakerName = bookmaker.name;
+      const update = fixtureOdds.update;
       
-      if(!oddsMap[bookmaker]) {
-        oddsMap[bookmaker] = {
-          bookmaker: bookmaker,
+      if(!oddsMap[bookmakerName]) {
+        oddsMap[bookmakerName] = {
+          bookmaker: bookmakerName,
           update: update,
           markets: {}
         };
       }
       
-      // Récupérer TOUS les marchés disponibles
-      bet.bets.forEach(betMarket => {
-        const marketName = betMarket.name;
-        oddsMap[bookmaker].markets[marketName] = betMarket.values.map(v => ({
+      // Récupérer les marchés (bets) pour ce bookmaker
+      const bets = bookmaker.bets || [];
+      bets.forEach(bet => {
+        const marketName = bet.name;
+        const values = bet.values || [];
+        
+        oddsMap[bookmakerName].markets[marketName] = values.map(v => ({
           odd: v.odd,
           value: v.value,
           name: v.value
         }));
-        console.log(`  📌 ${bookmaker} - Marché ${marketName}:`, oddsMap[bookmaker].markets[marketName]);
+        console.log(`  📌 ${bookmakerName} - Marché ${marketName}:`, oddsMap[bookmakerName].markets[marketName]);
       });
     });
     
