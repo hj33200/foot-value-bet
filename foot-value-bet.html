@@ -1045,15 +1045,32 @@ function buildMarkets(m,model){
     console.log('📊 Vraies cotes trouvées pour le match:', realOdds);
   }
   
-  // Extraire les cotes 1N2 des vraies cotes (utiliser la première qui a le marché 1X2)
+  // Extraire les cotes 1N2 des vraies cotes (chercher "Match Winner" au lieu de "1X2")
   let realCotes1N2 = null;
+  let usedBookmaker = null;
+  const preferredBookmakers = ['Unibet', 'Bet365', 'William Hill', 'BetVictor', '10Bet', 'Betfair'];
+  
   if(realOdds) {
-    for(const bookmakerName in realOdds) {
-      const bm = realOdds[bookmakerName];
-      if(bm.markets && bm.markets['1X2']) {
-        realCotes1N2 = bm.markets['1X2'];
-        console.log(`📌 Cotes 1N2 trouvées chez ${bookmakerName}:`, realCotes1N2);
+    // D'abord essayer les bookmakers préférés
+    for(const prefBm of preferredBookmakers) {
+      if(realOdds[prefBm] && realOdds[prefBm].markets && realOdds[prefBm].markets['Match Winner']) {
+        realCotes1N2 = realOdds[prefBm].markets['Match Winner'];
+        usedBookmaker = prefBm;
+        console.log(`✅ Cotes 1N2 trouvées chez ${prefBm}`);
         break;
+      }
+    }
+    
+    // Si pas trouvé, prendre le premier disponible
+    if(!realCotes1N2) {
+      for(const bookmakerName in realOdds) {
+        const bm = realOdds[bookmakerName];
+        if(bm.markets && bm.markets['Match Winner']) {
+          realCotes1N2 = bm.markets['Match Winner'];
+          usedBookmaker = bookmakerName;
+          console.log(`✅ Cotes 1N2 trouvées chez ${bookmakerName} (fallback)`);
+          break;
+        }
       }
     }
   }
