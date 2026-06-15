@@ -2053,7 +2053,8 @@ async function openDetail(id){
   const m = MATCHES.find(x => x.id === id);
   
   console.log(`📋 Match trouvé:`, m);
-  console.log(`📌 fixtureId: ${m?.fixtureId}`);
+  const fixtureId = m?.fixture?.id;
+  console.log(`📌 fixtureId: ${fixtureId}`);
   
   // Invalider immédiatement le cache
   delete matchCache[id];
@@ -2062,15 +2063,15 @@ async function openDetail(id){
   go('detail');
   
   // Récupérer les vraies cotes EN ARRIÈRE-PLAN
-  if(m && m.fixtureId) {
-    console.log(`📡 🚀 DÉMARRAGE du chargement des vraies cotes pour fixture ${m.fixtureId}...`);
+  if(m && fixtureId) {
+    console.log(`📡 🚀 DÉMARRAGE du chargement des vraies cotes pour fixture ${fixtureId}...`);
     
     // Afficher un spinner de chargement
     showLoadingOverlay('Chargement cotes réelles...');
     
     try {
-      console.log(`⏳ Appel à fetchOddsFromAPIFootball(${m.fixtureId})...`);
-      const realOdds = await fetchOddsFromAPIFootball(m.fixtureId);
+      console.log(`⏳ Appel à fetchOddsFromAPIFootball(${fixtureId})...`);
+      const realOdds = await fetchOddsFromAPIFootball(fixtureId);
       hideLoadingOverlay();
       
       console.log(`📊 Résultat fetchOdds:`, realOdds);
@@ -2095,7 +2096,7 @@ async function openDetail(id){
       toast('❌ Erreur cotes');
     }
   } else {
-    console.warn(`⚠️ Pas de fixtureId trouvé pour ce match!`);
+    console.warn(`⚠️ Pas de fixtureId trouvé pour ce match! fixtureId=${fixtureId}`);
   }
 }
 
