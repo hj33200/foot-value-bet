@@ -3296,26 +3296,21 @@ function generateMarketAnalysis(b) {
     return `
       <div class="detail-section">
         <h4>📊 L'analyse Double Chance</h4>
-        <p><strong>${b.matchName}:</strong> Parions sur <strong>${sel.label}</strong> (${sel.desc})</p>
+        <p><strong>${b.matchName}:</strong> Parions sur <strong>${sel.label}</strong></p>
         
         <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
           <div style="margin-bottom: 8px;"><strong>Probabilités 1N2</strong></div>
           <div style="margin-left: 12px; color: var(--txt2);">
-            ${b.home.name}: <strong>${(m.pH * 100).toFixed(1)}%</strong><br>
-            Nul: <strong>${(m.pD * 100).toFixed(1)}%</strong><br>
-            ${b.away.name}: <strong>${(m.pA * 100).toFixed(1)}%</strong>
+            ${b.home.name}: ${(m.pH * 100).toFixed(1)}%<br>
+            Nul: ${(m.pD * 100).toFixed(1)}%<br>
+            ${b.away.name}: ${(m.pA * 100).toFixed(1)}%
           </div>
         </div>
 
-        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
-          <div style="margin-bottom: 8px;"><strong>Votre sélection: ${sel.label}</strong></div>
-          <div style="margin-left: 12px; color: var(--txt2);">
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <strong>Votre sélection: ${sel.label}</strong>
+          <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
             P(${sel.label}) = <strong style="color: var(--accent); font-size: 13px;">${(sel.prob * 100).toFixed(1)}%</strong>
-            <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
-              ${sel.label === '1X' ? 'P(Home) + P(Nul) = ' + (m.pH*100).toFixed(1) + '% + ' + (m.pD*100).toFixed(1) + '%' : 
-                sel.label === '12' ? 'P(Home) + P(Away) = ' + (m.pH*100).toFixed(1) + '% + ' + (m.pA*100).toFixed(1) + '%' : 
-                'P(Nul) + P(Away) = ' + (m.pD*100).toFixed(1) + '% + ' + (m.pA*100).toFixed(1) + '%'}
-            </div>
           </div>
         </div>
       </div>
@@ -3327,6 +3322,9 @@ function generateMarketAnalysis(b) {
     const isHome = b.selIdx === 0;
     const team = isHome ? b.home.name : b.away.name;
     const prob = isHome ? m.dnbHome : m.dnbAway;
+    const probHome = m.pH || 0.5;
+    const probAway = m.pA || 0.5;
+    const probDraw = m.pD || 0.5;
     
     return `
       <div class="detail-section">
@@ -3336,8 +3334,8 @@ function generateMarketAnalysis(b) {
         <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
           <div style="margin-bottom: 8px;"><strong>Calcul DNB</strong></div>
           <div style="margin-left: 12px; color: var(--txt2);">
-            P(${team} gagne) = <strong>${(${isHome ? 'm.pH' : 'm.pA'} * 100).toFixed(1)}%</strong><br>
-            P(${team} ou Nul) = <strong>${((${isHome ? 'm.pH + m.pD' : 'm.pA + m.pD'}) * 100).toFixed(1)}%</strong><br>
+            P(${team} gagne) = <strong>${(${isHome ? probHome : probAway} * 100).toFixed(1)}%</strong><br>
+            P(${team} ou Nul) = <strong>${((${isHome ? probHome + probDraw : probAway + probDraw}) * 100).toFixed(1)}%</strong><br>
             <strong style="margin-top: 6px; display: block;">P(${team} remboursé) = P(gagne) / (P(gagne) + P(adversaire)) = ${(prob * 100).toFixed(1)}%</strong>
           </div>
         </div>
@@ -3360,12 +3358,12 @@ function generateMarketAnalysis(b) {
         <p><strong>${b.matchName}:</strong> Résultat à la 45ème minute</p>
         
         <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
-          <div style="margin-bottom: 8px;"><strong>Calcul (45 minutes)</strong></div>
+          <div style="margin-bottom: 8px;"><strong>Probabilités (45 minutes)</strong></div>
           <div style="margin-left: 12px; color: var(--txt2);">
-            Lambda ajusté (45 min): λ/2 pour chaque équipe<br>
-            ${b.home.name}: <strong>${m.pHT_1 ? (m.pHT_1 * 100).toFixed(1) : '—'}%</strong><br>
-            Nul: <strong>${m.pHT_D ? (m.pHT_D * 100).toFixed(1) : '—'}%</strong><br>
-            ${b.away.name}: <strong>${m.pHT_2 ? (m.pHT_2 * 100).toFixed(1) : '—'}%</strong>
+            Lambda ajusté: λ/2 pour chaque équipe<br><br>
+            ${b.home.name}: ${m.pHT_1 ? (m.pHT_1 * 100).toFixed(1) : '—'}%<br>
+            Nul: ${m.pHT_D ? (m.pHT_D * 100).toFixed(1) : '—'}%<br>
+            ${b.away.name}: ${m.pHT_2 ? (m.pHT_2 * 100).toFixed(1) : '—'}%
           </div>
         </div>
         
