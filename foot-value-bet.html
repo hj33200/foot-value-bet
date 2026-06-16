@@ -691,11 +691,11 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   const homeGF = homeStats.gf || home.gf || 1;
   const homeGA = homeStats.ga || home.ga || 1;
-  const homeMatches = homeStats.matches || home.matches || 1;
+  const homeMatches = homeForm.length > 0 ? homeForm.length : (homeStats.matches || home.matches || 1);
   
   const awayGF = awayStats.gf || away.gf || 1;
   const awayGA = awayStats.ga || away.ga || 1;
-  const awayMatches = awayStats.matches || away.matches || 1;
+  const awayMatches = awayForm.length > 0 ? awayForm.length : (awayStats.matches || away.matches || 1);
   
   // 1️⃣ FORCES OFFENSIVES/DÉFENSIVES
   const homeOffense = homeGF / homeMatches;
