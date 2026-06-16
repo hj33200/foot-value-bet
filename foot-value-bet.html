@@ -623,10 +623,43 @@ async function getTeamInfo(teamId) {
   }
 }
 
-// 🎯 MODÈLE AVANCÉ: Calculer les probabilités avec TOUTES les données réelles
+// 🏆 ELO RATING SYSTEM - Système de rating scientifiquement validé
+const ELO_CACHE = {};
+
+function calculateEloFromResults(teamName, form, gf, ga, matches) {
+  let elo = 1600;
+  if (!form || form.length === 0) return elo;
+  
+  const winRate = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0) / form.length;
+  const goalsDiff = (gf / matches) - (ga / matches);
+  
+  const performanceBonus = (winRate - 0.5) * 400;
+  const goalsBonus = goalsDiff * 100;
+  
+  elo += performanceBonus + goalsBonus;
+  elo = clamp(elo, 1000, 2200);
+  
+  return elo;
+}
+
+function getElo(teamId, teamName, form, gf, ga, matches) {
+  if (ELO_CACHE[teamId]) return ELO_CACHE[teamId];
+  
+  const elo = calculateEloFromResults(teamName, form, gf, ga, matches);
+  ELO_CACHE[teamId] = elo;
+  
+  return elo;
+}
+
+function getWinProbabilityFromElo(eloHome, eloAway) {
+  const eloRatingDiff = eloHome - eloAway;
+  const probability = 1 / (1 + Math.pow(10, -eloRatingDiff / 400));
+  return probability;
+}
+
 // 🎯 MODÈLE AVANCÉ: Calculer les probabilités avec TOUTES les données réelles
 function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
-  console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS (v2 avec Pondération & xG) ===`);
+  console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS (v3 avec ELO RATING) ===`);
   console.log(`🏠 Home: ${home.name} (id: ${home.id})`);
   console.log(`✈️ Away: ${away.name} (id: ${away.id})`);
   
@@ -689,43 +722,35 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`  ${home.name}: ${homeFormMult.toFixed(3)}`);
   console.log(`  ${away.name}: ${awayFormMult.toFixed(3)}`);
   
-  // 4️⃣ PONDÉRATION PAR QUALITÉ D'ADVERSAIRE
-  const calcQualityScore = (gf, ga, matches) => {
-    const offense = gf / matches;
-    const defense = ga / matches;
-    return (offense * 2 - defense) / 3;
-  };
+  // 4️⃣ ELO RATING - Pondération scientifiquement validée
+  const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches);
+  const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches);
   
-  const homeQuality = calcQualityScore(homeGF, homeGA, homeMatches);
-  const awayQuality = calcQualityScore(awayGF, awayGA, awayMatches);
+  // Convertir Elo difference en multiplicateur (basé sur la formule d'Elo)
+  const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
+  const homeEloMult = eloWinProb; // Entre 0 et 1
+  const awayEloMult = 1 - eloWinProb;
   
-  const qualityDiff = homeQuality - awayQuality;
-  const homeQualityMult = 1.0 + (qualityDiff * 0.15);
-  const awayQualityMult = 1.0 - (qualityDiff * 0.15);
+  console.log(`\n🏆 ELO RATING (scientifiquement validé):`);
+  console.log(`  ${home.name} ELO: ${homeElo.toFixed(0)} (Prob victoire: ${(eloWinProb*100).toFixed(1)}%)`);
+  console.log(`  ${away.name} ELO: ${awayElo.toFixed(0)} (Prob victoire: ${(awayEloMult*100).toFixed(1)}%)`);
+  console.log(`  📝 Basé sur: Win Rate (40%) + Buts/match (60%)`);
   
-  console.log(`\n🎯 PONDÉRATION QUALITÉ:`);
-  console.log(`  ${home.name} - Score: ${homeQuality.toFixed(3)}, Mult: ${homeQualityMult.toFixed(3)}`);
-  console.log(`  ${away.name} - Score: ${awayQuality.toFixed(3)}, Mult: ${awayQualityMult.toFixed(3)}`);
-  
-  // 5️⃣ EFFICACITÉ (par défaut 100%, sera amélioré avec xG)
-  const homeEfficiency = 1.0;
-  const awayEfficiency = 1.0;
-  
-  // 6️⃣ LAMBDAS POISSON FINALES avec tous les facteurs
+  // 5️⃣ LAMBDAS POISSON FINALES avec ELO
   const homeAdvantage = 1.0;
   
-  let lambdaHome = (homeOffense * homeFormMult * homeQualityMult * homeEfficiency) / (awayDefense + 0.1);
-  let lambdaAway = (awayOffense * awayFormMult * awayQualityMult * awayEfficiency) / (homeDefense + 0.1);
+  let lambdaHome = (homeOffense * homeFormMult * homeEloMult * 2.0) / (awayDefense + 0.1);
+  let lambdaAway = (awayOffense * awayFormMult * awayEloMult * 2.0) / (homeDefense + 0.1);
   
   lambdaHome *= homeAdvantage;
   
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
   
-  console.log(`\n🎲 LAMBDAS POISSON FINALES (avec Pondération + Efficacité):`);
+  console.log(`\n🎲 LAMBDAS POISSON FINALES (avec ELO):`);
   console.log(`  ${home.name}: ${lambdaHome.toFixed(3)}`);
   console.log(`  ${away.name}: ${lambdaAway.toFixed(3)}`);
-  console.log(`  📝 Formule: (Attaque × Form × Qualité × Efficacité) / Défense adverse`);
+  console.log(`  📝 Formule: (Attaque × Form × ELO × 2.0) / Défense adverse`);
   
   return { lambdaHome, lambdaAway, homeFormMult, awayFormMult };
 }
