@@ -1095,6 +1095,36 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   console.log(`\n🧹 CLEAN SHEET: Home=${(csHome*100).toFixed(1)}% / Away=${(csAway*100).toFixed(1)}%`);
   
+  // DOUBLE CHANCE
+  const dcX1 = pH + pD;      // 1X (Home ou nul)
+  const dc12 = pH + pA;      // 12 (pas de nul)
+  const dcX2 = pD + pA;      // X2 (nul ou Away)
+  
+  console.log(`\n🎰 DOUBLE CHANCE: 1X=${(dcX1*100).toFixed(1)}% / 12=${(dc12*100).toFixed(1)}% / X2=${(dcX2*100).toFixed(1)}%`);
+  
+  // DRAW NO BET (DNB)
+  const dnbHome = pH / (pH + pA);     // Home (remb. si nul)
+  const dnbAway = pA / (pH + pA);     // Away (remb. si nul)
+  
+  console.log(`\n💰 DRAW NO BET: Home=${(dnbHome*100).toFixed(1)}% / Away=${(dnbAway*100).toFixed(1)}%`);
+  
+  // FIRST HALF WINNER (1ère mi-temps)
+  // Utiliser λ/2 car seulement 45 minutes
+  const lH_HT = lambdaHome / 2;
+  const lA_HT = lambdaAway / 2;
+  
+  let pHT_1 = 0, pHT_D = 0, pHT_2 = 0;
+  for (let i = 0; i <= 5; i++) {
+    for (let j = 0; j <= 5; j++) {
+      const p = pois(i, lH_HT) * pois(j, lA_HT);
+      if (i > j) pHT_1 += p;
+      else if (i === j) pHT_D += p;
+      else pHT_2 += p;
+    }
+  }
+  
+  console.log(`\n⏱️ FIRST HALF: 1=${(pHT_1*100).toFixed(1)}% / X=${(pHT_D*100).toFixed(1)}% / 2=${(pHT_2*100).toFixed(1)}%`);
+  
   return { 
     lambdaHome, lambdaAway, homeFormMult, awayFormMult,
     // 📊 DONNÉES MARCHÉ 1N2
@@ -1334,7 +1364,18 @@ function buildModel(home,away,homeForm,awayForm,rng){
     ou35Total: advanced.ou35Total,
     // 📊 DONNÉES MARCHÉ CLEAN SHEET
     csHome: advanced.csHome,
-    csAway: advanced.csAway
+    csAway: advanced.csAway,
+    // 📊 DONNÉES MARCHÉ DOUBLE CHANCE
+    dcX1: advanced.dcX1,
+    dc12: advanced.dc12,
+    dcX2: advanced.dcX2,
+    // 📊 DONNÉES MARCHÉ DRAW NO BET
+    dnbHome: advanced.dnbHome,
+    dnbAway: advanced.dnbAway,
+    // 📊 DONNÉES MARCHÉ FIRST HALF
+    pHT_1: advanced.pHT_1,
+    pHT_D: advanced.pHT_D,
+    pHT_2: advanced.pHT_2
   };
   } catch(err) {
     console.error('❌ ERREUR dans buildModel:', err);
@@ -1900,13 +1941,13 @@ function buildMarkets(m,model){
   ]});
 
   list.push({id:'dc',name:'Double chance',cols:3,sels:[
-    mkSmart('1X — '+H+' ou nul',model.pH+model.pD,0,rng,'dc'),
-    mkSmart('12 — pas de nul',model.pH+model.pA,1,rng,'dc'),
-    mkSmart('X2 — nul ou '+A,model.pD+model.pA,2,rng,'dc')]});
+    mkSmart('1X — '+H+' ou nul',model.dcX1 || (model.pH+model.pD),0,rng,'dc'),
+    mkSmart('12 — pas de nul',model.dc12 || (model.pH+model.pA),1,rng,'dc'),
+    mkSmart('X2 — nul ou '+A,model.dcX2 || (model.pD+model.pA),2,rng,'dc')]});
 
   list.push({id:'dnb',name:'Draw No Bet',cols:2,sels:[
-    mkSmart(H+' (remb. si nul)',model.pH/(model.pH+model.pA),0,rng,'dnb'),
-    mkSmart(A+' (remb. si nul)',model.pA/(model.pH+model.pA),1,rng,'dnb')]});
+    mkSmart(H+' (remb. si nul)',model.dnbHome || (model.pH/(model.pH+model.pA)),0,rng,'dnb'),
+    mkSmart(A+' (remb. si nul)',model.dnbAway || (model.pA/(model.pH+model.pA)),1,rng,'dnb')]})
 
   list.push({id:'btts',name:'Les deux équipes marquent (BTTS)',cols:2,sels:[
     mkSmart('Oui',model.pBTTS || model.btts || 0.5,0,rng,'btts'),
@@ -1941,9 +1982,9 @@ function buildMarkets(m,model){
     mk(i+' - '+j,exact(i,j),{allowGray:true,grayChance:0.08}))});
 
   list.push({id:'htr',name:'Résultat à la mi-temps (1N2)',cols:3,sels:[
-    mkSmart(H+' à la pause',model.HT[1],0,rng,'htr'),
-    mkSmart('Nul à la pause',model.HT.N,1,rng,'htr'),
-    mkSmart(A+' à la pause',model.HT[2],2,rng,'htr')]});
+    mkSmart(H+' à la pause',model.pHT_1 || model.HT[1] || 0.5,0,rng,'htr'),
+    mkSmart('Nul à la pause',model.pHT_D || model.HT.N || 0.5,1,rng,'htr'),
+    mkSmart(A+' à la pause',model.pHT_2 || model.HT[2] || 0.5,2,rng,'htr')]});
 
   const htftLabels={'1/1':H+' / '+H,'1/N':H+' / Nul','1/2':H+' / '+A,'N/1':'Nul / '+H,'N/N':'Nul / Nul','N/2':'Nul / '+A,'2/1':A+' / '+H,'2/N':A+' / Nul','2/2':A+' / '+A};
   list.push({id:'htft',name:'Mi-temps / Fin de match',cols:3,sels:Object.keys(model.HTFT).map(k=>
@@ -3243,7 +3284,101 @@ function generateMarketAnalysis(b) {
     `;
   }
   
-  // Clean Sheet
+  // Double Chance
+  if (b.marketId === 'dc') {
+    const opts = [
+      { label: '1X', prob: m.dcX1, desc: 'Home ou nul' },
+      { label: '12', prob: m.dc12, desc: 'Pas de nul' },
+      { label: 'X2', prob: m.dcX2, desc: 'Nul ou Away' }
+    ];
+    const sel = opts[b.selIdx];
+    
+    return `
+      <div class="detail-section">
+        <h4>📊 L'analyse Double Chance</h4>
+        <p><strong>${b.matchName}:</strong> Parions sur <strong>${sel.label}</strong> (${sel.desc})</p>
+        
+        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <div style="margin-bottom: 8px;"><strong>Probabilités 1N2</strong></div>
+          <div style="margin-left: 12px; color: var(--txt2);">
+            ${b.home.name}: <strong>${(m.pH * 100).toFixed(1)}%</strong><br>
+            Nul: <strong>${(m.pD * 100).toFixed(1)}%</strong><br>
+            ${b.away.name}: <strong>${(m.pA * 100).toFixed(1)}%</strong>
+          </div>
+        </div>
+
+        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <div style="margin-bottom: 8px;"><strong>Votre sélection: ${sel.label}</strong></div>
+          <div style="margin-left: 12px; color: var(--txt2);">
+            P(${sel.label}) = <strong style="color: var(--accent); font-size: 13px;">${(sel.prob * 100).toFixed(1)}%</strong>
+            <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
+              ${sel.label === '1X' ? 'P(Home) + P(Nul) = ' + (m.pH*100).toFixed(1) + '% + ' + (m.pD*100).toFixed(1) + '%' : 
+                sel.label === '12' ? 'P(Home) + P(Away) = ' + (m.pH*100).toFixed(1) + '% + ' + (m.pA*100).toFixed(1) + '%' : 
+                'P(Nul) + P(Away) = ' + (m.pD*100).toFixed(1) + '% + ' + (m.pA*100).toFixed(1) + '%'}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Draw No Bet
+  if (b.marketId === 'dnb') {
+    const isHome = b.selIdx === 0;
+    const team = isHome ? b.home.name : b.away.name;
+    const prob = isHome ? m.dnbHome : m.dnbAway;
+    
+    return `
+      <div class="detail-section">
+        <h4>📊 L'analyse Draw No Bet</h4>
+        <p><strong>${b.matchName}:</strong> Parions sur ${team} (remboursé si nul)</p>
+        
+        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <div style="margin-bottom: 8px;"><strong>Calcul DNB</strong></div>
+          <div style="margin-left: 12px; color: var(--txt2);">
+            P(${team} gagne) = <strong>${(${isHome ? 'm.pH' : 'm.pA'} * 100).toFixed(1)}%</strong><br>
+            P(${team} ou Nul) = <strong>${((${isHome ? 'm.pH + m.pD' : 'm.pA + m.pD'}) * 100).toFixed(1)}%</strong><br>
+            <strong style="margin-top: 6px; display: block;">P(${team} remboursé) = P(gagne) / (P(gagne) + P(adversaire)) = ${(prob * 100).toFixed(1)}%</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // First Half
+  if (b.marketId === 'htr') {
+    const opts = [
+      { label: b.home.name, prob: m.pHT_1 },
+      { label: 'Nul', prob: m.pHT_D },
+      { label: b.away.name, prob: m.pHT_2 }
+    ];
+    const sel = opts[b.selIdx];
+    
+    return `
+      <div class="detail-section">
+        <h4>📊 L'analyse Résultat mi-temps</h4>
+        <p><strong>${b.matchName}:</strong> Résultat à la 45ème minute</p>
+        
+        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <div style="margin-bottom: 8px;"><strong>Calcul (45 minutes)</strong></div>
+          <div style="margin-left: 12px; color: var(--txt2);">
+            Lambda ajusté (45 min): λ/2 pour chaque équipe<br>
+            ${b.home.name}: <strong>${m.pHT_1 ? (m.pHT_1 * 100).toFixed(1) : '—'}%</strong><br>
+            Nul: <strong>${m.pHT_D ? (m.pHT_D * 100).toFixed(1) : '—'}%</strong><br>
+            ${b.away.name}: <strong>${m.pHT_2 ? (m.pHT_2 * 100).toFixed(1) : '—'}%</strong>
+          </div>
+        </div>
+        
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <strong>Votre sélection:</strong>
+          <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
+            ${sel.label}: <strong style="color: var(--accent); font-size: 13px;">${(sel.prob * 100).toFixed(1)}%</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
   if (b.marketId === 'cs') {
     const isHome = b.selIdx % 2 === 0; // 0,2 = Home / 1,3 = Away
     const team = isHome ? b.home.name : b.away.name;
