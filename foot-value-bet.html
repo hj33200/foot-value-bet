@@ -1043,7 +1043,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   const calculateOU = (lambda, threshold) => {
     let pUnder = 0;
     for (let i = 0; i <= threshold; i++) {
-      pUnder += poissonProb(lambda, i);
+      pUnder += pois(i, lambda);
     }
     return { pUnder, pOver: 1 - pUnder };
   };
@@ -1054,7 +1054,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
     let pUnder = 0;
     for (let i = 0; i <= 2.5; i++) {
       for (let j = 0; j <= 2.5 - i; j++) {
-        pUnder += poissonProb(lambdaHome, i) * poissonProb(lambdaAway, j);
+        pUnder += pois(i, lambdaHome) * pois(j, lambdaAway);
       }
     }
     return { pUnder, pOver: 1 - pUnder };
