@@ -1097,8 +1097,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   // PROBABILITÉS 1N2 (à partir de matrice FM)
   let pH = 0, pD = 0, pA = 0;
-  for (let i = 0; i <= 5; i++) {
-    for (let j = 0; j <= 5; j++) {
+  for (let i = 0; i <= 10; i++) {
+    for (let j = 0; j <= 10; j++) {
       const p = pois(i, lambdaHome) * pois(j, lambdaAway);
       if (i > j) pH += p;
       else if (i === j) pD += p;
@@ -1127,8 +1127,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   const lA_HT = lambdaAway / 2;
   
   let pHT_1 = 0, pHT_D = 0, pHT_2 = 0;
-  for (let i = 0; i <= 5; i++) {
-    for (let j = 0; j <= 5; j++) {
+  for (let i = 0; i <= 8; i++) {
+    for (let j = 0; j <= 8; j++) {
       const p = pois(i, lH_HT) * pois(j, lA_HT);
       if (i > j) pHT_1 += p;
       else if (i === j) pHT_D += p;
