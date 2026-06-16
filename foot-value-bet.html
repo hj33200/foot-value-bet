@@ -774,21 +774,21 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`  📝 Basé sur: Win Rate (40%) + Buts/match (60%)`);
   console.log(`  📝 Différence Elo: ${(homeElo - awayElo).toFixed(0)} points`);
   
-  // 5️⃣ LAMBDAS POISSON FINALES avec ELO
+  // 5️⃣ LAMBDAS POISSON FINALES avec ELO (Form multiplier supprimé - déjà dans Elo)
   const homeAdvantage = 1.0;
   
-  let lambdaHome = (homeOffense * homeFormMult * homeEloMult * 2.0) / (awayDefense + 0.1);
-  let lambdaAway = (awayOffense * awayFormMult * awayEloMult * 2.0) / (homeDefense + 0.1);
+  let lambdaHome = (homeOffense * homeEloMult * 1.8) / (awayDefense + 0.1);
+  let lambdaAway = (awayOffense * awayEloMult * 1.8) / (homeDefense + 0.1);
   
   lambdaHome *= homeAdvantage;
   
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
   
-  console.log(`\n🎲 LAMBDAS POISSON FINALES (avec ELO):`);
+  console.log(`\n🎲 LAMBDAS POISSON FINALES (avec ELO seul):`);
   console.log(`  ${home.name}: ${lambdaHome.toFixed(3)}`);
   console.log(`  ${away.name}: ${lambdaAway.toFixed(3)}`);
-  console.log(`  📝 Formule: (Attaque × Form × ELO × 2.0) / Défense adverse`);
+  console.log(`  📝 Formule: (Attaque × ELO × 1.8) / Défense adverse`);
   
   return { lambdaHome, lambdaAway, homeFormMult, awayFormMult };
 }
