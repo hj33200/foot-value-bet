@@ -630,14 +630,24 @@ function calculateEloFromResults(teamName, form, gf, ga, matches) {
   let elo = 1600;
   if (!form || form.length === 0) return elo;
   
-  const winRate = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0) / form.length;
-  const goalsDiff = (gf / matches) - (ga / matches);
+  // 1️⃣ WIN RATE (40% du calcul)
+  const winCount = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0);
+  const drawCount = form.split('').reduce((s,c) => s + (c==='D'?1:0), 0);
+  const winRate = (winCount * 3 + drawCount) / (form.length * 3); // Points / max points
   
   const performanceBonus = (winRate - 0.5) * 400;
-  const goalsBonus = goalsDiff * 100;
+  
+  // 2️⃣ BUTS/MATCH (60% du calcul) - Assurer qu'on divise par matches
+  const goalsDiff = Math.max(0.1, matches) > 0 
+    ? ((gf / Math.max(1, matches)) - (ga / Math.max(1, matches)))
+    : 0;
+  
+  const goalsBonus = goalsDiff * 150; // Plus de poids aux buts
+  
+  console.log(`  📝 ${teamName}: WinRate=${(winRate*100).toFixed(0)}% (${performanceBonus.toFixed(0)}), GoalsDiff=${goalsDiff.toFixed(2)} (${goalsBonus.toFixed(0)})`);
   
   elo += performanceBonus + goalsBonus;
-  elo = clamp(elo, 1000, 2200);
+  elo = clamp(elo, 1000, 2400);
   
   return elo;
 }
@@ -723,6 +733,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`  ${away.name}: ${awayFormMult.toFixed(3)}`);
   
   // 4️⃣ ELO RATING - Pondération scientifiquement validée
+  console.log(`\n🏆 CALCUL ELO RATING:`);
   const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches);
   const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches);
   
@@ -731,10 +742,11 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   const homeEloMult = eloWinProb; // Entre 0 et 1
   const awayEloMult = 1 - eloWinProb;
   
-  console.log(`\n🏆 ELO RATING (scientifiquement validé):`);
+  console.log(`\n🏆 ELO RATING FINAL:`);
   console.log(`  ${home.name} ELO: ${homeElo.toFixed(0)} (Prob victoire: ${(eloWinProb*100).toFixed(1)}%)`);
   console.log(`  ${away.name} ELO: ${awayElo.toFixed(0)} (Prob victoire: ${(awayEloMult*100).toFixed(1)}%)`);
   console.log(`  📝 Basé sur: Win Rate (40%) + Buts/match (60%)`);
+  console.log(`  📝 Différence Elo: ${(homeElo - awayElo).toFixed(0)} points`);
   
   // 5️⃣ LAMBDAS POISSON FINALES avec ELO
   const homeAdvantage = 1.0;
