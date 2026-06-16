@@ -626,6 +626,105 @@ async function getTeamInfo(teamId) {
 // 🏆 ELO RATING SYSTEM - Système de rating scientifiquement validé
 let ELO_CACHE = {}; // Réinitialiser à chaque calcul
 
+// 🌍 DÉTECTION TYPE DE COMPÉTITION
+function detectCompetitionType(leagueName, competitionName) {
+  const lowerLeague = (leagueName || '').toLowerCase();
+  const lowerComp = (competitionName || '').toLowerCase();
+  
+  // Mots-clés Coupe du Monde
+  const worldCupKeywords = ['world', 'coupe du monde', 'fifa', 'qatar', 'qatar 2022', 'world cup', 'copa del mundo'];
+  
+  for (const keyword of worldCupKeywords) {
+    if (lowerLeague.includes(keyword) || lowerComp.includes(keyword)) {
+      return 'WORLD_CUP';
+    }
+  }
+  
+  // Sinon: Championnat
+  return 'CHAMPIONSHIP';
+}
+
+// 🌍 OBTENIR LES PROPRIÉTÉS DE LA COMPÉTITION
+function getCompetitionProperties(competitionType) {
+  if (competitionType === 'WORLD_CUP') {
+    return {
+      name: 'Coupe du Monde',
+      isNeutralGround: true,
+      homeAdvantage: 1.0,
+      sosUsesHomeAway: false,
+      description: '⚽ Terrain neutre (tous les matchs)'
+    };
+  } else {
+    return {
+      name: 'Championnat',
+      isNeutralGround: false,
+      homeAdvantage: 1.03, // 3% d'avantage domicile
+      sosUsesHomeAway: true,
+      description: '🏟️ Avec avantage domicile'
+    };
+  }
+}
+
+// 🎯 Calculer la force d'une équipe (opponent strength) pour SOS
+function getOpponentStrength(teamId, teamName) {
+  if (ELO_CACHE[teamId]) return ELO_CACHE[teamId];
+  
+  const stats = FOOTBALL_API.getTeamStats(teamId);
+  if (!stats || !stats.form) return 1600;
+  
+  const elo = calculateEloFromResults(teamName, stats.form, stats.gf, stats.ga, stats.form.length);
+  ELO_CACHE[teamId] = elo;
+  
+  return elo;
+}
+
+// 🎯 Calculer SOS (Strength of Schedule) - force des adversaires
+function calculateSOS(teamId, teamName, matches, competitionType = 'CHAMPIONSHIP') {
+  if (!matches || matches.length === 0) {
+    console.log(`⚠️ Pas de matchs pour SOS de ${teamName}`);
+    return { sosAttaque: 1.0, sosDéfense: 1.0 };
+  }
+  
+  const compProps = getCompetitionProperties(competitionType);
+  let totalAdversaire = 0;
+  let totalPoids = 0;
+  
+  console.log(`\n🎯 CALCUL SOS pour ${teamName} - ${compProps.description}:`);
+  
+  matches.forEach((m, idx) => {
+    const isHome = m.teams.home.id == teamId;
+    const opponent = isHome ? m.teams.away : m.teams.home;
+    const opponentId = opponent.id;
+    
+    const opponentElo = getOpponentStrength(opponentId, opponent.name);
+    
+    // Pondération: matchs récents = plus de poids
+    const weight = (idx + 1) / matches.length;
+    
+    // Normaliser Elo en ratio (1600 = neutral)
+    const eloRatio = opponentElo / 1600;
+    
+    // ✅ NOUVEAU: Si terrain neutre, pas de pénalité/bonus selon position
+    let adversaireForce = eloRatio;
+    if (!compProps.isNeutralGround && !isHome) {
+      // Championnat + away: adversaire défense est plus forte (avantage domicile)
+      adversaireForce *= 1.03;
+    }
+    
+    totalAdversaire += adversaireForce * weight;
+    totalPoids += weight;
+    
+    const posLabel = isHome ? '🏠 dom.' : '✈️ ext.';
+    console.log(`  Match ${idx + 1}: ${opponent.name} (Elo: ${opponentElo.toFixed(0)}) ${posLabel}`);
+  });
+  
+  const sos = totalAdversaire / totalPoids;
+  
+  console.log(`  📊 SOS Final: ${sos.toFixed(3)} (${compProps.name})`);
+  
+  return { sos, competitionType };
+}
+
 function calculateEloFromResults(teamName, form, gf, ga, matches) {
   const PRIOR_ELO = 1600;
   if (!form || form.length === 0) return PRIOR_ELO;
@@ -697,6 +796,15 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS (v3 avec ELO RATING) ===`);
   console.log(`🏠 Home: ${home.name} (id: ${home.id})`);
   console.log(`✈️ Away: ${away.name} (id: ${away.id})`);
+  
+  // 🌍 DÉTECTER TYPE DE COMPÉTITION
+  // TODO: Récupérer leagueName et competitionName depuis les données du match
+  const leagueName = 'World Cup'; // Pour l'instant, on utilise World Cup par défaut
+  const competitionType = detectCompetitionType(leagueName, '');
+  const compProps = getCompetitionProperties(competitionType);
+  
+  console.log(`\n🌍 COMPÉTITION: ${compProps.name} ${compProps.description}`);
+  console.log(`   Home Advantage: ×${compProps.homeAdvantage.toFixed(2)}`);
   
   // Récupérer les vraies stats
   const homeStats = FOOTBALL_API.getTeamStats(home.id) || {};
@@ -775,7 +883,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`  📝 Différence Elo: ${(homeElo - awayElo).toFixed(0)} points`);
   
   // 5️⃣ LAMBDAS POISSON FINALES avec ELO (Form multiplier supprimé - déjà dans Elo)
-  const homeAdvantage = 1.0;
+  const homeAdvantage = compProps.homeAdvantage; // ✅ Utilise le type de compétition
   
   let lambdaHome = (homeOffense * homeEloMult * 1.8) / (awayDefense + 0.1);
   let lambdaAway = (awayOffense * awayEloMult * 1.8) / (homeDefense + 0.1);
