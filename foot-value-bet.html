@@ -1095,6 +1095,19 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   console.log(`\n🧹 CLEAN SHEET: Home=${(csHome*100).toFixed(1)}% / Away=${(csAway*100).toFixed(1)}%`);
   
+  // PROBABILITÉS 1N2 (à partir de matrice FM)
+  let pH = 0, pD = 0, pA = 0;
+  for (let i = 0; i <= 5; i++) {
+    for (let j = 0; j <= 5; j++) {
+      const p = pois(i, lambdaHome) * pois(j, lambdaAway);
+      if (i > j) pH += p;
+      else if (i === j) pD += p;
+      else pA += p;
+    }
+  }
+  
+  console.log(`\n1N2: Home=${(pH*100).toFixed(1)}% / Draw=${(pD*100).toFixed(1)}% / Away=${(pA*100).toFixed(1)}%`);
+  
   // DOUBLE CHANCE
   const dcX1 = pH + pD;      // 1X (Home ou nul)
   const dc12 = pH + pA;      // 12 (pas de nul)
@@ -1128,6 +1141,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   return { 
     lambdaHome, lambdaAway, homeFormMult, awayFormMult,
     // 📊 DONNÉES MARCHÉ 1N2
+    pH, pD, pA,
     homeElo, awayElo, eloWinProb,
     sosHome: sosHome.sos, sosAway: sosAway.sos,
     homeLastMatches, awayLastMatches,
@@ -1138,9 +1152,17 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
     // 📊 DONNÉES MARCHÉ BTTS
     pHomeScores, pAwayScores, pBTTS,
     // 📊 DONNÉES MARCHÉ OVER/UNDER
+    ou15Home, ou15Away, ou15Total,
     ou25Home, ou25Away, ou25Total,
+    ou35Home, ou35Away, ou35Total,
+    // 📊 DONNÉES MARCHÉ DOUBLE CHANCE
+    dcX1, dc12, dcX2,
+    // 📊 DONNÉES MARCHÉ DRAW NO BET
+    dnbHome, dnbAway,
     // 📊 DONNÉES MARCHÉ CLEAN SHEET
-    csHome, csAway
+    csHome, csAway,
+    // 📊 DONNÉES MARCHÉ FIRST HALF
+    pHT_1, pHT_D, pHT_2
   };
 }
 
