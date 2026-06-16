@@ -902,11 +902,11 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   // 4️⃣.5️⃣ CALCUL SOS (Strength of Schedule) - Force des adversaires
   console.log(`\n📋 RÉCUPÉRATION DES MATCHS POUR SOS...`);
-  const homeMatches = getLastMatches(home.id, 10) || [];
-  const awayMatches = getLastMatches(away.id, 10) || [];
+  const homeLastMatches = getLastMatches(home.id, 10) || [];
+  const awayLastMatches = getLastMatches(away.id, 10) || [];
   
-  const sosHome = calculateSOS(home.id, home.name, homeMatches, competitionType);
-  const sosAway = calculateSOS(away.id, away.name, awayMatches, competitionType);
+  const sosHome = calculateSOS(home.id, home.name, homeLastMatches, competitionType);
+  const sosAway = calculateSOS(away.id, away.name, awayLastMatches, competitionType);
   
   console.log(`\n📊 SOS RÉSUMÉ:`);
   console.log(`  ${home.name} SOS: ${sosHome.sos.toFixed(3)} (adversaires ${sosHome.sos > 1 ? 'plus forts' : 'plus faibles'} que moyenne)`);
