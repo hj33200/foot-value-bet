@@ -2535,9 +2535,9 @@ function statsSection(d){
       ${simpleRow('Classement domicile/extérieur',ord(H.rankSide)+' dom.',ord(A.rankSide)+' ext.')}
       <div class="srow"><span class="lbl">Forme (5 derniers)</span><span class="val"></span></div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 10px">
-        <span style="color:var(--blue);font-size:12px;font-weight:700">${m.home.short}</span>${formPills(H.form.split('').slice(-5))}</div>
+        <span style="color:var(--blue);font-size:12px;font-weight:700">${m.home.short}</span>${formPills(H.form.slice(-5))}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:0 0 6px">
-        <span style="color:var(--red);font-size:12px;font-weight:700">${m.away.short}</span>${formPills(A.form.split('').slice(-5))}</div>
+        <span style="color:var(--red);font-size:12px;font-weight:700">${m.away.short}</span>${formPills(A.form.slice(-5))}</div>
       ${simpleRow('Bilan (V-N-D)',`${H.wins}-${H.draws}-${H.losses}`,`${A.wins}-${A.draws}-${A.losses}`)}
       ${simpleRow('Séries récentes',`<span style="font-size:11px">${H.series}</span>`,`<span style="font-size:11px">${A.series}</span>`)}
     </div>
