@@ -624,7 +624,7 @@ async function getTeamInfo(teamId) {
 }
 
 // 🏆 ELO RATING SYSTEM - Système de rating scientifiquement validé
-const ELO_CACHE = {};
+let ELO_CACHE = {}; // Réinitialiser à chaque calcul
 
 function calculateEloFromResults(teamName, form, gf, ga, matches) {
   let elo = 1600;
@@ -746,6 +746,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   // 4️⃣ ELO RATING - Pondération scientifiquement validée
   console.log(`\n🏆 CALCUL ELO RATING:`);
+  ELO_CACHE = {}; // ← VIDER LE CACHE pour recalculer!
   const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches);
   const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches);
   
