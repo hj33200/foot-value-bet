@@ -627,38 +627,51 @@ async function getTeamInfo(teamId) {
 let ELO_CACHE = {}; // Réinitialiser à chaque calcul
 
 function calculateEloFromResults(teamName, form, gf, ga, matches) {
-  let elo = 1600;
-  if (!form || form.length === 0) return elo;
+  const PRIOR_ELO = 1600;
+  if (!form || form.length === 0) return PRIOR_ELO;
   
-  // 🔍 DEBUG
   console.log(`\n  📍 Calcul Elo pour ${teamName}:`);
   console.log(`    Form: ${form}, GF: ${gf}, GA: ${ga}, Matches: ${matches}`);
   
-  // 1️⃣ WIN RATE (40% du calcul)
+  // 1️⃣ WIN RATE
   const winCount = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0);
   const drawCount = form.split('').reduce((s,c) => s + (c==='D'?1:0), 0);
   const winRate = (winCount * 3 + drawCount) / (form.length * 3);
   
   console.log(`    Win Count: ${winCount}, Draw Count: ${drawCount}, Win Rate: ${(winRate*100).toFixed(1)}%`);
   
-  const performanceBonus = (winRate - 0.5) * 600;
+  // RÉDUIT de 600 → 350 (moins extrême)
+  const performanceBonus = (winRate - 0.5) * 350;
   console.log(`    Performance Bonus: ${performanceBonus.toFixed(0)}`);
   
-  // 2️⃣ BUTS/MATCH (60% du calcul)
+  // 2️⃣ BUTS/MATCH
   const goalsFor = gf / Math.max(1, matches);
   const goalsAgainst = ga / Math.max(1, matches);
   const goalsDiff = goalsFor - goalsAgainst;
   
   console.log(`    Goals For/Match: ${goalsFor.toFixed(2)}, Goals Against/Match: ${goalsAgainst.toFixed(2)}, Diff: ${goalsDiff.toFixed(2)}`);
   
-  const goalsBonus = goalsDiff * 250;
+  // RÉDUIT de 250 → 120 (moins extrême)
+  const goalsBonus = goalsDiff * 120;
   console.log(`    Goals Bonus: ${goalsBonus.toFixed(0)}`);
   
-  elo += performanceBonus + goalsBonus;
-  console.log(`    Elo avant clamp: ${elo.toFixed(0)}`);
+  // Elo brut
+  let eloRaw = PRIOR_ELO + performanceBonus + goalsBonus;
+  console.log(`    Elo brut: ${eloRaw.toFixed(0)}`);
   
-  // Plafond augmenté pour mieux différencier les équipes
-  elo = clamp(elo, 800, 2800);
+  // 3️⃣ FACTEUR DE CONFIANCE (basé sur le nombre de matchs)
+  // 5 matches = 70% confident
+  // 10 matches = 85% confident
+  // 20 matches = 95% confident
+  const confidence = Math.min(0.95, 0.4 + (matches / 30));
+  console.log(`    Confiance (${matches} matches): ${(confidence*100).toFixed(0)}%`);
+  
+  // Blend: Prior + Elo_calculé pondéré par confiance
+  let elo = PRIOR_ELO * (1 - confidence) + eloRaw * confidence;
+  console.log(`    Elo blendé (Prior + Calc): ${elo.toFixed(0)}`);
+  
+  // LISSER LES EXTRÊMES: min 1200, max 2000 (au lieu de 800-2800)
+  elo = clamp(elo, 1200, 2000);
   console.log(`    Elo final: ${elo.toFixed(0)}`);
   
   return elo;
