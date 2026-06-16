@@ -630,24 +630,35 @@ function calculateEloFromResults(teamName, form, gf, ga, matches) {
   let elo = 1600;
   if (!form || form.length === 0) return elo;
   
+  // 🔍 DEBUG
+  console.log(`\n  📍 Calcul Elo pour ${teamName}:`);
+  console.log(`    Form: ${form}, GF: ${gf}, GA: ${ga}, Matches: ${matches}`);
+  
   // 1️⃣ WIN RATE (40% du calcul)
   const winCount = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0);
   const drawCount = form.split('').reduce((s,c) => s + (c==='D'?1:0), 0);
-  const winRate = (winCount * 3 + drawCount) / (form.length * 3); // Points / max points
+  const winRate = (winCount * 3 + drawCount) / (form.length * 3);
+  
+  console.log(`    Win Count: ${winCount}, Draw Count: ${drawCount}, Win Rate: ${(winRate*100).toFixed(1)}%`);
   
   const performanceBonus = (winRate - 0.5) * 400;
+  console.log(`    Performance Bonus: ${performanceBonus.toFixed(0)}`);
   
-  // 2️⃣ BUTS/MATCH (60% du calcul) - Assurer qu'on divise par matches
-  const goalsDiff = Math.max(0.1, matches) > 0 
-    ? ((gf / Math.max(1, matches)) - (ga / Math.max(1, matches)))
-    : 0;
+  // 2️⃣ BUTS/MATCH (60% du calcul)
+  const goalsFor = gf / Math.max(1, matches);
+  const goalsAgainst = ga / Math.max(1, matches);
+  const goalsDiff = goalsFor - goalsAgainst;
   
-  const goalsBonus = goalsDiff * 150; // Plus de poids aux buts
+  console.log(`    Goals For/Match: ${goalsFor.toFixed(2)}, Goals Against/Match: ${goalsAgainst.toFixed(2)}, Diff: ${goalsDiff.toFixed(2)}`);
   
-  console.log(`  📝 ${teamName}: WinRate=${(winRate*100).toFixed(0)}% (${performanceBonus.toFixed(0)}), GoalsDiff=${goalsDiff.toFixed(2)} (${goalsBonus.toFixed(0)})`);
+  const goalsBonus = goalsDiff * 150;
+  console.log(`    Goals Bonus: ${goalsBonus.toFixed(0)}`);
   
   elo += performanceBonus + goalsBonus;
+  console.log(`    Elo avant clamp: ${elo.toFixed(0)}`);
+  
   elo = clamp(elo, 1000, 2400);
+  console.log(`    Elo final: ${elo.toFixed(0)}`);
   
   return elo;
 }
