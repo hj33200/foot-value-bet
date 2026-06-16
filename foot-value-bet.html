@@ -397,6 +397,7 @@ tbody tr:hover{background:var(--panel2)}
 .verdict-section { margin-bottom: 20px; }
 .verdict-banner { border-radius: 12px; padding: 16px; margin-bottom: 16px; text-align: center; font-weight: 700; }
 .verdict-good { background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(34,197,94,0.05)); border: 2px solid var(--green); color: var(--green); }
+.verdict-correct { background: linear-gradient(135deg, rgba(251,146,60,0.1), rgba(251,146,60,0.05)); border: 2px solid var(--orange); color: var(--orange); }
 .verdict-bad { background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.05)); border: 2px solid var(--red); color: var(--red); }
 .verdict-icon { font-size: 18px; margin-bottom: 6px; }
 .verdict-subtitle { font-size: 13px; font-weight: 500; opacity: 0.85; }
@@ -432,6 +433,7 @@ tbody tr:hover{background:var(--panel2)}
 .detail-section ul { margin: 0; padding-left: 20px; color: var(--txt2); }
 .detail-section li { margin: 6px 0; line-height: 1.4; }
 .rec-good { background: rgba(34, 197, 94, 0.1); border-left: 3px solid var(--green); padding: 10px; border-radius: 4px; color: var(--txt1) !important; }
+.rec-correct { background: rgba(251, 146, 60, 0.1); border-left: 3px solid var(--orange); padding: 10px; border-radius: 4px; color: var(--txt1) !important; }
 .rec-bad { background: rgba(239, 68, 68, 0.1); border-left: 3px solid var(--red); padding: 10px; border-radius: 4px; color: var(--txt1) !important; }
 </style>
 
@@ -1039,7 +1041,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   console.log(`\n🎯 BTTS: P(Home marque)=${(pHomeScores*100).toFixed(1)}% × P(Away marque)=${(pAwayScores*100).toFixed(1)}% = ${(pBTTS*100).toFixed(1)}%`);
   
-  // OVER/UNDER: Distribution Poisson
+  // OVER/UNDER: Distribution Poisson pour 3 seuils
   const calculateOU = (lambda, threshold) => {
     let pUnder = 0;
     for (let i = 0; i <= threshold; i++) {
@@ -1048,12 +1050,37 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
     return { pUnder, pOver: 1 - pUnder };
   };
   
+  // Calculer pour les 3 seuils
+  const ou15Home = calculateOU(lambdaHome, 1.5);
+  const ou15Away = calculateOU(lambdaAway, 1.5);
+  const ou15Total = (() => {
+    let pUnder = 0;
+    for (let i = 0; i <= 1.5; i++) {
+      for (let j = 0; j <= 1.5 - i; j++) {
+        pUnder += pois(i, lambdaHome) * pois(j, lambdaAway);
+      }
+    }
+    return { pUnder, pOver: 1 - pUnder };
+  })();
+  
   const ou25Home = calculateOU(lambdaHome, 2.5);
   const ou25Away = calculateOU(lambdaAway, 2.5);
   const ou25Total = (() => {
     let pUnder = 0;
     for (let i = 0; i <= 2.5; i++) {
       for (let j = 0; j <= 2.5 - i; j++) {
+        pUnder += pois(i, lambdaHome) * pois(j, lambdaAway);
+      }
+    }
+    return { pUnder, pOver: 1 - pUnder };
+  })();
+  
+  const ou35Home = calculateOU(lambdaHome, 3.5);
+  const ou35Away = calculateOU(lambdaAway, 3.5);
+  const ou35Total = (() => {
+    let pUnder = 0;
+    for (let i = 0; i <= 3.5; i++) {
+      for (let j = 0; j <= 3.5 - i; j++) {
         pUnder += pois(i, lambdaHome) * pois(j, lambdaAway);
       }
     }
@@ -1295,10 +1322,16 @@ function buildModel(home,away,homeForm,awayForm,rng){
     pHomeScores: advanced.pHomeScores,
     pAwayScores: advanced.pAwayScores,
     pBTTS: advanced.pBTTS,
-    // 📊 DONNÉES MARCHÉ OVER/UNDER
+    // 📊 DONNÉES MARCHÉ OVER/UNDER (3 seuils)
+    ou15Home: advanced.ou15Home,
+    ou15Away: advanced.ou15Away,
+    ou15Total: advanced.ou15Total,
     ou25Home: advanced.ou25Home,
     ou25Away: advanced.ou25Away,
     ou25Total: advanced.ou25Total,
+    ou35Home: advanced.ou35Home,
+    ou35Away: advanced.ou35Away,
+    ou35Total: advanced.ou35Total,
     // 📊 DONNÉES MARCHÉ CLEAN SHEET
     csHome: advanced.csHome,
     csAway: advanced.csAway
@@ -1876,10 +1909,19 @@ function buildMarkets(m,model){
     mkSmart(A+' (remb. si nul)',model.pA/(model.pH+model.pA),1,rng,'dnb')]});
 
   list.push({id:'btts',name:'Les deux équipes marquent (BTTS)',cols:2,sels:[
-    mkSmart('Oui',model.btts,0,rng,'btts'),
-    mkSmart('Non',1-model.btts,1,rng,'btts')]});
+    mkSmart('Oui',model.pBTTS,0,rng,'btts'),
+    mkSmart('Non',1-model.pBTTS,1,rng,'btts')]});
 
-  const tg=[];let totIdx=0;[1.5,2.5,3.5].forEach(t=>{tg.push(mkSmart('Plus de '+t+' buts',model.over[t],totIdx++,rng,'tot'));tg.push(mkSmart('Moins de '+t+' buts',1-model.over[t],totIdx++,rng,'tot'))});
+  const tg=[];let totIdx=0;
+  // 1.5 buts
+  tg.push(mkSmart('Plus de 1.5 buts', model.ou15Total.pOver, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Moins de 1.5 buts', model.ou15Total.pUnder, totIdx++, rng, 'tot'));
+  // 2.5 buts
+  tg.push(mkSmart('Plus de 2.5 buts', model.ou25Total.pOver, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Moins de 2.5 buts', model.ou25Total.pUnder, totIdx++, rng, 'tot'));
+  // 3.5 buts
+  tg.push(mkSmart('Plus de 3.5 buts', model.ou35Total.pOver, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Moins de 3.5 buts', model.ou35Total.pUnder, totIdx++, rng, 'tot'));
   list.push({id:'tot',name:'Total de buts (Over / Under)',cols:2,sels:tg});
 
   list.push({id:'tte',name:'Total buts par équipe',cols:2,sels:[
@@ -1889,10 +1931,10 @@ function buildMarkets(m,model){
     mkSmart(A+' -1.5',1-model.aOver[1.5],3,rng,'tte')]});
 
   list.push({id:'cs',name:'Clean sheet (ne pas encaisser)',cols:2,sels:[
-    mkSmart(H+' — oui',model.cs_h,0,rng,'cs'),
-    mkSmart(H+' — non',1-model.cs_h,1,rng,'cs'),
-    mkSmart(A+' — oui',model.cs_a,2,rng,'cs'),
-    mkSmart(A+' — non',1-model.cs_a,3,rng,'cs')]});
+    mkSmart(H+' — oui',model.csHome,0,rng,'cs'),
+    mkSmart(H+' — non',1-model.csHome,1,rng,'cs'),
+    mkSmart(A+' — oui',model.csAway,2,rng,'cs'),
+    mkSmart(A+' — non',1-model.csAway,3,rng,'cs')]});
 
   const scores=[[1,0],[2,0],[2,1],[3,1],[1,1],[2,2],[0,0],[0,1],[1,2],[0,2]];
   list.push({id:'score',name:'Score exact',cols:3,sels:scores.map(([i,j])=>
@@ -3062,6 +3104,41 @@ function openBetModal(marketId,selIdx){
   renderModal();showModal(true);
 }
 // 🎯 GÉNÉRER ANALYSE DÉTAILLÉE ADAPTÉE AU MARCHÉ
+// 🎯 ÉVALUER LA VALUE (edge %)
+function evaluateValue(value) {
+  if (value >= 0.05) return { level: '✅ EXCELLENT', color: 'var(--green)', desc: 'Edge très solide (≥5%)' };
+  if (value >= 0.02) return { level: '⚠️ CORRECT', color: 'var(--orange)', desc: 'Légère edge (2-5%)' };
+  return { level: '❌ FAIBLE', color: 'var(--red)', desc: 'Pas assez de value (<2%)' };
+}
+
+// 📊 ÉVALUER LA PROBABILITÉ STATS
+function evaluateStats(probability) {
+  if (probability >= 0.75) return { level: '✅ TRÈS PROBABLE', color: 'var(--green)', desc: '≥75% de chances' };
+  if (probability >= 0.50) return { level: '⚠️ PROBABLE', color: 'var(--orange)', desc: '50-75% de chances' };
+  return { level: '❌ INCERTAIN', color: 'var(--red)', desc: '<50% de chances' };
+}
+
+// 🎯 COMBINER VALUE + STATS POUR RECOMMANDATION
+function combineVerdicts(valueEval, statsEval, value, probability) {
+  const valueTier = value >= 0.05 ? 'excel' : value >= 0.02 ? 'correct' : 'low';
+  const statsTier = probability >= 0.75 ? 'high' : probability >= 0.50 ? 'med' : 'low';
+  
+  // Matrice de recommandations
+  const matrix = {
+    'excel-high': { emoji: '🔥', type: 'TOP PARI', desc: 'Excellent edge + Stats fortes = À PRENDRE' },
+    'excel-med': { emoji: '⭐', type: 'BON PARI', desc: 'Bon edge mais moins certain = Potentiel élevé' },
+    'excel-low': { emoji: '🎲', type: 'HAUT RISQUE', desc: 'Excellent edge mais incertain = À risque' },
+    'correct-high': { emoji: '🛡️', type: 'SAFE PARI', desc: 'Edge faible mais très probable = Risque faible' },
+    'correct-med': { emoji: '💭', type: 'COIN FLIP', desc: 'Faible edge et probas équilibrées = À réfléchir' },
+    'correct-low': { emoji: '⚠️', type: 'À ÉVITER', desc: 'Faible edge et probabilité basse = Mauvais' },
+    'low-high': { emoji: '❌', type: 'MAUVAIS', desc: 'Pas de value, peu importe les stats' },
+    'low-med': { emoji: '❌', type: 'MAUVAIS', desc: 'Pas de value, peu importe les stats' },
+    'low-low': { emoji: '❌', type: 'MAUVAIS', desc: 'Pas de value, peu importe les stats' }
+  };
+  
+  return matrix[valueTier + '-' + statsTier] || { emoji: '?', type: 'INCONNU', desc: '' };
+}
+
 function generateMarketAnalysis(b) {
   if (!b.model || !b.marketId) {
     return `<p>Données insuffisantes pour l'analyse détaillée.</p>`;
@@ -3256,12 +3333,43 @@ function renderModal(){
       <!-- 🎯 SECTION VERDICT PARI - NOUVEAU DESIGN CLAIR -->
       <div class="verdict-section">
         <!-- VERDICT COULEUR + TEXTE -->
-        <div class="verdict-banner ${value >= state.settings.greenMin ? 'verdict-good' : 'verdict-bad'}">
-          <div class="verdict-icon">${value >= state.settings.greenMin ? '✅ BON PARI' : '❌ MAUVAIS PARI'}</div>
+        <div class="verdict-banner ${
+          value >= 0.05 ? 'verdict-good' : 
+          value >= 0.02 ? 'verdict-correct' : 
+          'verdict-bad'
+        }">
+          <div class="verdict-icon">
+            ${
+              value >= 0.05 ? '✅ BON PARI' : 
+              value >= 0.02 ? '⚠️ CORRECT' : 
+              '❌ MAUVAIS PARI'
+            }
+          </div>
           <div class="verdict-subtitle">
-            ${value >= state.settings.greenMin 
-              ? 'La cote offre une bonne valeur' 
-              : 'La cote ne vaut pas le coup'}
+            ${
+              value >= 0.05 ? 'Bonne valeur - À prendre!' : 
+              value >= 0.02 ? 'Légère valeur - Pari acceptable' : 
+              'La cote ne vaut pas le coup'
+            }
+          </div>
+        </div>
+
+        <!-- 🎯 DOUBLE SCORE: VALUE + STATS -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+          <!-- VALUE SCORE -->
+          <div style="background: var(--bg); border-radius: 10px; padding: 12px; text-align: center; border: 2px solid ${evaluateValue(value).color};">
+            <div style="font-size: 11px; color: var(--txt3); margin-bottom: 4px;">💰 VALUE</div>
+            <div style="font-size: 24px; font-weight: 700; color: ${evaluateValue(value).color};">${(value * 100).toFixed(1)}%</div>
+            <div style="font-size: 12px; font-weight: 600; color: ${evaluateValue(value).color}; margin-top: 4px;">${evaluateValue(value).level}</div>
+            <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">${evaluateValue(value).desc}</div>
+          </div>
+          
+          <!-- STATS SCORE -->
+          <div style="background: var(--bg); border-radius: 10px; padding: 12px; text-align: center; border: 2px solid ${evaluateStats(b.est).color};">
+            <div style="font-size: 11px; color: var(--txt3); margin-bottom: 4px;">📊 STATS</div>
+            <div style="font-size: 24px; font-weight: 700; color: ${evaluateStats(b.est).color};">${(b.est * 100).toFixed(1)}%</div>
+            <div style="font-size: 12px; font-weight: 600; color: ${evaluateStats(b.est).color}; margin-top: 4px;">${evaluateStats(b.est).level}</div>
+            <div style="font-size: 10px; color: var(--txt3); margin-top: 4px;">${evaluateStats(b.est).desc}</div>
           </div>
         </div>
 
@@ -3283,7 +3391,11 @@ function renderModal(){
               <span class="label-value">${pct(b.est)}</span>
             </div>
             <div class="prob-bar">
-              <div class="prob-fill" style="width: ${(b.est * 100).toFixed(1)}%; background: ${value >= state.settings.greenMin ? 'var(--green)' : 'var(--red)'}"></div>
+              <div class="prob-fill" style="width: ${(b.est * 100).toFixed(1)}%; background: ${
+                value >= 0.05 ? 'var(--green)' : 
+                value >= 0.02 ? 'var(--orange)' : 
+                'var(--red)'
+              }"></div>
             </div>
           </div>
 
@@ -3322,11 +3434,34 @@ function renderModal(){
             ${generateMarketAnalysis(b)}
             
             <div class="detail-section">
-              <h4>💡 Recommandation</h4>
-              ${value >= state.settings.greenMin 
-                ? `<p class="rec-good">✅ Cette cote offre une <strong>edge positive</strong>. Le bookmaker sous-estime la probabilité réelle (${b.est*100 > b.implied*100 ? `notre: ${(b.est*100).toFixed(1)}% vs leur: ${(b.implied*100).toFixed(1)}%` : ''}).</p>`
-                : `<p class="rec-bad">❌ Cette cote <strong>surpaye le risque</strong>. Cherche une cote meilleure (≥ ${(1/b.est).toFixed(2)}).</p>`
-              }
+              <h4>💡 Recommandation combinée</h4>
+              ${(() => {
+                const valueEval = evaluateValue(value);
+                const statsEval = evaluateStats(b.est);
+                const combined = combineVerdicts(valueEval, statsEval, value, b.est);
+                return `
+                  <div style="background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px;">
+                    <div style="font-size: 16px; font-weight: 700; margin-bottom: 8px;">
+                      ${combined.emoji} <strong>${combined.type}</strong>
+                    </div>
+                    <div style="font-size: 13px; color: var(--txt2); line-height: 1.5;">
+                      ${combined.desc}
+                    </div>
+                  </div>
+                  <div style="background: var(--bg); border-radius: 8px; padding: 10px; font-size: 12px; color: var(--txt2); line-height: 1.6;">
+                    <strong>Analyse:</strong><br>
+                    • <strong>Value:</strong> ${valueEval.desc}<br>
+                    • <strong>Stats:</strong> ${statsEval.desc}<br>
+                    • <strong>Décision:</strong> ${
+                      value >= 0.05 && b.est >= 0.75 ? 'TOP PARI - À prendre sans hésiter!' :
+                      value >= 0.05 && b.est >= 0.50 ? 'Bon potentiel mais plus risqué' :
+                      value >= 0.02 && b.est >= 0.75 ? 'Pari conservateur et logique' :
+                      value >= 0.02 && b.est >= 0.50 ? 'À réfléchir selon ton profil' :
+                      'Cherche une meilleure cote'
+                    }
+                  </div>
+                `;
+              })()}
             </div>
           </div>
         </div>
