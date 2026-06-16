@@ -1031,16 +1031,59 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`  Impact Poisson: ${poissonImpact.toFixed(1)}%`);
   console.log(`  Probabilité finale: ${finalProb.toFixed(1)}%`);
   
+  // 🎯 CALCULS SPÉCIALISÉS PAR MARCHÉ
+  // BTTS: Both Teams To Score
+  const pHomeScores = 1 - Math.exp(-lambdaHome);
+  const pAwayScores = 1 - Math.exp(-lambdaAway);
+  const pBTTS = pHomeScores * pAwayScores;
+  
+  console.log(`\n🎯 BTTS: P(Home marque)=${(pHomeScores*100).toFixed(1)}% × P(Away marque)=${(pAwayScores*100).toFixed(1)}% = ${(pBTTS*100).toFixed(1)}%`);
+  
+  // OVER/UNDER: Distribution Poisson
+  const calculateOU = (lambda, threshold) => {
+    let pUnder = 0;
+    for (let i = 0; i <= threshold; i++) {
+      pUnder += poissonProb(lambda, i);
+    }
+    return { pUnder, pOver: 1 - pUnder };
+  };
+  
+  const ou25Home = calculateOU(lambdaHome, 2.5);
+  const ou25Away = calculateOU(lambdaAway, 2.5);
+  const ou25Total = (() => {
+    let pUnder = 0;
+    for (let i = 0; i <= 2.5; i++) {
+      for (let j = 0; j <= 2.5 - i; j++) {
+        pUnder += poissonProb(lambdaHome, i) * poissonProb(lambdaAway, j);
+      }
+    }
+    return { pUnder, pOver: 1 - pUnder };
+  })();
+  
+  console.log(`\n📊 OVER/UNDER 2.5 Total: Over=${(ou25Total.pOver*100).toFixed(1)}%`);
+  
+  // CLEAN SHEET
+  const csHome = Math.exp(-lambdaAway);
+  const csAway = Math.exp(-lambdaHome);
+  
+  console.log(`\n🧹 CLEAN SHEET: Home=${(csHome*100).toFixed(1)}% / Away=${(csAway*100).toFixed(1)}%`);
+  
   return { 
     lambdaHome, lambdaAway, homeFormMult, awayFormMult,
-    // 📊 NOUVELLES DONNÉES POUR L'ANALYSE DÉTAILLÉE
+    // 📊 DONNÉES MARCHÉ 1N2
     homeElo, awayElo, eloWinProb,
     sosHome: sosHome.sos, sosAway: sosAway.sos,
     homeLastMatches, awayLastMatches,
     homeOffense, homeDefense, awayOffense, awayDefense,
     homeGF, homeGA, awayGF, awayGA,
     eloRawProb, sosImpact, poissonImpact, finalProb,
-    competitionType, compProps
+    competitionType, compProps,
+    // 📊 DONNÉES MARCHÉ BTTS
+    pHomeScores, pAwayScores, pBTTS,
+    // 📊 DONNÉES MARCHÉ OVER/UNDER
+    ou25Home, ou25Away, ou25Total,
+    // 📊 DONNÉES MARCHÉ CLEAN SHEET
+    csHome, csAway
   };
 }
 
@@ -1236,7 +1279,7 @@ function buildModel(home,away,homeForm,awayForm,rng){
   
   return {
     lH: r2(lH), lA: r2(lA), FM, HT, HTFT, pH, pD, pA, btts, cs_h, cs_a, over, hOver, aOver, formMultH, formMultA, rng,
-    // 📊 DONNÉES DU MODÈLE POUR L'ANALYSE DÉTAILLÉE
+    // 📊 DONNÉES DU MODÈLE POUR L'ANALYSE DÉTAILLÉE - 1N2
     homeElo: advanced.homeElo,
     awayElo: advanced.awayElo,
     eloWinProb: advanced.eloWinProb,
@@ -1247,7 +1290,18 @@ function buildModel(home,away,homeForm,awayForm,rng){
     eloRawProb: advanced.eloRawProb,
     sosImpact: advanced.sosImpact,
     poissonImpact: advanced.poissonImpact,
-    finalProb: advanced.finalProb
+    finalProb: advanced.finalProb,
+    // 📊 DONNÉES MARCHÉ BTTS
+    pHomeScores: advanced.pHomeScores,
+    pAwayScores: advanced.pAwayScores,
+    pBTTS: advanced.pBTTS,
+    // 📊 DONNÉES MARCHÉ OVER/UNDER
+    ou25Home: advanced.ou25Home,
+    ou25Away: advanced.ou25Away,
+    ou25Total: advanced.ou25Total,
+    // 📊 DONNÉES MARCHÉ CLEAN SHEET
+    csHome: advanced.csHome,
+    csAway: advanced.csAway
   };
   } catch(err) {
     console.error('❌ ERREUR dans buildModel:', err);
@@ -1688,6 +1742,35 @@ function mkSel(label, est, rng, opt) {
     realCote: opt.realCote || null // Indiquer si c'est une vraie cote
   };
 }
+// 🎯 CALCUL BTTS - Both Teams To Score
+function calculateBTTS(lambdaHome, lambdaAway) {
+  const pHomeScores = 1 - Math.exp(-lambdaHome);
+  const pAwayScores = 1 - Math.exp(-lambdaAway);
+  const pBTTS = pHomeScores * pAwayScores;
+  console.log(`\n🎯 BTTS: ${(pBTTS * 100).toFixed(1)}% (Home ${(pHomeScores * 100).toFixed(1)}% × Away ${(pAwayScores * 100).toFixed(1)}%)`);
+  return pBTTS;
+}
+
+// 🎯 CALCUL OVER/UNDER 2.5
+function calculateOverUnder(lambdaHome, lambdaAway, threshold = 2.5) {
+  let pUnder = 0;
+  for (let i = 0; i <= threshold; i++) {
+    for (let j = 0; j <= threshold - i; j++) {
+      pUnder += poissonProb(lambdaHome, i) * poissonProb(lambdaAway, j);
+    }
+  }
+  const pOver = 1 - pUnder;
+  console.log(`\n📊 OVER/UNDER ${threshold}: Under ${(pUnder * 100).toFixed(1)}% / Over ${(pOver * 100).toFixed(1)}%`);
+  return { pUnder, pOver };
+}
+
+// 🎯 CALCUL CLEAN SHEET
+function calculateCleanSheet(lambdaDefense) {
+  const pClean = Math.exp(-lambdaDefense);
+  console.log(`\n🧹 CLEAN SHEET: ${(pClean * 100).toFixed(1)}%`);
+  return pClean;
+}
+
 function buildMarkets(m,model){
   const rng=model.rng;const H=m.home.short,A=m.away.short;
   const FM=model.FM;
@@ -2970,10 +3053,147 @@ function openBetModal(marketId,selIdx){
     home: m.home,
     away: m.away,
     homeForm: d.homeForm,
-    awayForm: d.awayForm
+    awayForm: d.awayForm,
+    // 📊 MARCHÉ SÉLECTIONNÉ
+    marketId: marketId,
+    selIdx: selIdx,
+    marketName: mk.name
   };
   renderModal();showModal(true);
 }
+// 🎯 GÉNÉRER ANALYSE DÉTAILLÉE ADAPTÉE AU MARCHÉ
+function generateMarketAnalysis(b) {
+  if (!b.model || !b.marketId) {
+    return `<p>Données insuffisantes pour l'analyse détaillée.</p>`;
+  }
+  
+  const m = b.model;
+  
+  // BTTS - Both Teams To Score
+  if (b.marketId === 'btts') {
+    return `
+      <div class="detail-section">
+        <h4>📊 L'analyse BTTS</h4>
+        <p><strong>${b.matchName}:</strong> Les deux équipes vont-elles marquer?</p>
+        
+        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <div style="margin-bottom: 8px;"><strong>1️⃣ Probabilité que ${b.home.name} marque</strong></div>
+          <div style="margin-left: 12px; color: var(--txt2);">
+            Lambda ${b.home.name}: <strong>${m.lambdaHome ? m.lambdaHome.toFixed(2) : '—'}</strong> buts/match
+            → P(marque ≥1) = <strong>${m.pHomeScores ? (m.pHomeScores * 100).toFixed(1) : '—'}%</strong>
+            <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
+              Formule: 1 - e^(-λ) = 1 - e^(-${m.lambdaHome ? m.lambdaHome.toFixed(2) : '—'})
+            </div>
+          </div>
+        </div>
+
+        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <div style="margin-bottom: 8px;"><strong>2️⃣ Probabilité que ${b.away.name} marque</strong></div>
+          <div style="margin-left: 12px; color: var(--txt2);">
+            Lambda ${b.away.name}: <strong>${m.lambdaAway ? m.lambdaAway.toFixed(2) : '—'}</strong> buts/match
+            → P(marque ≥1) = <strong>${m.pAwayScores ? (m.pAwayScores * 100).toFixed(1) : '—'}%</strong>
+            <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
+              Formule: 1 - e^(-λ) = 1 - e^(-${m.lambdaAway ? m.lambdaAway.toFixed(2) : '—'})
+            </div>
+          </div>
+        </div>
+
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <strong>📈 Résultat BTTS:</strong>
+          <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
+            P(BTTS) = P(${b.home.name} marque) × P(${b.away.name} marque)
+            <br>= ${m.pHomeScores ? (m.pHomeScores * 100).toFixed(1) : '—'}% × ${m.pAwayScores ? (m.pAwayScores * 100).toFixed(1) : '—'}%
+            <br><strong style="color: var(--accent); font-size: 13px;">= ${m.pBTTS ? (m.pBTTS * 100).toFixed(1) : '—'}%</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Over/Under
+  if (b.marketId === 'tot') {
+    return `
+      <div class="detail-section">
+        <h4>📊 L'analyse Over/Under</h4>
+        <p><strong>${b.matchName}:</strong> Combien de buts seront marqués?</p>
+        
+        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <div style="margin-bottom: 8px;"><strong>1️⃣ Buts attendus par équipe (Lambda)</strong></div>
+          <div style="margin-left: 12px; color: var(--txt2);">
+            ${b.home.name}: <strong>${m.lambdaHome ? m.lambdaHome.toFixed(2) : '—'}</strong> buts/match
+            <br>${b.away.name}: <strong>${m.lambdaAway ? m.lambdaAway.toFixed(2) : '—'}</strong> buts/match
+            <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
+              Basé sur attaque, défense, Elo et SOS
+            </div>
+          </div>
+        </div>
+
+        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <div style="margin-bottom: 8px;"><strong>2️⃣ Distribution Poisson totale</strong></div>
+          <div style="margin-left: 12px; color: var(--txt2);">
+            <strong>Under 2.5:</strong> ${m.ou25Total ? (m.ou25Total.pUnder * 100).toFixed(1) : '—'}%
+            <br><strong>Over 2.5:</strong> ${m.ou25Total ? (m.ou25Total.pOver * 100).toFixed(1) : '—'}%
+            <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
+              Simulation 100,000 matchs avec λHome et λAway
+            </div>
+          </div>
+        </div>
+
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <strong>📈 Résumé Over/Under 2.5:</strong>
+          <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
+            Buts totaux attendus: ${m.lambdaHome && m.lambdaAway ? (m.lambdaHome + m.lambdaAway).toFixed(2) : '—'}
+            <br><strong style="color: var(--accent); font-size: 13px;">Over 2.5: ${m.ou25Total ? (m.ou25Total.pOver * 100).toFixed(1) : '—'}%</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Par défaut: analyse 1N2
+  return `
+    <div class="detail-section">
+      <h4>📊 L'analyse détaillée</h4>
+      <p><strong>${b.matchName}:</strong> L'Elo brut suggère une probabilité élevée, mais notre modèle ajuste pour plusieurs facteurs:</p>
+      
+      <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+        <div style="margin-bottom: 8px;"><strong>1️⃣ Force ELO brute</strong></div>
+        <div style="margin-left: 12px; color: var(--txt2);">
+          ${b.home.name}: <strong>${m.homeElo ? m.homeElo.toFixed(0) : '—'}</strong> Elo
+          → <strong>${m.eloWinProb ? (m.eloWinProb * 100).toFixed(1) : '—'}%</strong> victoire (Elo seul)
+        </div>
+        <div style="margin-left: 12px; color: var(--txt2);">
+          ${b.away.name}: <strong>${m.awayElo ? m.awayElo.toFixed(0) : '—'}</strong> Elo
+          → <strong>${m.eloWinProb ? ((1-m.eloWinProb) * 100).toFixed(1) : '—'}%</strong> victoire
+        </div>
+      </div>
+
+      <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+        <div style="margin-bottom: 8px;"><strong>2️⃣ Force des adversaires (SOS)</strong></div>
+        <div style="margin-left: 12px; color: var(--txt2);">
+          <strong>${b.home.name} SOS: ${m.sosHome ? m.sosHome.toFixed(3) : '—'}</strong>
+          ${m.sosHome && m.sosHome > 1 ? '⚠️ Adversaires TRÈS forts' : '✅ Adversaires faibles'}
+          <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
+            ${m.sosHome && m.sosHome > 1 
+              ? `Joué contre des équipes fortes → +${(m.sosHome * 100 - 100).toFixed(1)}% plus difficile → Stats RÉELLES et impressionnantes!` 
+              : `Joué contre des équipes faibles → Stats GONFLÉES/exagérées!`}
+          </div>
+        </div>
+      </div>
+
+      <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+        <strong>📈 Résumé du calcul:</strong>
+        <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
+          Elo brut: <strong>${m.eloRawProb ? m.eloRawProb.toFixed(1) : '—'}%</strong><br>
+          Impact SOS: <strong>${m.sosImpact ? (m.sosImpact > 0 ? '+' : '') + m.sosImpact.toFixed(1) : '—'}%</strong><br>
+          Impact Poisson: <strong>${m.poissonImpact ? (m.poissonImpact > 0 ? '+' : '') + m.poissonImpact.toFixed(1) : '—'}%</strong><br>
+          <strong style="color: var(--accent); font-size: 13px;">Probabilité finale: ${m.finalProb ? m.finalProb.toFixed(1) : '—'}%</strong>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderModal(){
   const b=state.pendingBet;if(!b)return;
   const value=b.est*b.cote-1;
@@ -3083,69 +3303,7 @@ function renderModal(){
         <!-- DÉTAILS EXPANDABLE (CACHÉ PAR DÉFAUT) -->
         <div class="details-expanded" style="display: none;">
           <div class="detail-content">
-            ${b.model ? `
-            <div class="detail-section">
-              <h4>📊 L'analyse détaillée</h4>
-              <p><strong>${b.matchName}:</strong> L'Elo brut suggère une probabilité élevée, mais notre modèle ajuste pour plusieurs facteurs:</p>
-              
-              <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
-                <div style="margin-bottom: 8px;"><strong>1️⃣ Force ELO brute</strong></div>
-                <div style="margin-left: 12px; color: var(--txt2);">
-                  ${b.home.name}: <strong>${b.model.homeElo ? b.model.homeElo.toFixed(0) : '—'}</strong> Elo
-                  → <strong>${b.model.eloWinProb ? (b.model.eloWinProb * 100).toFixed(1) : '—'}%</strong> victoire (Elo seul)
-                </div>
-                <div style="margin-left: 12px; color: var(--txt2);">
-                  ${b.away.name}: <strong>${b.model.awayElo ? b.model.awayElo.toFixed(0) : '—'}</strong> Elo
-                  → <strong>${b.model.eloWinProb ? ((1-b.model.eloWinProb) * 100).toFixed(1) : '—'}%</strong> victoire
-                </div>
-              </div>
-
-              <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
-                <div style="margin-bottom: 8px;"><strong>2️⃣ Force des adversaires (SOS)</strong></div>
-                <div style="margin-left: 12px; color: var(--txt2);">
-                  <strong>${b.home.name} SOS: ${b.model.sosHome ? b.model.sosHome.toFixed(3) : '—'}</strong>
-                  ${b.model.sosHome && b.model.sosHome > 1 ? '⚠️ Adversaires TRÈS forts' : '✅ Adversaires faibles'}
-                  <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
-                    ${b.model.sosHome && b.model.sosHome > 1 
-                      ? `Joué contre des équipes fortes → ${(b.model.sosHome * 100 - 100).toFixed(1)}% plus difficile → Stats RÉELLES et impressionnantes!` 
-                      : `Joué contre des équipes faibles → Stats GONFLÉES/exagérées!`}
-                  </div>
-                </div>
-                <div style="margin-left: 12px; color: var(--txt2); margin-top: 6px;">
-                  <strong>${b.away.name} SOS: ${b.model.sosAway ? b.model.sosAway.toFixed(3) : '—'}</strong>
-                  ${b.model.sosAway && b.model.sosAway > 1 ? '⚠️ Adversaires forts' : '✅ Adversaires plutôt faibles'}
-                  <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
-                    ${b.model.sosAway && b.model.sosAway > 1 
-                      ? `Joué contre du bon niveau → ${(b.model.sosAway * 100 - 100).toFixed(1)}% plus difficile` 
-                      : `Joué contre des équipes faibles`}
-                  </div>
-                </div>
-              </div>
-
-              <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
-                <div style="margin-bottom: 8px;"><strong>3️⃣ Poisson Distribution (lambdas)</strong></div>
-                <div style="margin-left: 12px; color: var(--txt2);">
-                  ${b.home.name}: <strong>${b.model.lambdaHome ? b.model.lambdaHome.toFixed(2) : '—'}</strong> buts/match attendus
-                </div>
-                <div style="margin-left: 12px; color: var(--txt2);">
-                  ${b.away.name}: <strong>${b.model.lambdaAway ? b.model.lambdaAway.toFixed(2) : '—'}</strong> buts/match attendus
-                </div>
-                <div style="font-size: 11px; margin-top: 4px; color: var(--txt3); margin-left: 12px;">
-                  Simulation 100,000 matchs → Probabilité plus réaliste que l'Elo brut
-                </div>
-              </div>
-
-              <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
-                <strong>📈 Résumé du calcul:</strong>
-                <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
-                  Elo brut: <strong>${b.model.eloRawProb ? b.model.eloRawProb.toFixed(1) : '—'}%</strong><br>
-                  Impact SOS: <strong>${b.model.sosImpact ? (b.model.sosImpact > 0 ? '+' : '') + b.model.sosImpact.toFixed(1) : '—'}%</strong><br>
-                  Impact Poisson: <strong>${b.model.poissonImpact ? (b.model.poissonImpact > 0 ? '+' : '') + b.model.poissonImpact.toFixed(1) : '—'}%</strong><br>
-                  <strong style="color: var(--accent); font-size: 13px;">Probabilité finale: ${b.model.finalProb ? b.model.finalProb.toFixed(1) : '—'}%</strong>
-                </div>
-              </div>
-            </div>
-            ` : ''}
+            ${generateMarketAnalysis(b)}
             
             <div class="detail-section">
               <h4>💡 Recommandation</h4>
