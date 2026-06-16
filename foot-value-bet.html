@@ -626,6 +626,24 @@ async function getTeamInfo(teamId) {
 // 🏆 ELO RATING SYSTEM - Système de rating scientifiquement validé
 let ELO_CACHE = {}; // Réinitialiser à chaque calcul
 
+// 🎯 Récupérer les 10 derniers matchs d'une équipe (pour SOS)
+async function getLastMatches(teamId, limit = 10) {
+  try {
+    // Vérifier si les matchs sont en cache
+    const stats = FOOTBALL_API.getTeamStats(teamId);
+    if (stats && stats.lastMatches && stats.lastMatches.length > 0) {
+      console.log(`✅ Matchs trouvés en cache pour équipe ${teamId}`);
+      return stats.lastMatches.slice(-limit);
+    }
+    
+    console.log(`⚠️ Pas de matchs en cache pour équipe ${teamId}`);
+    return [];
+  } catch (e) {
+    console.warn(`Erreur getLastMatches:`, e);
+    return [];
+  }
+}
+
 // 🌍 DÉTECTION TYPE DE COMPÉTITION
 function detectCompetitionType(leagueName, competitionName) {
   const lowerLeague = (leagueName || '').toLowerCase();
@@ -882,21 +900,34 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`  📝 Basé sur: Win Rate (40%) + Buts/match (60%)`);
   console.log(`  📝 Différence Elo: ${(homeElo - awayElo).toFixed(0)} points`);
   
-  // 5️⃣ LAMBDAS POISSON FINALES avec ELO (Form multiplier supprimé - déjà dans Elo)
+  // 4️⃣.5️⃣ CALCUL SOS (Strength of Schedule) - Force des adversaires
+  console.log(`\n📋 RÉCUPÉRATION DES MATCHS POUR SOS...`);
+  const homeMatches = getLastMatches(home.id, 10) || [];
+  const awayMatches = getLastMatches(away.id, 10) || [];
+  
+  const sosHome = calculateSOS(home.id, home.name, homeMatches, competitionType);
+  const sosAway = calculateSOS(away.id, away.name, awayMatches, competitionType);
+  
+  console.log(`\n📊 SOS RÉSUMÉ:`);
+  console.log(`  ${home.name} SOS: ${sosHome.sos.toFixed(3)} (adversaires ${sosHome.sos > 1 ? 'plus forts' : 'plus faibles'} que moyenne)`);
+  console.log(`  ${away.name} SOS: ${sosAway.sos.toFixed(3)} (adversaires ${sosAway.sos > 1 ? 'plus forts' : 'plus faibles'} que moyenne)`);
+  
+  // 5️⃣ LAMBDAS POISSON FINALES avec ELO + SOS
   const homeAdvantage = compProps.homeAdvantage; // ✅ Utilise le type de compétition
   
-  let lambdaHome = (homeOffense * homeEloMult * 1.8) / (awayDefense + 0.1);
-  let lambdaAway = (awayOffense * awayEloMult * 1.8) / (homeDefense + 0.1);
+  // ✅ NOUVEAU: Lambdas ajustés par SOS
+  let lambdaHome = (homeOffense * homeEloMult * 1.8 * sosHome.sos) / (awayDefense * sosAway.sos + 0.1);
+  let lambdaAway = (awayOffense * awayEloMult * 1.8 * sosAway.sos) / (homeDefense * sosHome.sos + 0.1);
   
   lambdaHome *= homeAdvantage;
   
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
   
-  console.log(`\n🎲 LAMBDAS POISSON FINALES (avec ELO seul):`);
+  console.log(`\n🎲 LAMBDAS POISSON FINALES (avec ELO + SOS):`);
   console.log(`  ${home.name}: ${lambdaHome.toFixed(3)}`);
   console.log(`  ${away.name}: ${lambdaAway.toFixed(3)}`);
-  console.log(`  📝 Formule: (Attaque × ELO × 1.8) / Défense adverse`);
+  console.log(`  📝 Formule: (Attaque × ELO × 1.8 × SOS) / (Défense × SOS_adversaire)`);
   
   return { lambdaHome, lambdaAway, homeFormMult, awayFormMult };
 }
