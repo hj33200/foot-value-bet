@@ -1234,7 +1234,25 @@ function buildModel(home,away,homeForm,awayForm,rng){
     }
   }
   
-  return {lH: r2(lH), lA: r2(lA), FM, HT, HTFT, pH, pD, pA, btts, cs_h, cs_a, over, hOver, aOver, formMultH, formMultA, rng};
+  return {
+    lH: r2(lH), lA: r2(lA), FM, HT, HTFT, pH, pD, pA, btts, cs_h, cs_a, over, hOver, aOver, formMultH, formMultA, rng,
+    // 📊 DONNÉES DU MODÈLE POUR L'ANALYSE DÉTAILLÉE
+    homeElo: advanced.homeElo,
+    awayElo: advanced.awayElo,
+    eloWinProb: advanced.eloWinProb,
+    sosHome: advanced.sosHome,
+    sosAway: advanced.sosAway,
+    lambdaHome: advanced.lambdaHome,
+    lambdaAway: advanced.lambdaAway,
+    eloRawProb: advanced.eloRawProb,
+    sosImpact: advanced.sosImpact,
+    poissonImpact: advanced.poissonImpact,
+    finalProb: advanced.finalProb
+  };
+  } catch(err) {
+    console.error('❌ ERREUR dans buildModel:', err);
+    return null;
+  }
 }
 
 function buildStats(team, form, kind){
