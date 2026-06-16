@@ -3325,6 +3325,8 @@ function generateMarketAnalysis(b) {
     const probHome = m.pH || 0.5;
     const probAway = m.pA || 0.5;
     const probDraw = m.pD || 0.5;
+    const pWin = isHome ? probHome : probAway;
+    const pOrDraw = isHome ? probHome + probDraw : probAway + probDraw;
     
     return `
       <div class="detail-section">
@@ -3334,9 +3336,9 @@ function generateMarketAnalysis(b) {
         <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
           <div style="margin-bottom: 8px;"><strong>Calcul DNB</strong></div>
           <div style="margin-left: 12px; color: var(--txt2);">
-            P(${team} gagne) = <strong>${(${isHome ? probHome : probAway} * 100).toFixed(1)}%</strong><br>
-            P(${team} ou Nul) = <strong>${((${isHome ? probHome + probDraw : probAway + probDraw}) * 100).toFixed(1)}%</strong><br>
-            <strong style="margin-top: 6px; display: block;">P(${team} remboursé) = P(gagne) / (P(gagne) + P(adversaire)) = ${(prob * 100).toFixed(1)}%</strong>
+            P(${team} gagne) = <strong>${(pWin * 100).toFixed(1)}%</strong><br>
+            P(${team} ou Nul) = <strong>${(pOrDraw * 100).toFixed(1)}%</strong><br>
+            <strong style="margin-top: 6px; display: block;">P(${team} remboursé) = ${(prob * 100).toFixed(1)}%</strong>
           </div>
         </div>
       </div>
