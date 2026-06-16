@@ -624,8 +624,9 @@ async function getTeamInfo(teamId) {
 }
 
 // 🎯 MODÈLE AVANCÉ: Calculer les probabilités avec TOUTES les données réelles
+// 🎯 MODÈLE AVANCÉ: Calculer les probabilités avec TOUTES les données réelles
 function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
-  console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS ===`);
+  console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS (v2 avec Pondération & xG) ===`);
   console.log(`🏠 Home: ${home.name} (id: ${home.id})`);
   console.log(`✈️ Away: ${away.name} (id: ${away.id})`);
   
@@ -633,7 +634,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   const homeStats = FOOTBALL_API.getTeamStats(home.id) || {};
   const awayStats = FOOTBALL_API.getTeamStats(away.id) || {};
   
-  // Fallback sur les stats de base si pas de vraies stats
   const homeGF = homeStats.gf || home.gf || 1;
   const homeGA = homeStats.ga || home.ga || 1;
   const homeMatches = homeStats.matches || home.matches || 1;
@@ -643,12 +643,12 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   const awayMatches = awayStats.matches || away.matches || 1;
   
   // 1️⃣ FORCES OFFENSIVES/DÉFENSIVES
-  const homeOffense = homeGF / homeMatches;  // Buts marqués par match
-  const homeDefense = homeGA / homeMatches;  // Buts encaissés par match
+  const homeOffense = homeGF / homeMatches;
+  const homeDefense = homeGA / homeMatches;
   const awayOffense = awayGF / awayMatches;
   const awayDefense = awayGA / awayMatches;
   
-  console.log(`\n⚔️ FORCES:`);
+  console.log(`\n⚔️ FORCES BRUTES:`);
   console.log(`  ${home.name} - Attaque: ${homeOffense.toFixed(2)}/match, Défense: ${homeDefense.toFixed(2)}/match`);
   console.log(`  ${away.name} - Attaque: ${awayOffense.toFixed(2)}/match, Défense: ${awayDefense.toFixed(2)}/match`);
   
@@ -667,25 +667,19 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`  ${home.name}: ${(homeWinRate*100).toFixed(1)}%`);
   console.log(`  ${away.name}: ${(awayWinRate*100).toFixed(1)}%`);
   
-  // 3️⃣ FORM MULTIPLIER AMÉLIORÉ (poids plus élevé pour les derniers matchs)
+  // 3️⃣ FORM MULTIPLIER AMÉLIORÉ
   const calcAdvancedFormMult = (form) => {
     if(!form || form.length === 0) return 1.0;
-    
-    // Pondération: le plus récent a le poids le plus élevé
     let weightedPoints = 0;
     let totalWeight = 0;
-    
     for(let i = 0; i < form.length; i++) {
       const weight = (form.length - i);
       const points = form[i]==='V' ? 3 : form[i]==='D' ? 1 : 0;
       weightedPoints += points * weight;
       totalWeight += 3 * weight;
     }
-    
     const avgPercentage = weightedPoints / totalWeight;
-    const formMult = 0.5 + avgPercentage;
-    
-    return formMult;
+    return 0.5 + avgPercentage;
   };
   
   const homeFormMult = calcAdvancedFormMult(homeForm);
@@ -695,25 +689,43 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`  ${home.name}: ${homeFormMult.toFixed(3)}`);
   console.log(`  ${away.name}: ${awayFormMult.toFixed(3)}`);
   
-  // 4️⃣ LAMBDAS POISSON AVANCÉES
-  // Lambda = (Force offensive × Multiplicateur) / (Force défensive de l'opponent)
-  // Terrain neutre (Coupe du Monde): home advantage = 1.0
+  // 4️⃣ PONDÉRATION PAR QUALITÉ D'ADVERSAIRE
+  const calcQualityScore = (gf, ga, matches) => {
+    const offense = gf / matches;
+    const defense = ga / matches;
+    return (offense * 2 - defense) / 3;
+  };
   
-  const homeAdvantage = 1.0; // Terrain neutre
+  const homeQuality = calcQualityScore(homeGF, homeGA, homeMatches);
+  const awayQuality = calcQualityScore(awayGF, awayGA, awayMatches);
   
-  let lambdaHome = (homeOffense * homeFormMult) / (awayDefense + 0.1);
-  let lambdaAway = (awayOffense * awayFormMult) / (homeDefense + 0.1);
+  const qualityDiff = homeQuality - awayQuality;
+  const homeQualityMult = 1.0 + (qualityDiff * 0.15);
+  const awayQualityMult = 1.0 - (qualityDiff * 0.15);
   
-  // Appliquer le home advantage
+  console.log(`\n🎯 PONDÉRATION QUALITÉ:`);
+  console.log(`  ${home.name} - Score: ${homeQuality.toFixed(3)}, Mult: ${homeQualityMult.toFixed(3)}`);
+  console.log(`  ${away.name} - Score: ${awayQuality.toFixed(3)}, Mult: ${awayQualityMult.toFixed(3)}`);
+  
+  // 5️⃣ EFFICACITÉ (par défaut 100%, sera amélioré avec xG)
+  const homeEfficiency = 1.0;
+  const awayEfficiency = 1.0;
+  
+  // 6️⃣ LAMBDAS POISSON FINALES avec tous les facteurs
+  const homeAdvantage = 1.0;
+  
+  let lambdaHome = (homeOffense * homeFormMult * homeQualityMult * homeEfficiency) / (awayDefense + 0.1);
+  let lambdaAway = (awayOffense * awayFormMult * awayQualityMult * awayEfficiency) / (homeDefense + 0.1);
+  
   lambdaHome *= homeAdvantage;
   
-  // Clamper dans une plage raisonnable
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
   
-  console.log(`\n🎲 LAMBDAS POISSON (Expected Goals):`);
-  console.log(`  ${home.name} (avec avantage domicile): ${lambdaHome.toFixed(3)}`);
+  console.log(`\n🎲 LAMBDAS POISSON FINALES (avec Pondération + Efficacité):`);
+  console.log(`  ${home.name}: ${lambdaHome.toFixed(3)}`);
   console.log(`  ${away.name}: ${lambdaAway.toFixed(3)}`);
+  console.log(`  📝 Formule: (Attaque × Form × Qualité × Efficacité) / Défense adverse`);
   
   return { lambdaHome, lambdaAway, homeFormMult, awayFormMult };
 }
@@ -1957,7 +1969,6 @@ function kellyFrac(){return {full:1,half:.5,quarter:.25}[state.settings.kellyMod
 const PAGES=[
   {id:'dashboard',label:'Dashboard',icon:'M3 12l9-9 9 9M5 10v10h14V10'},
   {id:'detail',label:'Détail Match',icon:'M9 12l2 2 4-4M12 3a9 9 0 100 18 9 9 0 000-18z'},
-  {id:'import',label:'Import Winamax',icon:'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M16 8l-4-4-4 4M12 4v12'},
   {id:'analytics',label:'Analytics',icon:'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'},
   {id:'bets',label:'Paris en cours',icon:'M4 7h16M4 12h16M4 17h10',badge:()=>state.bets.length},
   {id:'history',label:'Historique',icon:'M3 12a9 9 0 109-9 9 9 0 00-9 9zm9-5v5l3 2'},
@@ -1982,7 +1993,6 @@ function go(page){state.page=page;render();window.scrollTo(0,0)}
 const TITLES={
   dashboard:['Dashboard',"Recherchez un match et lancez l'analyse value."],
   detail:['Détail Match','Statistiques, cotes et pronostics value.'],
-  import:['Import Winamax','Collez les cotes scrapées depuis votre navigateur.'],
   analytics:['Analytics','Votre performance et statistiques de paris.'],
   bets:['Paris en cours','Suivez vos positions actives.'],
   history:['Historique','Bilan et performance de vos paris clôturés.'],
@@ -2028,132 +2038,6 @@ function statusTag(st){
   return '<span class="tag tag-fin">TERMINÉ</span>';
 }
 
-/* ============================================================
-   PAGE: IMPORT WINAMAX
-   ============================================================ */
-let importedOdds={};
-function viewImport(){
-  return `
-  <div class="card" style="padding:24px;margin-bottom:22px">
-    <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:20px">
-      <div style="font-size:32px">📲</div>
-      <div>
-        <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Comment utiliser?</h3>
-        <ol style="font-size:13px;color:var(--txt2);line-height:1.7;margin-left:20px">
-          <li>Installez l'extension Chrome (voir ci-dessous)</li>
-          <li>Allez sur <b>Winamax.fr</b> et cherchez un match</li>
-          <li>Cliquez le bouton de l'extension (en haut à droite)</li>
-          <li>Attendez que les cotes s'affichent</li>
-          <li>Cliquez <b>"Copier le JSON"</b></li>
-          <li>Revenez ici et collez le JSON ci-dessous</li>
-          <li>Sélectionnez le match concerné</li>
-          <li>Cliquez <b>"Appliquer"</b></li>
-        </ol>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" style="padding:24px;margin-bottom:22px">
-    <h3 style="font-family:var(--disp);font-size:16px;font-weight:800;margin-bottom:14px">Installation extension (5 min)</h3>
-    <ol style="font-size:13px;color:var(--txt2);line-height:1.8;margin-left:20px">
-      <li><b>Téléchargez</b> les 3 fichiers: manifest.json, popup.html, popup.js</li>
-      <li><b>Créez</b> un dossier: <code style="background:var(--bg2);padding:2px 6px;border-radius:4px">winamax-extension/</code></li>
-      <li><b>Mettez</b> les 3 fichiers dans ce dossier</li>
-      <li><b>Ouvrez</b> Chrome → <code style="background:var(--bg2);padding:2px 6px;border-radius:4px">chrome://extensions/</code></li>
-      <li><b>Activez</b> le mode développeur (en haut à droite)</li>
-      <li><b>Cliquez</b> "Charger une extension non empaquetée"</li>
-      <li><b>Sélectionnez</b> votre dossier → ✅ C'est prêt!</li>
-    </ol>
-  </div>
-
-  <div class="card" style="padding:24px;margin-bottom:22px">
-    <h3 style="font-family:var(--disp);font-size:16px;font-weight:800;margin-bottom:14px">Coller les cotes Winamax</h3>
-    <div class="mf">
-      <label>JSON de l'extension</label>
-      <textarea id="jsonInput" placeholder='{\n  "match": "Paris Saint-Germain — Olympique Lyonnais",\n  "odds": [...]\n}' style="min-height:140px;font-family:var(--mono);font-size:12px;width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--txt);padding:11px 13px;border-radius:11px;outline:none" oninput="document.getElementById('parseBtn').disabled=!this.value.trim()"></textarea>
-    </div>
-    <button class="btn btn-primary" id="parseBtn" style="width:100%;margin-top:12px" onclick="parseWinamaxJSON()" disabled>
-      ${iconSvg('M12 4v16m8-8H4')} Analyser les cotes</button>
-  </div>
-
-  <div id="parseResult" style="display:none">
-    <div class="card" style="padding:24px;margin-bottom:22px">
-      <h3 style="font-family:var(--disp);font-size:16px;font-weight:800;margin-bottom:14px">Match détecté</h3>
-      <div style="background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:14px;margin-bottom:14px">
-        <div style="font-size:12px;color:var(--txt3);margin-bottom:4px">MATCH</div>
-        <div id="detectedMatch" style="font-weight:700;font-size:15px"></div>
-      </div>
-      
-      <h3 style="font-family:var(--disp);font-size:14px;font-weight:800;margin-bottom:10px;margin-top:18px">Cotes trouvées</h3>
-      <div id="detectedOdds" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div>
-      
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-        <div>
-          <label style="display:block;font-size:12px;font-weight:700;color:var(--txt3);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em">Sélectionner un match</label>
-          <select id="matchSelect" style="width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--txt);padding:11px 13px;border-radius:11px;outline:none;font-weight:600">
-            <option value="">-- Choisir --</option>
-            ${MATCHES.map(m=>'<option value="'+m.id+'">'+m.home.name+' vs '+m.away.name+'</option>').join('')}
-          </select>
-        </div>
-        <div>
-          <label style="display:block;font-size:12px;font-weight:700;color:var(--txt3);margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em">Marché</label>
-          <select id="marketSelect" style="width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--txt);padding:11px 13px;border-radius:11px;outline:none;font-weight:600">
-            <option value="1N2">1N2 (Résultat)</option>
-            <option value="over_under">Total de buts</option>
-            <option value="btts">BTTS</option>
-          </select>
-        </div>
-      </div>
-      
-      <button class="btn btn-primary" style="width:100%" onclick="applyWinamaxOdds()">
-        ${iconSvg('M5 13l4 4L19 7')} Appliquer ces cotes</button>
-    </div>
-  </div>
-  `;
-}
-
-function parseWinamaxJSON(){
-  const input=document.getElementById('jsonInput').value.trim();
-  if(!input){toast('Collez d\'abord le JSON',true);return}
-  try{
-    const data=JSON.parse(input);
-    if(!data.odds||!Array.isArray(data.odds)||data.odds.length===0){
-      toast('Format invalide: besoin d\'un array "odds"',true);return
-    }
-    importedOdds=data;
-    document.getElementById('detectedMatch').textContent=data.match||'Match inconnu';
-    const oddsList=document.getElementById('detectedOdds');
-    oddsList.innerHTML=data.odds.map(o=>`
-      <div style="background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px;text-align:center">
-        <div style="font-size:12px;color:var(--txt3);margin-bottom:6px">${o.selection}</div>
-        <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">${o.cote.toFixed(2)}</div>
-      </div>
-    `).join('');
-    document.getElementById('parseResult').style.display='block';
-    toast('✅ JSON analysé!');
-  }catch(e){
-    toast('Format JSON invalide: '+e.message,true);
-  }
-}
-
-function applyWinamaxOdds(){
-  const matchId=document.getElementById('matchSelect').value;
-  const market=document.getElementById('marketSelect').value;
-  if(!matchId){toast('Sélectionnez un match',true);return}
-  const m=MATCHES.find(x=>x.id===matchId);
-  if(!m){toast('Match non trouvé',true);return}
-  
-  // Store the imported odds for this match
-  state.winamaxImports=state.winamaxImports||{};
-  state.winamaxImports[matchId]={match:importedOdds.match,odds:importedOdds.odds,market,date:new Date().toLocaleString('fr-FR')};
-  
-  toast('✅ Cotes importées pour '+m.home.name+' vs '+m.away.name);
-  document.getElementById('jsonInput').value='';
-  document.getElementById('parseResult').style.display='none';
-  setTimeout(()=>go('dashboard'),1200);
-}
-
-/* ============================================================
    PAGE: ANALYTICS
    ============================================================ */
 function viewAnalytics(){
