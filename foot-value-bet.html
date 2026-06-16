@@ -627,20 +627,21 @@ async function getTeamInfo(teamId) {
 let ELO_CACHE = {}; // Réinitialiser à chaque calcul
 
 // 🎯 Récupérer les 10 derniers matchs d'une équipe (pour SOS)
-async function getLastMatches(teamId, limit = 10) {
+function getLastMatches(teamId, limit = 10) {
   try {
-    // Vérifier si les matchs sont en cache
     const stats = FOOTBALL_API.getTeamStats(teamId);
-    if (stats && stats.lastMatches && stats.lastMatches.length > 0) {
-      console.log(`✅ Matchs trouvés en cache pour équipe ${teamId}`);
+    
+    // Vérifier si les matchs sont en cache
+    if (stats && Array.isArray(stats.lastMatches) && stats.lastMatches.length > 0) {
+      console.log(`✅ ${stats.lastMatches.length} matchs trouvés en cache pour équipe ${teamId}`);
       return stats.lastMatches.slice(-limit);
     }
     
-    console.log(`⚠️ Pas de matchs en cache pour équipe ${teamId}`);
-    return [];
+    console.log(`⚠️ Pas de matchs en cache pour équipe ${teamId} - utilisant valeurs par défaut`);
+    return []; // Retourner array vide, JAMAIS undefined
   } catch (e) {
     console.warn(`Erreur getLastMatches:`, e);
-    return [];
+    return []; // Retourner array vide en cas d'erreur
   }
 }
 
@@ -698,47 +699,57 @@ function getOpponentStrength(teamId, teamName) {
 
 // 🎯 Calculer SOS (Strength of Schedule) - force des adversaires
 function calculateSOS(teamId, teamName, matches, competitionType = 'CHAMPIONSHIP') {
-  if (!matches || matches.length === 0) {
-    console.log(`⚠️ Pas de matchs pour SOS de ${teamName}`);
-    return { sosAttaque: 1.0, sosDéfense: 1.0 };
+  if (!matches || !Array.isArray(matches) || matches.length === 0) {
+    console.log(`⚠️ Pas de matchs pour SOS de ${teamName} - utilisant SOS neutre (1.0)`);
+    return { sos: 1.0, competitionType };
   }
   
   const compProps = getCompetitionProperties(competitionType);
   let totalAdversaire = 0;
   let totalPoids = 0;
+  let validMatches = 0;
   
-  console.log(`\n🎯 CALCUL SOS pour ${teamName} - ${compProps.description}:`);
+  console.log(`\n🎯 CALCUL SOS pour ${teamName} (${matches.length} matchs):`);
   
-  matches.forEach((m, idx) => {
-    const isHome = m.teams.home.id == teamId;
-    const opponent = isHome ? m.teams.away : m.teams.home;
-    const opponentId = opponent.id;
-    
-    const opponentElo = getOpponentStrength(opponentId, opponent.name);
-    
-    // Pondération: matchs récents = plus de poids
-    const weight = (idx + 1) / matches.length;
-    
-    // Normaliser Elo en ratio (1600 = neutral)
-    const eloRatio = opponentElo / 1600;
-    
-    // ✅ NOUVEAU: Si terrain neutre, pas de pénalité/bonus selon position
-    let adversaireForce = eloRatio;
-    if (!compProps.isNeutralGround && !isHome) {
-      // Championnat + away: adversaire défense est plus forte (avantage domicile)
-      adversaireForce *= 1.03;
-    }
-    
-    totalAdversaire += adversaireForce * weight;
-    totalPoids += weight;
-    
-    const posLabel = isHome ? '🏠 dom.' : '✈️ ext.';
-    console.log(`  Match ${idx + 1}: ${opponent.name} (Elo: ${opponentElo.toFixed(0)}) ${posLabel}`);
-  });
+  try {
+    matches.forEach((m, idx) => {
+      if (!m || !m.teams || !m.teams.home || !m.teams.away) {
+        console.log(`  ⚠️ Match ${idx + 1}: structure incomplète`);
+        return;
+      }
+      
+      const isHome = m.teams.home.id == teamId;
+      const opponent = isHome ? m.teams.away : m.teams.home;
+      const opponentId = opponent.id;
+      
+      const opponentElo = getOpponentStrength(opponentId, opponent.name);
+      const weight = (idx + 1) / matches.length;
+      const eloRatio = opponentElo / 1600;
+      
+      let adversaireForce = eloRatio;
+      if (!compProps.isNeutralGround && !isHome) {
+        adversaireForce *= 1.03;
+      }
+      
+      totalAdversaire += adversaireForce * weight;
+      totalPoids += weight;
+      validMatches++;
+      
+      const posLabel = isHome ? '🏠 dom.' : '✈️ ext.';
+      console.log(`  Match ${idx + 1}: ${opponent.name} (Elo: ${opponentElo.toFixed(0)}) ${posLabel}`);
+    });
+  } catch (e) {
+    console.warn(`⚠️ Erreur lors du calcul SOS:`, e);
+    return { sos: 1.0, competitionType };
+  }
+  
+  if (validMatches === 0 || totalPoids === 0) {
+    console.log(`⚠️ Aucun match valide - utilisant SOS neutre`);
+    return { sos: 1.0, competitionType };
+  }
   
   const sos = totalAdversaire / totalPoids;
-  
-  console.log(`  📊 SOS Final: ${sos.toFixed(3)} (${compProps.name})`);
+  console.log(`  📊 SOS Final: ${sos.toFixed(3)}`);
   
   return { sos, competitionType };
 }
