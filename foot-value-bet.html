@@ -641,7 +641,7 @@ function calculateEloFromResults(teamName, form, gf, ga, matches) {
   
   console.log(`    Win Count: ${winCount}, Draw Count: ${drawCount}, Win Rate: ${(winRate*100).toFixed(1)}%`);
   
-  const performanceBonus = (winRate - 0.5) * 400;
+  const performanceBonus = (winRate - 0.5) * 600;
   console.log(`    Performance Bonus: ${performanceBonus.toFixed(0)}`);
   
   // 2️⃣ BUTS/MATCH (60% du calcul)
@@ -651,13 +651,14 @@ function calculateEloFromResults(teamName, form, gf, ga, matches) {
   
   console.log(`    Goals For/Match: ${goalsFor.toFixed(2)}, Goals Against/Match: ${goalsAgainst.toFixed(2)}, Diff: ${goalsDiff.toFixed(2)}`);
   
-  const goalsBonus = goalsDiff * 150;
+  const goalsBonus = goalsDiff * 250;
   console.log(`    Goals Bonus: ${goalsBonus.toFixed(0)}`);
   
   elo += performanceBonus + goalsBonus;
   console.log(`    Elo avant clamp: ${elo.toFixed(0)}`);
   
-  elo = clamp(elo, 1000, 2400);
+  // Plafond augmenté pour mieux différencier les équipes
+  elo = clamp(elo, 800, 2800);
   console.log(`    Elo final: ${elo.toFixed(0)}`);
   
   return elo;
