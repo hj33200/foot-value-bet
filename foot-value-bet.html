@@ -3112,6 +3112,22 @@ function generateMarketAnalysis(b) {
   
   // Over/Under
   if (b.marketId === 'tot') {
+    // Déduire le seuil et Over/Under du selIdx
+    // selIdx 0,1 = 1.5 / selIdx 2,3 = 2.5 / selIdx 4,5 = 3.5
+    const thresholds = [1.5, 1.5, 2.5, 2.5, 3.5, 3.5];
+    const threshold = thresholds[b.selIdx] || 2.5;
+    const isOver = b.selIdx % 2 === 0;
+    
+    // Affichage du seuil
+    const thresholdLabel = threshold === 1.5 ? '1.5' : threshold === 2.5 ? '2.5' : '3.5';
+    const overUnderLabel = isOver ? `Over ${thresholdLabel}` : `Under ${thresholdLabel}`;
+    
+    // Probabilités (simplifié: on utilise ou25Total pour 2.5)
+    const totalProb = m.ou25Total;
+    const probDisplay = isOver 
+      ? (totalProb ? (totalProb.pOver * 100).toFixed(1) : '—')
+      : (totalProb ? (totalProb.pUnder * 100).toFixed(1) : '—');
+    
     return `
       <div class="detail-section">
         <h4>📊 L'analyse Over/Under</h4>
@@ -3131,8 +3147,8 @@ function generateMarketAnalysis(b) {
         <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
           <div style="margin-bottom: 8px;"><strong>2️⃣ Distribution Poisson totale</strong></div>
           <div style="margin-left: 12px; color: var(--txt2);">
-            <strong>Under 2.5:</strong> ${m.ou25Total ? (m.ou25Total.pUnder * 100).toFixed(1) : '—'}%
-            <br><strong>Over 2.5:</strong> ${m.ou25Total ? (m.ou25Total.pOver * 100).toFixed(1) : '—'}%
+            <strong>Under ${thresholdLabel}:</strong> ${m.ou25Total ? (m.ou25Total.pUnder * 100).toFixed(1) : '—'}%
+            <br><strong>Over ${thresholdLabel}:</strong> ${m.ou25Total ? (m.ou25Total.pOver * 100).toFixed(1) : '—'}%
             <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
               Simulation 100,000 matchs avec λHome et λAway
             </div>
@@ -3140,10 +3156,10 @@ function generateMarketAnalysis(b) {
         </div>
 
         <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
-          <strong>📈 Résumé Over/Under 2.5:</strong>
+          <strong>📈 Résumé ${overUnderLabel}:</strong>
           <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
             Buts totaux attendus: ${m.lambdaHome && m.lambdaAway ? (m.lambdaHome + m.lambdaAway).toFixed(2) : '—'}
-            <br><strong style="color: var(--accent); font-size: 13px;">Over 2.5: ${m.ou25Total ? (m.ou25Total.pOver * 100).toFixed(1) : '—'}%</strong>
+            <br><strong style="color: var(--accent); font-size: 13px;">${overUnderLabel}: ${probDisplay}%</strong>
           </div>
         </div>
       </div>
