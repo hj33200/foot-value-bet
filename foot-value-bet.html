@@ -1986,7 +1986,7 @@ const FOOTBALL_API = {
       
       console.log('✓ Stats sur les 10 derniers:', {wins, draws, losses, gf, ga});
       console.log('✓ Form (5 derniers):', form);
-      return { wins, draws, losses, gf, ga, form, totalMatches: matches.length };
+      return { wins, draws, losses, gf, ga, form, totalMatches: matches.length, lastMatches: last10 };
       
     } catch (err) {
       console.error('❌ Error fetching team stats:', err);
