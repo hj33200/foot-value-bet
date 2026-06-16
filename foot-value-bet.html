@@ -392,6 +392,47 @@ tbody tr:hover{background:var(--panel2)}
 .calendar-grid button { padding: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--txt); cursor: pointer; border-radius: 4px; font-size: 12px; }
 .calendar-grid button:hover { background: var(--accent); color: var(--bg); }
 .calendar-grid button.today { background: var(--accent); color: var(--bg); font-weight: bold; }
+
+/* 🎯 NOUVEAU DESIGN - VERDICT PARI */
+.verdict-section { margin-bottom: 20px; }
+.verdict-banner { border-radius: 12px; padding: 16px; margin-bottom: 16px; text-align: center; font-weight: 700; }
+.verdict-good { background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(34,197,94,0.05)); border: 2px solid var(--green); color: var(--green); }
+.verdict-bad { background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.05)); border: 2px solid var(--red); color: var(--red); }
+.verdict-icon { font-size: 18px; margin-bottom: 6px; }
+.verdict-subtitle { font-size: 13px; font-weight: 500; opacity: 0.85; }
+.prob-comparison { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+.prob-row { margin-bottom: 14px; display: flex; gap: 12px; align-items: center; }
+.prob-row:last-child { margin-bottom: 0; }
+.prob-label { display: flex; flex-direction: column; min-width: 120px; }
+.label-text { font-size: 12px; color: var(--txt3); font-weight: 500; margin-bottom: 4px; }
+.label-value { font-size: 15px; font-weight: 700; color: var(--txt1); }
+.prob-bar { flex: 1; height: 28px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; min-width: 100px; }
+.prob-fill { height: 100%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: white; font-size: 11px; font-weight: 700; }
+.prob-diff { display: flex; justify-content: space-between; padding: 10px; background: var(--bg); border-radius: 6px; font-size: 13px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.diff-label { color: var(--txt2); font-weight: 600; }
+.diff-value { font-weight: 700; font-family: var(--mono); }
+.diff-value.negative { color: var(--red); }
+.diff-value.positive { color: var(--green); }
+.fair-odds-box { background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 10px; padding: 12px; margin-bottom: 14px; font-size: 12px; }
+.fo-row { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
+.fo-row:last-child { margin-bottom: 0; }
+.fo-label { color: var(--txt2); font-weight: 500; }
+.fo-value { font-weight: 700; font-family: var(--mono); color: var(--txt1); }
+.fo-value.overpay { color: var(--red); }
+.fo-value.good { color: var(--green); }
+.expand-details { width: 100%; padding: 10px 12px; background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; color: var(--txt2); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; margin-bottom: 12px; }
+.expand-details:hover { background: var(--bg); color: var(--accent); border-color: var(--accent); }
+.details-expanded { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin-bottom: 14px; animation: slideDown 0.3s ease; }
+@keyframes slideDown { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 500px; } }
+.detail-content { font-size: 13px; line-height: 1.5; color: var(--txt2); }
+.detail-section { margin-bottom: 14px; }
+.detail-section:last-child { margin-bottom: 0; }
+.detail-section h4 { margin: 0 0 8px 0; color: var(--txt1); font-size: 13px; font-weight: 700; }
+.detail-section p { margin: 0 0 8px 0; color: var(--txt2); }
+.detail-section ul { margin: 0; padding-left: 20px; color: var(--txt2); }
+.detail-section li { margin: 6px 0; line-height: 1.4; }
+.rec-good { background: rgba(34, 197, 94, 0.1); border-left: 3px solid var(--green); padding: 10px; border-radius: 4px; color: var(--txt1) !important; }
+.rec-bad { background: rgba(239, 68, 68, 0.1); border-left: 3px solid var(--red); padding: 10px; border-radius: 4px; color: var(--txt1) !important; }
 </style>
 
 <script>
@@ -974,7 +1015,33 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   console.log(`  ${away.name}: ${lambdaAway.toFixed(3)}`);
   console.log(`  📝 Formule: (Attaque × ELO × 1.8 × SOS) / (Défense × SOS_adversaire)`);
   
-  return { lambdaHome, lambdaAway, homeFormMult, awayFormMult };
+  // 🎯 CALCULER PROBABILITÉ POISSON FINALE
+  // Utiliser la distribution Poisson pour estimer P(Home > Away)
+  const poissonProb = calculatePoissonWinProb(lambdaHome, lambdaAway);
+  
+  // 📊 IMPACTS EN POURCENTAGE
+  const eloRawProb = eloWinProb * 100; // Prob Elo brut
+  const sosImpact = ((sosHome.sos - 1) * 100) - ((sosAway.sos - 1) * 100); // Impact SOS
+  const poissonImpact = (poissonProb * 100) - eloRawProb; // Impact Poisson
+  const finalProb = poissonProb * 100;
+  
+  console.log(`\n📈 IMPACTS:`);
+  console.log(`  Elo brut: ${eloRawProb.toFixed(1)}%`);
+  console.log(`  Impact SOS: ${sosImpact.toFixed(1)}%`);
+  console.log(`  Impact Poisson: ${poissonImpact.toFixed(1)}%`);
+  console.log(`  Probabilité finale: ${finalProb.toFixed(1)}%`);
+  
+  return { 
+    lambdaHome, lambdaAway, homeFormMult, awayFormMult,
+    // 📊 NOUVELLES DONNÉES POUR L'ANALYSE DÉTAILLÉE
+    homeElo, awayElo, eloWinProb,
+    sosHome: sosHome.sos, sosAway: sosAway.sos,
+    homeLastMatches, awayLastMatches,
+    homeOffense, homeDefense, awayOffense, awayDefense,
+    homeGF, homeGA, awayGF, awayGA,
+    eloRawProb, sosImpact, poissonImpact, finalProb,
+    competitionType, compProps
+  };
 }
 
 // 📊 Récupérer les STATISTICS avancées (xG, possession, tirs, etc.)
@@ -1075,15 +1142,53 @@ async function getTeamInfo(teamId) {
   }
 }
 
-function buildModel(home,away,homeForm,awayForm,rng){
-  // 🎯 UTILISER LE MODÈLE AVANCÉ POUR CALCULER LES LAMBDAS
-  const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm);
-  let lH = advanced.lambdaHome;
-  let lA = advanced.lambdaAway;
-  const formMultH = advanced.homeFormMult;
-  const formMultA = advanced.awayFormMult;
+// 🎯 Calculer probabilité Poisson(home > away)
+function calculatePoissonWinProb(lambdaHome, lambdaAway) {
+  // Approximation: utiliser la distribution Poisson
+  // P(Home gagne) ≈ somme pour i=1 à ∞ de P(Poisson(lambdaHome) = i) × P(Poisson(lambdaAway) < i)
+  // Simplification: simulation rapide sur 20 buts max
   
-  console.log(`\n✅ Lambdas finales: lH=${lH.toFixed(3)}, lA=${lA.toFixed(3)}\n`);
+  let prob = 0;
+  for (let homeGoals = 1; homeGoals <= 20; homeGoals++) {
+    // P(Home marque exactement homeGoals)
+    const pHome = poissonProb(lambdaHome, homeGoals);
+    
+    // P(Away marque moins que homeGoals)
+    let pAwayLess = 0;
+    for (let awayGoals = 0; awayGoals < homeGoals; awayGoals++) {
+      pAwayLess += poissonProb(lambdaAway, awayGoals);
+    }
+    
+    prob += pHome * pAwayLess;
+  }
+  
+  return prob;
+}
+
+// Probabilité Poisson P(X = k) avec paramètre lambda
+function poissonProb(lambda, k) {
+  const numerator = Math.pow(lambda, k) * Math.exp(-lambda);
+  let denominator = 1;
+  for (let i = 1; i <= k; i++) {
+    denominator *= i;
+  }
+  return numerator / denominator;
+}
+
+function buildModel(home,away,homeForm,awayForm,rng){
+  try {
+    // 🎯 UTILISER LE MODÈLE AVANCÉ POUR CALCULER LES LAMBDAS
+    const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm);
+    if (!advanced) {
+      console.error('❌ calculateAdvancedProbabilities retourné undefined!');
+      return null;
+    }
+    let lH = advanced.lambdaHome;
+    let lA = advanced.lambdaAway;
+    const formMultH = advanced.homeFormMult;
+    const formMultA = advanced.awayFormMult;
+    
+    console.log(`\n✅ Lambdas finales: lH=${lH.toFixed(3)}, lA=${lA.toFixed(3)}\n`);
   
   const CAP = 7;
   const FM = Array.from({length:13}, () => new Array(13).fill(0));
@@ -2841,7 +2946,13 @@ function openBetModal(marketId,selIdx){
     league:LEAGUES[m.lg].name,
     market:mk.name, sel:s.sel, cote:s.cote,
     implied:s.implied, est:s.est, value:s.value, kelly:s.kelly,
-    stake:'', conf:autoConf, note:''
+    stake:'', conf:autoConf, note:'',
+    // 📊 DONNÉES DU MODÈLE POUR L'ANALYSE DÉTAILLÉE
+    model: d.model,
+    home: m.home,
+    away: m.away,
+    homeForm: d.homeForm,
+    awayForm: d.awayForm
   };
   renderModal();showModal(true);
 }
@@ -2888,12 +2999,141 @@ function renderModal(){
           <span class="bs-sel">${b.sel}</span><span class="ob-cote" style="font-family:var(--mono);font-size:20px;font-weight:700">${b.cote.toFixed(2)}</span></div>
       </div>
 
-      <div class="calc-grid">
-        <div class="calc-cell"><div class="lab">Prob. implicite</div><div class="num" id="cImp">${pct(b.implied)}</div></div>
-        <div class="calc-cell"><div class="lab">Prob. estimée</div><div class="num" id="cEst">${pct(b.est)}</div></div>
-        <div class="calc-cell ${valClass}" id="cValCell"><div class="lab">Value</div><div class="num" id="cVal">${(value>=0?'+':'')+pct(value)}</div></div>
+      <!-- 🎯 SECTION VERDICT PARI - NOUVEAU DESIGN CLAIR -->
+      <div class="verdict-section">
+        <!-- VERDICT COULEUR + TEXTE -->
+        <div class="verdict-banner ${value >= state.settings.greenMin ? 'verdict-good' : 'verdict-bad'}">
+          <div class="verdict-icon">${value >= state.settings.greenMin ? '✅ BON PARI' : '❌ MAUVAIS PARI'}</div>
+          <div class="verdict-subtitle">
+            ${value >= state.settings.greenMin 
+              ? 'La cote offre une bonne valeur' 
+              : 'La cote ne vaut pas le coup'}
+          </div>
+        </div>
+
+        <!-- COMPARAISON VISUELLE PROBAS -->
+        <div class="prob-comparison">
+          <div class="prob-row">
+            <div class="prob-label">
+              <span class="label-text">Bookmaker dit</span>
+              <span class="label-value">${pct(b.implied)}</span>
+            </div>
+            <div class="prob-bar">
+              <div class="prob-fill" style="width: ${(b.implied * 100).toFixed(1)}%; background: var(--orange)"></div>
+            </div>
+          </div>
+
+          <div class="prob-row">
+            <div class="prob-label">
+              <span class="label-text">Notre modèle dit</span>
+              <span class="label-value">${pct(b.est)}</span>
+            </div>
+            <div class="prob-bar">
+              <div class="prob-fill" style="width: ${(b.est * 100).toFixed(1)}%; background: ${value >= state.settings.greenMin ? 'var(--green)' : 'var(--red)'}"></div>
+            </div>
+          </div>
+
+          <div class="prob-diff">
+            <span class="diff-label">Écart:</span>
+            <span class="diff-value ${value < 0 ? 'negative' : 'positive'}">
+              ${(value < 0 ? '' : '+')}${(value * 100).toFixed(1)}%
+            </span>
+          </div>
+        </div>
+
+        <!-- COTE ÉQUITABLE (BONUS) -->
+        <div class="fair-odds-box">
+          <div class="fo-row">
+            <span class="fo-label">Cote équitable:</span>
+            <span class="fo-value">${(1/b.est).toFixed(2)}</span>
+          </div>
+          <div class="fo-row">
+            <span class="fo-label">Votre cote:</span>
+            <span class="fo-value">${b.cote.toFixed(2)}</span>
+          </div>
+          <div class="fo-row" style="border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px;">
+            <span class="fo-label">Vous payez:</span>
+            <span class="fo-value ${value < 0 ? 'overpay' : 'good'}">${value < 0 ? '❌' : '✅'} ${Math.abs(value * 100).toFixed(1)}%</span>
+          </div>
+        </div>
+
+        <!-- BOUTON EXPANDABLE DÉTAILS -->
+        <button class="expand-details" onclick="toggleDetails(this)">
+          ▼ Pourquoi cette différence? (SOS, Elo, etc.)
+        </button>
+
+        <!-- DÉTAILS EXPANDABLE (CACHÉ PAR DÉFAUT) -->
+        <div class="details-expanded" style="display: none;">
+          <div class="detail-content">
+            ${b.model ? `
+            <div class="detail-section">
+              <h4>📊 L'analyse détaillée</h4>
+              <p><strong>${b.matchName}:</strong> L'Elo brut suggère une probabilité élevée, mais notre modèle ajuste pour plusieurs facteurs:</p>
+              
+              <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+                <div style="margin-bottom: 8px;"><strong>1️⃣ Force ELO brute</strong></div>
+                <div style="margin-left: 12px; color: var(--txt2);">
+                  ${b.home.name}: <strong>${b.model.homeElo ? b.model.homeElo.toFixed(0) : '—'}</strong> Elo
+                  → <strong>${b.model.eloWinProb ? (b.model.eloWinProb * 100).toFixed(1) : '—'}%</strong> victoire (Elo seul)
+                </div>
+                <div style="margin-left: 12px; color: var(--txt2);">
+                  ${b.away.name}: <strong>${b.model.awayElo ? b.model.awayElo.toFixed(0) : '—'}</strong> Elo
+                  → <strong>${b.model.eloWinProb ? ((1-b.model.eloWinProb) * 100).toFixed(1) : '—'}%</strong> victoire
+                </div>
+              </div>
+
+              <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+                <div style="margin-bottom: 8px;"><strong>2️⃣ Force des adversaires (SOS)</strong></div>
+                <div style="margin-left: 12px; color: var(--txt2);">
+                  <strong>${b.home.name} SOS: ${b.model.sosHome ? b.model.sosHome.toFixed(3) : '—'}</strong>
+                  ${b.model.sosHome && b.model.sosHome > 1 ? '⚠️ Adversaires TRÈS forts' : '✅ Adversaires faibles'}
+                  <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
+                    A joué contre des équipes fortes → Ses stats sont exagérées!
+                  </div>
+                </div>
+                <div style="margin-left: 12px; color: var(--txt2); margin-top: 6px;">
+                  <strong>${b.away.name} SOS: ${b.model.sosAway ? b.model.sosAway.toFixed(3) : '—'}</strong>
+                  ${b.model.sosAway && b.model.sosAway > 1 ? '⚠️ Adversaires forts' : '✅ Adversaires plutôt faibles'}
+                </div>
+              </div>
+
+              <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+                <div style="margin-bottom: 8px;"><strong>3️⃣ Poisson Distribution (lambdas)</strong></div>
+                <div style="margin-left: 12px; color: var(--txt2);">
+                  ${b.home.name}: <strong>${b.model.lambdaHome ? b.model.lambdaHome.toFixed(2) : '—'}</strong> buts/match attendus
+                </div>
+                <div style="margin-left: 12px; color: var(--txt2);">
+                  ${b.away.name}: <strong>${b.model.lambdaAway ? b.model.lambdaAway.toFixed(2) : '—'}</strong> buts/match attendus
+                </div>
+                <div style="font-size: 11px; margin-top: 4px; color: var(--txt3); margin-left: 12px;">
+                  Simulation 100,000 matchs → Probabilité plus réaliste que l'Elo brut
+                </div>
+              </div>
+
+              <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+                <strong>📈 Résumé du calcul:</strong>
+                <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
+                  Elo brut: <strong>${b.model.eloRawProb ? b.model.eloRawProb.toFixed(1) : '—'}%</strong><br>
+                  Impact SOS: <strong>${b.model.sosImpact ? (b.model.sosImpact > 0 ? '+' : '') + b.model.sosImpact.toFixed(1) : '—'}%</strong><br>
+                  Impact Poisson: <strong>${b.model.poissonImpact ? (b.model.poissonImpact > 0 ? '+' : '') + b.model.poissonImpact.toFixed(1) : '—'}%</strong><br>
+                  <strong style="color: var(--accent); font-size: 13px;">Probabilité finale: ${b.model.finalProb ? b.model.finalProb.toFixed(1) : '—'}%</strong>
+                </div>
+              </div>
+            </div>
+            ` : ''}
+            
+            <div class="detail-section">
+              <h4>💡 Recommandation</h4>
+              ${value >= state.settings.greenMin 
+                ? `<p class="rec-good">✅ Cette cote offre une <strong>edge positive</strong>. Le bookmaker sous-estime la probabilité réelle (${b.est*100 > b.implied*100 ? `notre: ${(b.est*100).toFixed(1)}% vs leur: ${(b.implied*100).toFixed(1)}%` : ''}).</p>`
+                : `<p class="rec-bad">❌ Cette cote <strong>surpaye le risque</strong>. Cherche une cote meilleure (≥ ${(1/b.est).toFixed(2)}).</p>`
+              }
+            </div>
+          </div>
+        </div>
       </div>
 
+      <!-- AUTRES SECTIONS (inchangées) -->
       <div class="mf">
         <label>Probabilité estimée (modifiable) <span class="hint">recalcule la value</span></label>
         <div class="range-wrap">
@@ -2950,6 +3190,14 @@ function updateEst(v){
   const ksv=document.getElementById('kStakeVal');
   if(ksv){ksv.textContent=kStake.toFixed(2)+' '+curSym();document.getElementById('kellyPct').textContent=(Math.max(0,kelly)*100).toFixed(1)}
 }
+
+// 🎯 Toggle détails du verdict
+function toggleDetails(btn) {
+  const details = btn.nextElementSibling;
+  details.style.display = details.style.display === 'none' ? 'block' : 'none';
+  btn.textContent = details.style.display === 'none' ? '▼ Pourquoi cette différence? (SOS, Elo, etc.)' : '▲ Masquer les détails';
+}
+
 function updateConfDisplay(){
   const conf=state.pendingBet.conf;
   const stars=['❌','⭐','⭐⭐','⭐⭐⭐','⭐⭐⭐⭐','⭐⭐⭐⭐⭐'][Math.min(5,Math.floor(conf/2))];
