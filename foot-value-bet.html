@@ -1909,19 +1909,19 @@ function buildMarkets(m,model){
     mkSmart(A+' (remb. si nul)',model.pA/(model.pH+model.pA),1,rng,'dnb')]});
 
   list.push({id:'btts',name:'Les deux équipes marquent (BTTS)',cols:2,sels:[
-    mkSmart('Oui',model.pBTTS,0,rng,'btts'),
-    mkSmart('Non',1-model.pBTTS,1,rng,'btts')]});
+    mkSmart('Oui',model.pBTTS || model.btts || 0.5,0,rng,'btts'),
+    mkSmart('Non',1-(model.pBTTS || model.btts || 0.5),1,rng,'btts')]});
 
   const tg=[];let totIdx=0;
   // 1.5 buts
-  tg.push(mkSmart('Plus de 1.5 buts', model.ou15Total.pOver, totIdx++, rng, 'tot'));
-  tg.push(mkSmart('Moins de 1.5 buts', model.ou15Total.pUnder, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Plus de 1.5 buts', model.ou15Total?.pOver || model.over[1.5] || 0.5, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Moins de 1.5 buts', model.ou15Total?.pUnder || (1-model.over[1.5]) || 0.5, totIdx++, rng, 'tot'));
   // 2.5 buts
-  tg.push(mkSmart('Plus de 2.5 buts', model.ou25Total.pOver, totIdx++, rng, 'tot'));
-  tg.push(mkSmart('Moins de 2.5 buts', model.ou25Total.pUnder, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Plus de 2.5 buts', model.ou25Total?.pOver || model.over[2.5] || 0.5, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Moins de 2.5 buts', model.ou25Total?.pUnder || (1-model.over[2.5]) || 0.5, totIdx++, rng, 'tot'));
   // 3.5 buts
-  tg.push(mkSmart('Plus de 3.5 buts', model.ou35Total.pOver, totIdx++, rng, 'tot'));
-  tg.push(mkSmart('Moins de 3.5 buts', model.ou35Total.pUnder, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Plus de 3.5 buts', model.ou35Total?.pOver || model.over[3.5] || 0.5, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Moins de 3.5 buts', model.ou35Total?.pUnder || (1-model.over[3.5]) || 0.5, totIdx++, rng, 'tot'));
   list.push({id:'tot',name:'Total de buts (Over / Under)',cols:2,sels:tg});
 
   list.push({id:'tte',name:'Total buts par équipe',cols:2,sels:[
@@ -1931,10 +1931,10 @@ function buildMarkets(m,model){
     mkSmart(A+' -1.5',1-model.aOver[1.5],3,rng,'tte')]});
 
   list.push({id:'cs',name:'Clean sheet (ne pas encaisser)',cols:2,sels:[
-    mkSmart(H+' — oui',model.csHome,0,rng,'cs'),
-    mkSmart(H+' — non',1-model.csHome,1,rng,'cs'),
-    mkSmart(A+' — oui',model.csAway,2,rng,'cs'),
-    mkSmart(A+' — non',1-model.csAway,3,rng,'cs')]});
+    mkSmart(H+' — oui',model.csHome || model.cs_h || 0.5,0,rng,'cs'),
+    mkSmart(H+' — non',1-(model.csHome || model.cs_h || 0.5),1,rng,'cs'),
+    mkSmart(A+' — oui',model.csAway || model.cs_a || 0.5,2,rng,'cs'),
+    mkSmart(A+' — non',1-(model.csAway || model.cs_a || 0.5),3,rng,'cs')]});
 
   const scores=[[1,0],[2,0],[2,1],[3,1],[1,1],[2,2],[0,0],[0,1],[1,2],[0,2]];
   list.push({id:'score',name:'Score exact',cols:3,sels:scores.map(([i,j])=>
