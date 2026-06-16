@@ -3106,12 +3106,19 @@ function renderModal(){
                   <strong>${b.home.name} SOS: ${b.model.sosHome ? b.model.sosHome.toFixed(3) : '—'}</strong>
                   ${b.model.sosHome && b.model.sosHome > 1 ? '⚠️ Adversaires TRÈS forts' : '✅ Adversaires faibles'}
                   <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
-                    A joué contre des équipes fortes → Ses stats sont exagérées!
+                    ${b.model.sosHome && b.model.sosHome > 1 
+                      ? `Joué contre des équipes fortes → ${(b.model.sosHome * 100 - 100).toFixed(1)}% plus difficile → Stats RÉELLES et impressionnantes!` 
+                      : `Joué contre des équipes faibles → Stats GONFLÉES/exagérées!`}
                   </div>
                 </div>
                 <div style="margin-left: 12px; color: var(--txt2); margin-top: 6px;">
                   <strong>${b.away.name} SOS: ${b.model.sosAway ? b.model.sosAway.toFixed(3) : '—'}</strong>
                   ${b.model.sosAway && b.model.sosAway > 1 ? '⚠️ Adversaires forts' : '✅ Adversaires plutôt faibles'}
+                  <div style="font-size: 11px; margin-top: 4px; color: var(--txt3);">
+                    ${b.model.sosAway && b.model.sosAway > 1 
+                      ? `Joué contre du bon niveau → ${(b.model.sosAway * 100 - 100).toFixed(1)}% plus difficile` 
+                      : `Joué contre des équipes faibles`}
+                  </div>
                 </div>
               </div>
 
