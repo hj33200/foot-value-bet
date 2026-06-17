@@ -2105,33 +2105,47 @@ function buildMarkets(m,model){
     return null;
   };
   
-  // Mapper les noms de marchés de notre app avec les noms de l'API-Football
+  // 📊 MAPPER CORRECT: Noms EXACTS retournés par l'API-Football
   const marketMapping = {
     '1n2': 'Match Winner',
     'dc': 'Double Chance',
-    'dnb': 'Draw No Bet',
+    'dnb': 'Draw No Bet (1st Half)',  // ✅ Corrigé: nom exact de l'API
     'btts': 'Both Teams Score',
     'tot': 'Goals Over/Under',
-    'cs': 'Clean Sheet',
+    'cs': 'Clean Sheet - Home',  // ✅ Corrigé: utiliser version "-Home"
     'htr': 'First Half Winner',
     'htft': 'HT/FT Double',
     'eh': 'Handicap Result',
     'ah': 'Asian Handicap',
-    'rou': 'Result/Total Goals',
-    'rbtts': 'Results/Both Teams Score',
+    'rou': 'Result/Total Goals',  // ✅ Existe chez 10Bet
+    'rbtts': 'Results/Both Teams Score',  // ✅ Existe chez 10Bet
     'hou': 'Total - Home',
     'aou': 'Total - Away',
     'score': 'Exact Score'
   };
   
-  // 🎯 FONCTION: Créer une sélection (vraies cotes OU formule de probabilité) avec VALIDATION
+  // 🎯 FONCTION: Créer une sélection (vraies cotes OU formule de probabilité) avec VALIDATION ET FALLBACKS
   const mkSmart = (label, est, idx, rngLocal, marketId) => {
     const opt = {};
     
     // D'abord chercher les vraies cotes
     if(marketId) {
-      const marketName = marketMapping[marketId];
-      const result = getRealCotes(marketName);
+      let marketName = marketMapping[marketId];
+      let result = getRealCotes(marketName);
+      
+      // 🔧 FALLBACK SPÉCIAL pour Clean Sheet
+      if(!result && marketId === 'cs') {
+        // Clean Sheet n'existe pas direct, chercher "Clean Sheet - Home" ou "Clean Sheet - Away"
+        if(idx === 0 || idx === 1) {
+          // Pour Home (idx 0 = yes, 1 = no)
+          result = getRealCotes('Clean Sheet - Home', ['10Bet', 'Unibet']);
+        } else {
+          // Pour Away (idx 2 = yes, 3 = no)
+          result = getRealCotes('Clean Sheet - Away', ['10Bet', 'Unibet']);
+          idx = idx - 2;  // Ajuster l'index (0-1 au lieu de 2-3)
+        }
+        marketName = 'Clean Sheet';
+      }
       
       if(result && result.cotes) {
         // ✅ VALIDATION: vérifier que l'index existe et a une cote valide
@@ -2150,6 +2164,9 @@ function buildMarkets(m,model){
         // ⚠️ Si index invalide ou cote absente
         console.warn(`⚠️ 💥 ${marketId}[${idx}] INVALIDE - total cotes: ${result.cotes.length}`);
         console.warn(`   Cotes disponibles:`, result.cotes);
+      } else if(marketId === 'dnb' || marketId === 'cs') {
+        // Fallback silencieux pour Draw No Bet et Clean Sheet
+        console.log(`ℹ️ ${marketId}[${idx}]: marché non disponible, utilise fallback`);
       }
     }
     
