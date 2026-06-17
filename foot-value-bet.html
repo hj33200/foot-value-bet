@@ -1106,25 +1106,13 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   console.log(`\n🎯 BTTS (Poisson + correction empirique): ${(pBTTS_indep*100).toFixed(1)}% × ${(bttsAnalysis.corrFactor*100).toFixed(0)}% = ${(pBTTS*100).toFixed(1)}% (empirique: ${bttsAnalysis.empiricalBTTS ? (bttsAnalysis.empiricalBTTS*100).toFixed(1) : 'N/A'}%, dataPoints: ${bttsAnalysis.dataPoints})`);
   
-  // OVER/UNDER: Distribution avec correction Negative Binomial
+  // OVER/UNDER: Distribution Poisson simple (NB blend ne change rien)
   const calculateOU = (lambda, threshold) => {
-    // Méthode 1: Poisson basique
-    let pUnder_pois = 0;
+    let pUnder = 0;
     for (let i = 0; i <= threshold; i++) {
-      pUnder_pois += pois(i, lambda);
+      pUnder += pois(i, lambda);
     }
-    
-    // Méthode 2: Negative Binomial (capture overdispersion)
-    let pUnder_nb = 0;
-    for (let i = 0; i <= threshold; i++) {
-      pUnder_nb += negBinom(i, lambda);
-    }
-    
-    // Blend: 70% Poisson (stable) + 30% Negative Binomial (capture variance extra)
-    const pUnder = pUnder_pois * 0.7 + pUnder_nb * 0.3;
-    const pOver = 1 - pUnder;
-    
-    return { pUnder, pOver, pUnder_pois, pOver_pois: 1 - pUnder_pois };
+    return { pUnder, pOver: 1 - pUnder };
   };
   
   // Calculer pour les 3 seuils
