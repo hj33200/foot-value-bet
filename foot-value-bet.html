@@ -230,8 +230,11 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .btn-edit{background:transparent;border:none;padding:6px 8px;cursor:pointer;font-size:18px;opacity:0;transition:.2s;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;user-select:none;flex-shrink:0}
 .odd-btn:hover .btn-edit{opacity:0.7}
 .odd-btn:hover .btn-edit:hover{opacity:1;color:var(--accent);background:rgba(100,200,255,0.1)}
-.odd-btn .ob-stats{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:10.5px;color:var(--txt3)}
-.odd-btn .ob-stats .v{font-weight:700;margin-left:auto}
+.odd-btn .ob-scores{display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:11px;color:var(--txt3)}
+.ob-score-item{display:flex;align-items:center;gap:6px;padding:4px 6px;background:rgba(0,0,0,0.15);border-radius:6px}
+.ob-score-item .voyant{width:8px;height:8px}
+.ob-score-item .score-label{font-weight:600;font-size:10px;color:var(--txt2);min-width:40px}
+.ob-score-item .score-value{font-weight:700;margin-left:auto;color:var(--txt);min-width:35px;text-align:right}
 .voyant{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
 .v-green{background:var(--green);box-shadow:0 0 8px var(--green)}
 .v-yellow{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
@@ -2154,10 +2157,7 @@ function buildMarkets(m,model){
     mkSmart(A+' — oui',model.csAway || model.cs_a || 0.5,2,rng,'cs'),
     mkSmart(A+' — non',1-(model.csAway || model.cs_a || 0.5),3,rng,'cs')]});
 
-  const scores=[[1,0],[2,0],[2,1],[3,1],[1,1],[2,2],[0,0],[0,1],[1,2],[0,2]];
-  list.push({id:'score',name:'Score exact',cols:3,sels:scores.map(([i,j])=>
-    mk(i+' - '+j,exact(i,j),{allowGray:true,grayChance:0.08}))});
-
+  // First Half (résultat HT)
   list.push({id:'htr',name:'Résultat à la mi-temps (1N2)',cols:3,sels:[
     mkSmart(H+' à la pause',model.pHT_1 || model.HT[1] || 0.5,0,rng,'htr'),
     mkSmart('Nul à la pause',model.pHT_D || model.HT.N || 0.5,1,rng,'htr'),
@@ -2169,15 +2169,15 @@ function buildMarkets(m,model){
 
   // HOME OVER/UNDER
   list.push({id:'hou',name:H+' Over/Under',cols:3,sels:[
-    mkSmart(H+' > 1.5',model.homeOU15 || 0.5,0,rng,'hou'),
-    mkSmart(H+' > 2.5',model.homeOU25 || 0.5,1,rng,'hou'),
-    mkSmart(H+' > 3.5',model.homeOU35 || 0.5,2,rng,'hou')]});
+    mkSmart(H+' > 1.5',model.ou15Home || 0.5,0,rng,'hou'),
+    mkSmart(H+' > 2.5',model.ou25Home || 0.5,1,rng,'hou'),
+    mkSmart(H+' > 3.5',model.ou35Home || 0.5,2,rng,'hou')]});
 
   // AWAY OVER/UNDER
   list.push({id:'aou',name:A+' Over/Under',cols:3,sels:[
-    mkSmart(A+' > 1.5',model.awayOU15 || 0.5,0,rng,'aou'),
-    mkSmart(A+' > 2.5',model.awayOU25 || 0.5,1,rng,'aou'),
-    mkSmart(A+' > 3.5',model.awayOU35 || 0.5,2,rng,'aou')]});
+    mkSmart(A+' > 1.5',model.ou15Away || 0.5,0,rng,'aou'),
+    mkSmart(A+' > 2.5',model.ou25Away || 0.5,1,rng,'aou'),
+    mkSmart(A+' > 3.5',model.ou35Away || 0.5,2,rng,'aou')]});
 
   // CORRECT SCORE - Top 10 scores probables
   let correctScores=[];
@@ -2683,7 +2683,7 @@ const state={
   bets:[],
   history:[],
   settings:{
-    apiKey: localStorage.getItem('foot-value-bet-apiKey') || '',
+    apiKey: localStorage.getItem('foot-value-bet-apiKey') || 'fa96c57b27321cef9fc4cae58aa3fe13',
     currency:'EUR',
     bankroll:0,
     bookmakers:['Winabet','BetClever','UniBetX'],
@@ -3270,13 +3270,37 @@ function marketBlock(mk,idx){
   </div>`;
 }
 function oddButton(mk,s,i){
+  // Calculer les couleurs et valeurs
+  const vTxt = s.value ? ((s.value>=0?'+':'')+(s.value*100).toFixed(1)+'%') : 'N/A';
+  const statColor = s.est >= 0.75 ? 'green' : s.est >= 0.50 ? 'orange' : s.est ? 'red' : 'gray';
+  const statPct = s.est ? (s.est*100).toFixed(0)+'%' : 'N/A';
+  
+  // Cas spécial: N/A (pas de cote)
   if(s.color==='gray'||s.cote==null){
     return `<div class="odd-btn gray">
-      <div class="ob-top"><span class="ob-sel">${s.sel}</span><span class="voyant v-gray"></span></div>
-      <div class="ob-stats">N/A</div></div>`;
+      <div class="ob-top">
+        <span class="ob-sel">${s.sel}</span>
+        <span class="voyant v-gray"></span>
+      </div>
+      <div class="ob-cote-row">
+        <span class="ob-cote-display">N/A</span>
+      </div>
+      <div class="ob-scores">
+        <div class="ob-score-item">
+          <span class="voyant v-gray" title="VALUE"></span>
+          <span class="score-label">VALUE</span>
+          <span class="score-value">—</span>
+        </div>
+        <div class="ob-score-item">
+          <span class="voyant v-${statColor}" title="STATS"></span>
+          <span class="score-label">STATS</span>
+          <span class="score-value">${statPct}</span>
+        </div>
+      </div>
+    </div>`;
   }
-  const vTxt=(s.value>=0?'+':'')+(s.value*100).toFixed(1)+'%';
-  const statColor = s.est >= 0.75 ? 'green' : s.est >= 0.50 ? 'orange' : 'red';
+  
+  // Cas normal: avec cote
   return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i}); event.stopPropagation();'>
     <div class="ob-top">
       <span class="ob-sel">${s.sel}</span>
@@ -3286,11 +3310,17 @@ function oddButton(mk,s,i){
       <span class="ob-cote-display">${s.cote.toFixed(2)}</span>
       <div class="btn-edit" onclick="editOddCote('${mk.id}',${i}); event.stopPropagation();" title="Éditer la cote">✏️</div>
     </div>
-    <div class="ob-stats">
-      <span>imp ${(s.implied*100).toFixed(0)}%</span>
-      <span>est ${(s.est*100).toFixed(0)}%</span>
-      <span class="v">${vTxt}</span>
-      <span class="voyant v-${statColor}" title="Score STATS"></span>
+    <div class="ob-scores">
+      <div class="ob-score-item">
+        <span class="voyant v-${s.color}" title="VALUE"></span>
+        <span class="score-label">VALUE</span>
+        <span class="score-value">${vTxt}</span>
+      </div>
+      <div class="ob-score-item">
+        <span class="voyant v-${statColor}" title="STATS"></span>
+        <span class="score-label">STATS</span>
+        <span class="score-value">${statPct}</span>
+      </div>
     </div>
   </button>`;
 }
