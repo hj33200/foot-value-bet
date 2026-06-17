@@ -1115,7 +1115,67 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
     return { pUnder, pOver: 1 - pUnder };
   };
   
-  // CLEAN SHEET - avec correction variance défensive
+  // 🎯 HT/FT DOUBLE - MONTE CARLO SIMULATION
+  function calculateHTFTProbs(lH, lA) {
+    const simulations = 100000;
+    const htft = {'1/1':0,'1/N':0,'1/2':0,'N/1':0,'N/N':0,'N/2':0,'2/1':0,'2/N':0,'2/2':0};
+    
+    for (let s = 0; s < simulations; s++) {
+      // SCORE HT (40% des buts)
+      let homeHT = 0, awayHT = 0;
+      let r = Math.random();
+      for (let i = 0; i <= 10; i++) {
+        if (r < pois(i, lH * 0.40)) { homeHT = i; break; }
+        r -= pois(i, lH * 0.40);
+      }
+      r = Math.random();
+      for (let i = 0; i <= 10; i++) {
+        if (r < pois(i, lA * 0.40)) { awayHT = i; break; }
+        r -= pois(i, lA * 0.40);
+      }
+      
+      // RÉSULTAT HT
+      let htResult = homeHT > awayHT ? '1' : homeHT === awayHT ? 'N' : '2';
+      
+      // MOMENTUM FACTOR: Ajuster λ pour 2e mi-temps
+      let lH_2nd = lH * 0.60, lA_2nd = lA * 0.60;
+      const scoreDiff = homeHT - awayHT;
+      if (scoreDiff > 0) { // Home mène
+        lH_2nd *= 1.15; lA_2nd *= 0.85;
+      } else if (scoreDiff < 0) { // Away mène
+        lA_2nd *= 1.15; lH_2nd *= 0.85;
+      }
+      // Si Nul: garder λ inchangé
+      
+      // SCORE 2e MI-TEMPS (60% des buts)
+      let home_2nd = 0, away_2nd = 0;
+      r = Math.random();
+      for (let i = 0; i <= 10; i++) {
+        if (r < pois(i, lH_2nd)) { home_2nd = i; break; }
+        r -= pois(i, lH_2nd);
+      }
+      r = Math.random();
+      for (let i = 0; i <= 10; i++) {
+        if (r < pois(i, lA_2nd)) { away_2nd = i; break; }
+        r -= pois(i, lA_2nd);
+      }
+      
+      // SCORE FINAL = HT + 2nd
+      let homeFinal = homeHT + home_2nd;
+      let awayFinal = awayHT + away_2nd;
+      let ftResult = homeFinal > awayFinal ? '1' : homeFinal === awayFinal ? 'N' : '2';
+      
+      // ENREGISTRER HT/FT
+      const key = htResult + '/' + ftResult;
+      htft[key]++;
+    }
+    
+    // CONVERTIR EN PROBABILITÉS
+    for (let k in htft) htft[k] /= simulations;
+    return htft;
+  }
+  
+  const htftProbs = calculateHTFTProbs(lambdaHome, lambdaAway);
   const csHome_pois = Math.exp(-lambdaAway);
   const csAway_pois = Math.exp(-lambdaHome);
   
@@ -1248,7 +1308,9 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
     ou35Home: ou35Home,
     ou15Away: ou15Away,
     ou25Away: ou25Away,
-    ou35Away: ou35Away
+    ou35Away: ou35Away,
+    // 📊 DONNÉES MARCHÉ HT/FT DOUBLE
+    HTFT: htftProbs
   };
 }
 
@@ -1401,28 +1463,8 @@ function buildModel(home,away,homeForm,awayForm,rng){
   const CAP = 7;
   const FM = Array.from({length:13}, () => new Array(13).fill(0));
   const HT = {1:0, N:0, 2:0};
-  const HTFT = {};
-  ['1','N','2'].forEach(h => ['1','N','2'].forEach(f => HTFT[h+'/'+f] = 0));
-  
-  const l1H = lH * 0.45, l2H = lH * 0.55;
-  const l1A = lA * 0.45, l2A = lA * 0.55;
-  
-  for(let h1=0; h1<CAP; h1++) {
-    for(let a1=0; a1<CAP; a1++) {
-      for(let h2=0; h2<CAP; h2++) {
-        for(let a2=0; a2<CAP; a2++) {
-          const p = pois(h1,l1H) * pois(a1,l1A) * pois(h2,l2H) * pois(a2,l2A);
-          if(p < 1e-9) continue;
-          const fh = h1 + h2, fa = a1 + a2;
-          FM[fh][fa] += p;
-          const htK = h1 > a1 ? '1' : h1 < a1 ? '2' : 'N';
-          const ftK = fh > fa ? '1' : fh < fa ? '2' : 'N';
-          HT[htK==='1'?1:htK==='2'?2:'N'] += p;
-          HTFT[htK+'/'+ftK] += p;
-        }
-      }
-    }
-  }
+  // 🎯 HTFT - Utiliser la simulation Monte Carlo (avec momentum)
+  const HTFT = advanced.HTFT || {};
   
   let pH=0, pD=0, pA=0, btts=0, cs_h=0, cs_a=0;
   const over = {};
@@ -3527,6 +3569,29 @@ function generateMarketAnalysis(b) {
   // Correct Score
   if (b.marketId === 'score') {
     return `<div class="detail-section"><h4>📊 Score Exact</h4><p>${b.matchName}</p><div style="background:var(--bg);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;"><div>Poisson 2D: λHome=${m.lambdaHome ? m.lambdaHome.toFixed(2) : '—'}, λAway=${m.lambdaAway ? m.lambdaAway.toFixed(2) : '—'}</div><div style="margin-top:6px;"><strong>Score sélectionné: ${b.est ? (b.est*100).toFixed(1) : '—'}%</strong></div></div></div>`;
+  }
+  
+  // HT/FT Double
+  if (b.marketId === 'htft') {
+    const htftLabel = {
+      '1/1': `${b.home.name} en HT et FT`,
+      '1/N': `${b.home.name} en HT, Nul en FT`,
+      '1/2': `${b.home.name} en HT, ${b.away.name} en FT`,
+      'N/1': `Nul en HT, ${b.home.name} en FT`,
+      'N/N': `Nul en HT et FT`,
+      'N/2': `Nul en HT, ${b.away.name} en FT`,
+      '2/1': `${b.away.name} en HT, ${b.home.name} en FT`,
+      '2/N': `${b.away.name} en HT, Nul en FT`,
+      '2/2': `${b.away.name} en HT et FT`
+    };
+    
+    const combinations = Object.entries(m.HTFT || {})
+      .sort((a,b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([k, p]) => `${k}: ${(p*100).toFixed(1)}%`)
+      .join('<br>');
+    
+    return `<div class="detail-section"><h4>📊 Mi-temps / Fin de match</h4><p>${b.matchName}</p><div style="background:var(--bg);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;"><div style="margin-bottom:8px;"><strong>Combinaison sélectionnée:</strong></div><div style="margin-left:12px;color:var(--txt2);">${htftLabel[b.sel] || b.sel}</div></div><div style="background:var(--bg);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;"><div style="margin-bottom:8px;"><strong>Top 5 combinaisons HT/FT:</strong></div><div style="margin-left:12px;color:var(--txt2);font-size:11px;">${combinations}</div></div><div style="background:rgba(59, 130, 246, 0.1);border: 1px solid rgba(59, 130, 246, 0.3);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;"><strong>Probabilité estimée: ${b.est ? (b.est*100).toFixed(1) : '—'}%</strong><div style="margin-top:6px;font-size:11px;color:var(--txt2);">Basé sur simulation Monte Carlo 100k matchs avec momentum factor</div></div></div>`;
   }
   
   if (b.marketId === 'cs') {
