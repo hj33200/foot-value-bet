@@ -1689,20 +1689,27 @@ async function fetchOddsFromAPIFootball(fixtureId) {
       
       // Récupérer les marchés (bets) pour ce bookmaker
       const bets = bookmaker.bets || [];
+      console.log(`    🎯 ${bookmakerName} a ${bets.length} marchés`);
+      
       bets.forEach(bet => {
         const marketName = bet.name;
         const values = bet.values || [];
+        
+        // 🔍 DEBUG: Afficher exactement ce que l'API retourne
+        console.log(`    📊 Marché: "${marketName}" (${values.length} cotes)`);
+        values.forEach((v, i) => {
+          console.log(`      [${i}] value="${v.value}" → odd=${v.odd}`);
+        });
         
         oddsMap[bookmakerName].markets[marketName] = values.map(v => ({
           odd: v.odd,
           value: v.value,
           name: v.value
         }));
-        console.log(`  📌 ${bookmakerName} - Marché ${marketName}:`, oddsMap[bookmakerName].markets[marketName]);
       });
     });
     
-    console.log(`✅✅✅ Cotes finales:`, oddsMap);
+    console.log(`✅✅✅ STRUCTURE COMPLÈTE DES COTES:`, JSON.stringify(oddsMap, null, 2));
     return oddsMap;
     
   } catch(err) {
@@ -2062,20 +2069,39 @@ function buildMarkets(m,model){
     }
   }
   
-  // 🎯 FONCTION: Chercher les vraies cotes avec fallback sur 10Bet
+  // 🎯 FONCTION: Chercher les vraies cotes avec fallback et VALIDATION complète
   const getRealCotes = (marketName, bookmakerPriority = ['Unibet', '10Bet']) => {
-    if(!realOdds) return null;
+    if(!realOdds) {
+      console.warn(`⚠️ getRealCotes: realOdds est NULL!`);
+      return null;
+    }
     
     // Pour Exact Score, chercher d'abord chez 10Bet (Unibet n'a pas ce marché)
     if(marketName === 'Exact Score') {
       bookmakerPriority = ['10Bet', 'Unibet'];
     }
     
+    console.log(`🔍 Cherche marché "${marketName}" chez [${bookmakerPriority.join(', ')}]`);
+    console.log(`   Bookmakers disponibles: [${Object.keys(realOdds).join(', ')}]`);
+    console.log(`   Marchés disponibles chez ces bookmakers:`, 
+      Object.fromEntries(
+        Object.entries(realOdds)
+          .map(([bm, data]) => [bm, Object.keys(data.markets || {})])
+      )
+    );
+    
     for(let bm of bookmakerPriority) {
       if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
-        return {cotes: realOdds[bm].markets[marketName], bookmaker: bm};
+        const cotes = realOdds[bm].markets[marketName];
+        console.log(`✅ Trouvé chez ${bm}: ${cotes.length} cotes`);
+        return {cotes: cotes, bookmaker: bm};
+      } else {
+        const available = realOdds[bm]?.markets ? Object.keys(realOdds[bm].markets) : [];
+        console.log(`❌ ${bm}: marché "${marketName}" pas trouvé. Marchés dispo: [${available.join(', ')}]`);
       }
     }
+    
+    console.warn(`⚠️ Marché "${marketName}" introuvable chez TOUS les bookmakers`);
     return null;
   };
   
@@ -2091,14 +2117,14 @@ function buildMarkets(m,model){
     'htft': 'HT/FT Double',
     'eh': 'Handicap Result',
     'ah': 'Asian Handicap',
-    'rou': 'Result/Total Goals',  // Cherche les vraies cotes composées
-    'rbtts': 'Results/Both Teams Score',  // Cherche les vraies cotes composées
+    'rou': 'Result/Total Goals',
+    'rbtts': 'Results/Both Teams Score',
     'hou': 'Total - Home',
     'aou': 'Total - Away',
     'score': 'Exact Score'
   };
   
-  // 🎯 FONCTION: Créer une sélection (vraies cotes OU formule de probabilité)
+  // 🎯 FONCTION: Créer une sélection (vraies cotes OU formule de probabilité) avec VALIDATION
   const mkSmart = (label, est, idx, rngLocal, marketId) => {
     const opt = {};
     
@@ -2107,14 +2133,28 @@ function buildMarkets(m,model){
       const marketName = marketMapping[marketId];
       const result = getRealCotes(marketName);
       
-      if(result && result.cotes && result.cotes[idx]) {
-        opt.realCote = parseFloat(result.cotes[idx].odd);
-        console.log(`💰 ${marketName}[${idx}] = ${opt.realCote} chez ${result.bookmaker}`);
-        return mkSel(label, est, rngLocal, opt, marketId);
+      if(result && result.cotes) {
+        // ✅ VALIDATION: vérifier que l'index existe et a une cote valide
+        if(idx < result.cotes.length) {
+          const coteObj = result.cotes[idx];
+          if(coteObj && coteObj.odd) {
+            const oddValue = parseFloat(coteObj.odd);
+            if(!isNaN(oddValue) && oddValue > 0) {
+              opt.realCote = oddValue;
+              console.log(`✅ 💰 ${marketId}[${idx}] = ${oddValue} (label: "${label}") chez ${result.bookmaker}`);
+              return mkSel(label, est, rngLocal, opt, marketId);
+            }
+          }
+        }
+        
+        // ⚠️ Si index invalide ou cote absente
+        console.warn(`⚠️ 💥 ${marketId}[${idx}] INVALIDE - total cotes: ${result.cotes.length}`);
+        console.warn(`   Cotes disponibles:`, result.cotes);
       }
     }
     
     // Sinon générer une cote basée sur la probabilité
+    console.log(`🔄 ${marketId}[${idx}]: utilise probabilité fallback`);
     return mkSel(label, est, rngLocal, opt, marketId);
   };
   
