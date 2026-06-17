@@ -2081,7 +2081,6 @@ function buildMarkets(m,model){
     'dnb': 'Draw No Bet',
     'btts': 'Both Teams Score',
     'tot': 'Goals Over/Under',
-    'tte': 'Home Team Total Goals',
     'cs': 'Clean Sheet',
     'htr': 'First Half Winner',
     'htft': 'HT/FT Double',
@@ -2149,12 +2148,6 @@ function buildMarkets(m,model){
   tg.push(mkSmart('Moins de 3.5 buts', model.ou35Total?.pUnder || (1-model.over[3.5]) || 0.5, totIdx++, rng, 'tot'));
   list.push({id:'tot',name:'Total de buts (Over / Under)',cols:2,sels:tg});
 
-  list.push({id:'tte',name:'Total buts par équipe',cols:2,sels:[
-    mkSmart(H+' +1.5',model.hOver[1.5],0,rng,'tte'),
-    mkSmart(H+' -1.5',1-model.hOver[1.5],1,rng,'tte'),
-    mkSmart(A+' +1.5',model.aOver[1.5],2,rng,'tte'),
-    mkSmart(A+' -1.5',1-model.aOver[1.5],3,rng,'tte')]});
-
   list.push({id:'cs',name:'Clean sheet (ne pas encaisser)',cols:2,sels:[
     mkSmart(H+' — oui',model.csHome || model.cs_h || 0.5,0,rng,'cs'),
     mkSmart(H+' — non',1-(model.csHome || model.cs_h || 0.5),1,rng,'cs'),
@@ -2210,16 +2203,15 @@ function buildMarkets(m,model){
     mkSmart(A+' (-1)',ea_h,5,rng,'eh')]});
 
   // Asian handicap
-  let ah05_h=0,ah05_a=0,ah1_h=0,ah1_a=0;
+  let ah05_h=0,ah05_a=0,ah1_h=0,ah1_a=0,ah1_null=0;
   for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;
     if(i-0.5>j)ah05_h+=p;else ah05_a+=p;
-    if(i-1>j){ah1_h+=p}else if(i-1<j){ah1_a+=p} }
-  const den1=ah1_h+ah1_a||1;
+    if(i-1>j){ah1_h+=p}else if(i-1===j){ah1_null+=p}else if(i-1<j){ah1_a+=p} }
   list.push({id:'ah',name:'Handicap asiatique',cols:2,sels:[
     mkSmart(H+' -0.5',ah05_h,0,rng,'ah'),
     mkSmart(A+' +0.5',ah05_a,1,rng,'ah'),
-    mkSmart(H+' -1.0',ah1_h/den1,2,rng,'ah'),
-    mkSmart(A+' +1.0',ah1_a/den1,3,rng,'ah')]});
+    mkSmart(H+' -1.0',ah1_h+ah1_null*0.5,2,rng,'ah'),
+    mkSmart(A+' +1.0',ah1_a+ah1_null*0.5,3,rng,'ah')]});
 
   // Result + Over/Under 2.5
   let r1o=0,r1u=0,rNo=0,rNu=0,r2o=0,r2u=0;
@@ -3240,11 +3232,29 @@ function statsSection(d){
   </div>`;
 }
 
+// 🎯 SCORING COMBINÉ: VALUE (40%) + STATS (60%)
+function combinedScore(sel) {
+  if(!sel.value || sel.est == null) return -Infinity;
+  
+  const valueScore = (sel.value * 100); // En % (-100 à +100)
+  
+  // Score STATS: 100% si ≥75%, 75% si 50-75%, 50% si 25-50%, 0% si <25%
+  let statsScore = 0;
+  if(sel.est >= 0.75) statsScore = 100;
+  else if(sel.est >= 0.50) statsScore = 75;
+  else if(sel.est >= 0.25) statsScore = 50;
+  else statsScore = 0;
+  
+  // Score combiné: VALUE (40%) + STATS (60%)
+  return (valueScore * 0.4) + (statsScore * 0.6);
+}
+
 function marketBlock(mk,idx){
   const collapsed=state.collapsed[mk.id]?'collapsed':'';
   const valid=mk.sels.filter(s=>s.value!=null);
-  const best=valid.length?valid.reduce((a,b)=>b.value>a.value?b:a):null;
-  const bestTxt=best&&best.value>0?`<i class="voyant v-${best.color}"></i> meilleure value ${(best.value*100).toFixed(1)}%`:'aucune value';
+  const best=valid.length?valid.reduce((a,b)=>combinedScore(b)>combinedScore(a)?b:a):null;
+  const bestScore=best?combinedScore(best):null;
+  const bestTxt=best&&bestScore>0?`<i class="voyant v-${best.color}"></i> meilleur pari ${bestScore.toFixed(0)} pts`:'aucune valeur';
   return `<div class="card market ${collapsed}" id="mk-${mk.id}">
     <div class="market-head" onclick="toggleMarket('${mk.id}')">
       <span class="mh-name">${mk.name}</span>
@@ -3266,6 +3276,7 @@ function oddButton(mk,s,i){
       <div class="ob-stats">N/A</div></div>`;
   }
   const vTxt=(s.value>=0?'+':'')+(s.value*100).toFixed(1)+'%';
+  const statColor = s.est >= 0.75 ? 'green' : s.est >= 0.50 ? 'orange' : 'red';
   return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i}); event.stopPropagation();'>
     <div class="ob-top">
       <span class="ob-sel">${s.sel}</span>
@@ -3279,6 +3290,7 @@ function oddButton(mk,s,i){
       <span>imp ${(s.implied*100).toFixed(0)}%</span>
       <span>est ${(s.est*100).toFixed(0)}%</span>
       <span class="v">${vTxt}</span>
+      <span class="voyant v-${statColor}" title="Score STATS"></span>
     </div>
   </button>`;
 }
