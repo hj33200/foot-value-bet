@@ -1901,10 +1901,10 @@ function voyantColor(value,est){
   if(value>=state.settings.yellowMin) return 'yellow';
   return 'red';
 }
-function mkSel(label, est, rng, opt) {
+function mkSel(label, est, rng, opt, marketId) {
   opt = opt || {};
   if(est == null || (opt.allowGray && rng() < opt.grayChance)) {
-    return {sel: label, cote: null, implied: null, est: null, value: null, kelly: null, color: 'gray'};
+    return {sel: label, cote: null, implied: null, est: null, value: null, kelly: null, color: 'gray', marketId};
   }
   est = clamp(est, 0.005, 0.985);
   
@@ -1928,6 +1928,7 @@ function mkSel(label, est, rng, opt) {
     value,
     kelly,
     color: voyantColor(value, est),
+    marketId
     realCote: opt.realCote || null // Indiquer si c'est une vraie cote
   };
 }
@@ -2037,12 +2038,12 @@ function buildMarkets(m,model){
       if(realCotes && realCotes[idx]) {
         opt.realCote = parseFloat(realCotes[idx].odd);
         console.log(`💰 ${marketName}[${idx}] = ${opt.realCote} chez Unibet`);
-        return mkSel(label, est, rngLocal, opt);
+        return mkSel(label, est, rngLocal, opt, marketId);
       }
     }
     
     // Sinon utiliser la formule classique
-    return mkSel(label, est, rngLocal, opt);
+    return mkSel(label, est, rngLocal, opt, marketId);
   };
   
   const mk=(l,e,o)=>mkSel(l,e,rng,o);
@@ -3517,6 +3518,7 @@ function generateMarketAnalysis(b) {
   
   // Home Over/Under
   if (b.marketId === 'hou') {
+    console.log(`🔍 DEBUG HOU: m.homeOU15=${m.homeOU15}, m.homeOU25=${m.homeOU25}, m.homeOU35=${m.homeOU35}`);
     const opts = [{label:'> 1.5',prob:m.homeOU15},{label:'> 2.5',prob:m.homeOU25},{label:'> 3.5',prob:m.homeOU35}];
     const sel = opts[b.selIdx];
     return `<div class="detail-section"><h4>📊 ${b.home.name} Over/Under</h4><p>${b.matchName}</p><div style="background:var(--bg);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;"><div style="margin-left:12px;color:var(--txt2);">${opts[0].label}: ${(opts[0].prob*100).toFixed(1)}%<br>${opts[1].label}: ${(opts[1].prob*100).toFixed(1)}%<br>${opts[2].label}: ${(opts[2].prob*100).toFixed(1)}%</div></div></div>`;
