@@ -224,6 +224,8 @@ input,select,textarea{font-family:inherit;font-size:14px}
 }
 .odd-btn:hover{border-color:var(--accent);background:var(--panel2);transform:translateY(-2px)}
 .odd-btn .ob-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+.ob-top-badges{display:flex;gap:5px}
+.ob-top-badges .voyant{width:10px;height:10px}
 .odd-btn .ob-sel{font-weight:700;font-size:13px;color:var(--txt);line-height:1.2}
 .ob-cote-row{display:flex;align-items:center;gap:10px;margin:12px 0 8px}
 .odd-btn .ob-cote-display{font-family:var(--mono);font-weight:700;font-size:24px}
@@ -3289,12 +3291,12 @@ function oddButton(mk,s,i){
         <div class="ob-score-item">
           <span class="voyant v-gray" title="VALUE"></span>
           <span class="score-label">VALUE</span>
-          <span class="score-value">—</span>
+          <span class="score-value" style="color:var(--gray)">—</span>
         </div>
         <div class="ob-score-item">
           <span class="voyant v-${statColor}" title="STATS"></span>
           <span class="score-label">STATS</span>
-          <span class="score-value">${statPct}</span>
+          <span class="score-value" style="color:var(--${statColor === 'green' ? 'green' : statColor === 'orange' ? 'accent2' : statColor === 'red' ? 'red' : 'gray'})">${statPct}</span>
         </div>
       </div>
     </div>`;
@@ -3304,7 +3306,10 @@ function oddButton(mk,s,i){
   return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i}); event.stopPropagation();'>
     <div class="ob-top">
       <span class="ob-sel">${s.sel}</span>
-      <span class="voyant v-${s.color}"></span>
+      <div class="ob-top-badges">
+        <span class="voyant v-${s.color}" title="VALUE"></span>
+        <span class="voyant v-${statColor}" title="STATS"></span>
+      </div>
     </div>
     <div class="ob-cote-row">
       <span class="ob-cote-display">${s.cote.toFixed(2)}</span>
@@ -3314,12 +3319,12 @@ function oddButton(mk,s,i){
       <div class="ob-score-item">
         <span class="voyant v-${s.color}" title="VALUE"></span>
         <span class="score-label">VALUE</span>
-        <span class="score-value">${vTxt}</span>
+        <span class="score-value" style="color:var(--${s.color === 'green' ? 'green' : s.color === 'yellow' ? 'yellow' : s.color === 'red' ? 'red' : 'gray'})">${vTxt}</span>
       </div>
       <div class="ob-score-item">
         <span class="voyant v-${statColor}" title="STATS"></span>
         <span class="score-label">STATS</span>
-        <span class="score-value">${statPct}</span>
+        <span class="score-value" style="color:var(--${statColor === 'green' ? 'green' : statColor === 'orange' ? 'accent2' : statColor === 'red' ? 'red' : 'gray'})">${statPct}</span>
       </div>
     </div>
   </button>`;
