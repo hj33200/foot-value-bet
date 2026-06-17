@@ -1168,6 +1168,18 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   console.log(`\n🧹 CLEAN SHEET: Home=${(csHome*100).toFixed(1)}% / Away=${(csAway*100).toFixed(1)}% (Poisson: ${(csHome_pois*100).toFixed(1)}% / ${(csAway_pois*100).toFixed(1)}%)`);
   
+  // HOME/AWAY OVER/UNDER - Poisson individuel pour chaque équipe
+  const homeOU15 = 1 - (Math.exp(-lambdaHome) + lambdaHome * Math.exp(-lambdaHome));
+  const homeOU25 = 1 - (Math.exp(-lambdaHome) + lambdaHome * Math.exp(-lambdaHome) + Math.pow(lambdaHome, 2) / 2 * Math.exp(-lambdaHome));
+  const homeOU35 = 1 - (Math.exp(-lambdaHome) + lambdaHome * Math.exp(-lambdaHome) + Math.pow(lambdaHome, 2) / 2 * Math.exp(-lambdaHome) + Math.pow(lambdaHome, 3) / 6 * Math.exp(-lambdaHome));
+  
+  const awayOU15 = 1 - (Math.exp(-lambdaAway) + lambdaAway * Math.exp(-lambdaAway));
+  const awayOU25 = 1 - (Math.exp(-lambdaAway) + lambdaAway * Math.exp(-lambdaAway) + Math.pow(lambdaAway, 2) / 2 * Math.exp(-lambdaAway));
+  const awayOU35 = 1 - (Math.exp(-lambdaAway) + lambdaAway * Math.exp(-lambdaAway) + Math.pow(lambdaAway, 2) / 2 * Math.exp(-lambdaAway) + Math.pow(lambdaAway, 3) / 6 * Math.exp(-lambdaAway));
+  
+  console.log(`\n🏠 HOME OU: >1.5=${(homeOU15*100).toFixed(1)}% / >2.5=${(homeOU25*100).toFixed(1)}% / >3.5=${(homeOU35*100).toFixed(1)}%`);
+  console.log(`✈️ AWAY OU: >1.5=${(awayOU15*100).toFixed(1)}% / >2.5=${(awayOU25*100).toFixed(1)}% / >3.5=${(awayOU35*100).toFixed(1)}%`);
+  
   // PROBABILITÉS 1N2 (à partir de matrice FM)
   let pH = 0, pD = 0, pA = 0;
   for (let i = 0; i <= 10; i++) {
@@ -1236,7 +1248,10 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
     // 📊 DONNÉES MARCHÉ CLEAN SHEET
     csHome, csAway,
     // 📊 DONNÉES MARCHÉ FIRST HALF
-    pHT_1, pHT_D, pHT_2
+    pHT_1, pHT_D, pHT_2,
+    // 📊 DONNÉES MARCHÉ HOME/AWAY OVER/UNDER
+    homeOU15, homeOU25, homeOU35,
+    awayOU15, awayOU25, awayOU35
   };
 }
 
@@ -2085,6 +2100,27 @@ function buildMarkets(m,model){
   const htftLabels={'1/1':H+' / '+H,'1/N':H+' / Nul','1/2':H+' / '+A,'N/1':'Nul / '+H,'N/N':'Nul / Nul','N/2':'Nul / '+A,'2/1':A+' / '+H,'2/N':A+' / Nul','2/2':A+' / '+A};
   list.push({id:'htft',name:'Mi-temps / Fin de match',cols:3,sels:Object.keys(model.HTFT).map(k=>
     mk(htftLabels[k],model.HTFT[k],{allowGray:true,grayChance:0.05}))});
+
+  // HOME OVER/UNDER
+  list.push({id:'hou',name:H+' Over/Under',cols:3,sels:[
+    mkSmart(H+' > 1.5',model.homeOU15 || 0.5,0,rng,'hou'),
+    mkSmart(H+' > 2.5',model.homeOU25 || 0.5,1,rng,'hou'),
+    mkSmart(H+' > 3.5',model.homeOU35 || 0.5,2,rng,'hou')]});
+
+  // AWAY OVER/UNDER
+  list.push({id:'aou',name:A+' Over/Under',cols:3,sels:[
+    mkSmart(A+' > 1.5',model.awayOU15 || 0.5,0,rng,'aou'),
+    mkSmart(A+' > 2.5',model.awayOU25 || 0.5,1,rng,'aou'),
+    mkSmart(A+' > 3.5',model.awayOU35 || 0.5,2,rng,'aou')]});
+
+  // CORRECT SCORE - Top 10 scores probables
+  let correctScores=[];
+  for(let i=0;i<=5;i++)for(let j=0;j<=5;j++){
+    const p = FM[i] && FM[i][j] ? FM[i][j] : pois(i,m.lambdaHome)*pois(j,m.lambdaAway);
+    correctScores.push({score:`${i}-${j}`,p});}
+  correctScores.sort((a,b)=>b.p-a.p);
+  const topScores = correctScores.slice(0,9).map((s,idx)=>mk(s.score,s.p,{allowGray:true}));
+  list.push({id:'score',name:'Score exact',cols:3,sels:topScores});
 
   // European handicap (-1 / +1) lines from FM
   let eh_h=0,eh_d=0,eh_a=0; // home -1
@@ -3473,6 +3509,25 @@ function generateMarketAnalysis(b) {
         </div>
       </div>
     `;
+  }
+  
+  // Home Over/Under
+  if (b.marketId === 'hou') {
+    const opts = [{label:'> 1.5',prob:m.homeOU15},{label:'> 2.5',prob:m.homeOU25},{label:'> 3.5',prob:m.homeOU35}];
+    const sel = opts[b.selIdx];
+    return `<div class="detail-section"><h4>📊 ${b.home.name} Over/Under</h4><p>${b.matchName}</p><div style="background:var(--bg);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;"><div style="margin-left:12px;color:var(--txt2);">${opts[0].label}: ${(opts[0].prob*100).toFixed(1)}%<br>${opts[1].label}: ${(opts[1].prob*100).toFixed(1)}%<br>${opts[2].label}: ${(opts[2].prob*100).toFixed(1)}%</div></div></div>`;
+  }
+  
+  // Away Over/Under
+  if (b.marketId === 'aou') {
+    const opts = [{label:'> 1.5',prob:m.awayOU15},{label:'> 2.5',prob:m.awayOU25},{label:'> 3.5',prob:m.awayOU35}];
+    const sel = opts[b.selIdx];
+    return `<div class="detail-section"><h4>📊 ${b.away.name} Over/Under</h4><p>${b.matchName}</p><div style="background:var(--bg);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;"><div style="margin-left:12px;color:var(--txt2);">${opts[0].label}: ${(opts[0].prob*100).toFixed(1)}%<br>${opts[1].label}: ${(opts[1].prob*100).toFixed(1)}%<br>${opts[2].label}: ${(opts[2].prob*100).toFixed(1)}%</div></div></div>`;
+  }
+  
+  // Correct Score
+  if (b.marketId === 'score') {
+    return `<div class="detail-section"><h4>📊 Score Exact</h4><p>${b.matchName}</p><div style="background:var(--bg);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;"><div>Poisson 2D: λHome=${m.lambdaHome ? m.lambdaHome.toFixed(2) : '—'}, λAway=${m.lambdaAway ? m.lambdaAway.toFixed(2) : '—'}</div><div style="margin-top:6px;"><strong>Score sélectionné: ${b.est ? (b.est*100).toFixed(1) : '—'}%</strong></div></div></div>`;
   }
   
   if (b.marketId === 'cs') {
