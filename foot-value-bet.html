@@ -578,15 +578,10 @@ function calculateBTTSEmpirical(homeMatches, awayMatches) {
   const pAway_pois = 1 - Math.exp(-awayMatches.reduce((s, m) => s + (m?.goals?.for || 0), 0) / n);
   const poissonBTTS = pHome_pois * pAway_pois;
   
-  // Corrélation = empirique / théorique (avec régularisation Bayésienne)
-  // Blend: (1 - confidence) * prior + confidence * empirique
-  // Confidence basée sur nombre de dataPoints (min 5)
-  const confidence = Math.min(n / 10, 1.0); // 0 à 1
-  const corrFactor_empirical = poissonBTTS > 0 ? empiricalBTTS / poissonBTTS : 1.0;
-  const corrFactor_prior = 1.0; // Poisson non ajusté
-  const corrFactor = (1 - confidence) * corrFactor_prior + confidence * corrFactor_empirical;
+  // Corrélation = empirique / théorique
+  const corrFactor = poissonBTTS > 0 ? empiricalBTTS / poissonBTTS : 1.0;
   
-  console.log(`📊 BTTS EMPIRIQUE: Home=${(pHome_emp*100).toFixed(1)}% Away=${(pAway_emp*100).toFixed(1)}% → BTTS=${(empiricalBTTS*100).toFixed(1)}% vs Poisson=${(poissonBTTS*100).toFixed(1)}% → CorrFactor=${corrFactor.toFixed(3)} (Bayesian, confidence=${(confidence*100).toFixed(0)}%)`);
+  console.log(`📊 BTTS EMPIRIQUE: Home=${(pHome_emp*100).toFixed(1)}% Away=${(pAway_emp*100).toFixed(1)}% → BTTS=${(empiricalBTTS*100).toFixed(1)}% vs Poisson=${(poissonBTTS*100).toFixed(1)}% → CorrFactor=${corrFactor.toFixed(3)}`);
   
   return { corrFactor, empiricalBTTS, poissonBTTS, pHome_emp, pAway_emp, dataPoints: n };
 }
@@ -628,12 +623,12 @@ const TEAMS={
 };
 function M(id,lg,h,a,time,status){return{id,lg,home:TEAMS[h],away:TEAMS[a],time,status,date:'2026-05-29'}}
 const MATCHES=[
-  M('m1','wc','fra','sen','21:00','up'),
-  M('m2','wc','arg','ger','18:00','up'),
-  M('m3','wc','bra','esp','16:30','live'),
-  M('m4','wc','ita','ned','21:00','up'),
-  M('m5','wc','eng','bel','20:45','up'),
-  M('m6','wc','por','fra','15:30','up'),
+  M('m1','l1','psg','mco','21:00','up'),
+  M('m2','l1','lil','lyo','18:00','up'),
+  M('m3','l1','bst','nic','16:30','live'),
+  M('m4','l1','mar','tls','21:00','up'),
+  M('m5','l1','ren','nan','20:45','up'),
+  M('m6','l1','len','str','15:30','up'),
 ];
 
 /* ---------- match model (Poisson) ---------- */
@@ -973,12 +968,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   console.log(`✈️ Away: ${away.name} (id: ${away.id})`);
   
   // 🌍 DÉTECTER TYPE DE COMPÉTITION
-  // Récupérer leagueName depuis le LEAGUES dict basé sur leagueKey
   const leagueName = LEAGUES[leagueKey]?.name || 'Championnat';
-  const leagueId = LEAGUES[leagueKey]?.id || 61;
-  const isWorldCup = leagueKey === 'wc'; // Coupe du Monde = terrain neutre
-  
-  const competitionType = detectCompetitionType(leagueName, isWorldCup ? 'World Cup' : '');
+  const competitionType = detectCompetitionType(leagueName, '');
   const compProps = getCompetitionProperties(competitionType);
   
   console.log(`\n🌍 COMPÉTITION: ${compProps.name} ${compProps.description}`);
@@ -1266,6 +1257,12 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   console.log(`\n🎰 DOUBLE CHANCE: 1X=${(dcX1*100).toFixed(1)}% / 12=${(dc12*100).toFixed(1)}% / X2=${(dcX2*100).toFixed(1)}%`);
   
+  // DRAW NO BET (DNB)
+  const dnbHome = pH / (pH + pA);     // Home (remb. si nul)
+  const dnbAway = pA / (pH + pA);     // Away (remb. si nul)
+  
+  console.log(`\n💰 DRAW NO BET: Home=${(dnbHome*100).toFixed(1)}% / Away=${(dnbAway*100).toFixed(1)}%`);
+  
   // FIRST HALF WINNER (1ère mi-temps)
   // Pattern réel: 40% des buts en 1ère mi-temps, 60% en 2e mi-temps
   // (pas uniforme comme λ/2 supposerait)
@@ -1283,25 +1280,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   }
   
   console.log(`\n⏱️ FIRST HALF: 1=${(pHT_1*100).toFixed(1)}% / X=${(pHT_D*100).toFixed(1)}% / 2=${(pHT_2*100).toFixed(1)}%`);
-  
-  // EXACT SCORE - Calculer les probabilités pour tous les scores probables
-  const exactScores = {};
-  const topScores = [];
-  for(let i=0;i<=10;i++) {
-    for(let j=0;j<=10;j++) {
-      const p = pois(i, lambdaHome) * pois(j, lambdaAway);
-      if(p > 0) {
-        const scoreKey = `${i}-${j}`;
-        exactScores[scoreKey] = p;
-        topScores.push({score: scoreKey, p: p});
-      }
-    }
-  }
-  // Trier par probabilité et garder top 10
-  topScores.sort((a,b) => b.p - a.p);
-  const topExactScores = topScores.slice(0, 10);
-  console.log(`\n🎯 EXACT SCORES (Top 10):`);
-  topExactScores.forEach(s => console.log(`   ${s.score}: ${(s.p*100).toFixed(2)}%`));
   
   return { 
     lambdaHome, lambdaAway, homeFormMult, awayFormMult,
@@ -1322,6 +1300,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     ou35Home, ou35Away, ou35Total,
     // 📊 DONNÉES MARCHÉ DOUBLE CHANCE
     dcX1, dc12, dcX2,
+    // 📊 DONNÉES MARCHÉ DRAW NO BET
+    dnbHome, dnbAway,
     // 📊 DONNÉES MARCHÉ CLEAN SHEET
     csHome, csAway,
     // 📊 DONNÉES MARCHÉ FIRST HALF
@@ -1334,10 +1314,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     ou25Away: ou25Away,
     ou35Away: ou35Away,
     // 📊 DONNÉES MARCHÉ HT/FT DOUBLE
-    HTFT: htftProbs,
-    // 📊 DONNÉES MARCHÉ EXACT SCORE
-    exactScores: exactScores,
-    topExactScores: topExactScores
+    HTFT: htftProbs
   };
 }
 
@@ -1565,6 +1542,9 @@ function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
     dcX1: advanced.dcX1,
     dc12: advanced.dc12,
     dcX2: advanced.dcX2,
+    // 📊 DONNÉES MARCHÉ DRAW NO BET
+    dnbHome: advanced.dnbHome,
+    dnbAway: advanced.dnbAway,
     // 📊 DONNÉES MARCHÉ FIRST HALF
     pHT_1: advanced.pHT_1,
     pHT_D: advanced.pHT_D,
@@ -1712,15 +1692,24 @@ async function fetchOddsFromAPIFootball(fixtureId) {
         const marketName = bet.name;
         const values = bet.values || [];
         
+        // 🔍 DEBUG: Afficher la structure exacte des cotes
+        if(values.length > 0) {
+          console.log(`   📌 ${bookmakerName} - Marché ${marketName}:`);
+          values.slice(0, 3).forEach((v, i) => {
+            console.log(`      [${i}] odd="${v.odd}" value="${v.value}" (type: ${typeof v.odd})`);
+          });
+        }
+        
         oddsMap[bookmakerName].markets[marketName] = values.map(v => ({
           odd: v.odd,
           value: v.value,
           name: v.value
         }));
+        console.log(`  📌 ${bookmakerName} - Marché ${marketName}:`, oddsMap[bookmakerName].markets[marketName]);
       });
     });
     
-    console.log(`✅ Cotes chargées: ${Object.keys(oddsMap).length} bookmakers avec leurs marchés`);
+    console.log(`✅✅✅ Cotes finales:`, oddsMap);
     return oddsMap;
     
   } catch(err) {
@@ -1731,11 +1720,16 @@ async function fetchOddsFromAPIFootball(fixtureId) {
 
 /* ---------- H2H ---------- */
 async function fetchH2H(teamId1, teamId2) {
+  // Les IDs d'équipe peuvent être fictifs (< 100), donc on skip silencieusement
+  if (!teamId1 || !teamId2 || teamId1 < 100 || teamId2 < 100) {
+    return []; // Fallback silencieux pour IDs fictifs
+  }
+  
   const apiKey = FOOTBALL_API.getApiKey();
   if (!apiKey) throw new Error('API key missing');
   
   try {
-    // Endpoint H2H de l'API-Football
+    // Endpoint H2H via proxy Vercel
     const url = FOOTBALL_API.BASE + '?endpoint=fixtures&h2h=' + teamId1 + '-' + teamId2;
     console.log('📡 Fetching H2H:', url);
     
@@ -1765,8 +1759,8 @@ async function fetchH2H(teamId1, teamId2) {
     }));
     
   } catch(err) {
-    console.warn('❌ H2H Error:', err.message);
-    return []; // Fallback: vide
+    console.log('ℹ️ H2H non disponible (probablement IDs fictifs), utilise fallback');
+    return []; // Fallback silencieux
   }
 }
 
@@ -2080,97 +2074,87 @@ function buildMarkets(m,model){
     }
   }
   
-  // 🎯 FONCTION: Chercher les vraies cotes avec fallback intelligent
+  // 🎯 FONCTION: Chercher les vraies cotes avec fallback COMPLET (tous les bookmakers)
   const getRealCotes = (marketName, bookmakerPriority = ['Unibet', '10Bet']) => {
-    if(!realOdds) {
-      console.warn(`⚠️ realOdds est NULL`);
-      return null;
-    }
+    if(!realOdds) return null;
     
-    // Pour Exact Score, chercher d'abord chez 10Bet
+    // Pour Exact Score, chercher d'abord chez 10Bet (Unibet n'a pas ce marché)
     if(marketName === 'Exact Score') {
       bookmakerPriority = ['10Bet', 'Unibet'];
     }
     
+    // D'abord essayer les bookmakers prioritaires
     for(let bm of bookmakerPriority) {
       if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
-        const cotes = realOdds[bm].markets[marketName];
-        return {cotes: cotes, bookmaker: bm};
+        console.log(`✅ Cotes trouvées: ${marketName} chez ${bm}`);
+        return {cotes: realOdds[bm].markets[marketName], bookmaker: bm};
+      }
+    }
+    
+    // FALLBACK: Essayer TOUS les autres bookmakers
+    console.log(`⚠️ ${marketName} pas trouvé chez prioritaires, cherche tous les bookmakers...`);
+    for(let bm of Object.keys(realOdds)) {
+      if(!bookmakerPriority.includes(bm) && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
+        console.log(`✅ Cotes trouvées (fallback): ${marketName} chez ${bm}`);
+        return {cotes: realOdds[bm].markets[marketName], bookmaker: bm};
       }
     }
     
     return null;
   };
   
-  // 📊 MAPPER EXACT: Noms EXACTS retournés par l'API-Football
-  // ✅ Validé via logs console (tous les marchés testés)
+  // Mapper les noms de marchés de notre app avec les noms de l'API-Football
   const marketMapping = {
-    '1n2': 'Match Winner',              // ✅ Testé: 1.46, 4.5, 7
-    'dc': 'Double Chance',              // ✅ Testé: 1.09, 1.19, 2.7
-    'btts': 'Both Teams Score',         // ✅ Testé: 1.84, 1.86
-    'tot': 'Goals Over/Under',          // ✅ Testé: 1.21, 4.25, 1.34...
-    'cs': 'Clean Sheet - Home',         // ✅ CORRECTION: Existe en Home/Away
-    'htr': 'First Half Winner',         // ✅ Testé: 1.9, 2.38, 5.8
-    'htft': 'HT/FT Double',             // ✅ Existe chez Unibet
-    'eh': 'Handicap Result',            // ✅ Testé: 2.2, 2.65, 3.4...
-    'ah': 'Asian Handicap',             // ✅ Testé: 1.41, 2.65, 1.08, 5.8
-    'rou': 'Result/Total Goals',        // ✅ Testé chez 10Bet: 5.5, 9...
-    'rbtts': 'Results/Both Teams Score',// ✅ Testé chez 10Bet: 3.1, 5.5...
-    'hou': 'Total - Home',              // ✅ Testé: 1.53, 2.38, 2.65
-    'aou': 'Total - Away',              // ✅ Testé: 4.1, 1.2, 12.5
-    'score': 'Exact Score'              // À chercher chez plusieurs bookmakers
+    '1n2': 'Match Winner',
+    'dc': 'Double Chance',
+    'dnb': 'Draw No Bet',
+    'btts': 'Both Teams Score',
+    'tot': 'Goals Over/Under',
+    'cs': 'Clean Sheet',
+    'htr': 'First Half Winner',
+    'htft': 'HT/FT Double',
+    'eh': 'Handicap Result',
+    'ah': 'Asian Handicap',
+    'rou': 'Result/Total Goals',  // Cherche les vraies cotes composées
+    'rbtts': 'Results/Both Teams Score',  // Cherche les vraies cotes composées
+    'hou': 'Total - Home',
+    'aou': 'Total - Away',
+    'score': 'Exact Score'
   };
   
-  // 🎯 FONCTION: Créer une sélection avec VRAIES COTES ou fallback probabiliste
+  // 🎯 FONCTION: Créer une sélection (VRAIES COTES SEULEMENT)
   const mkSmart = (label, est, idx, rngLocal, marketId) => {
     const opt = {};
     
-    if(!marketId) {
-      console.log(`🔄 ${marketId}[${idx}]: utilise probabilité fallback (pas de marketId)`);
-      return mkSel(label, est, rngLocal, opt, marketId);
-    }
-    
-    let marketName = marketMapping[marketId];
-    let result = getRealCotes(marketName);
-    let adjustedIdx = idx;
-    
-    // 🔧 FALLBACK 1: Clean Sheet est split en Home/Away chez l'API
-    if(!result && marketId === 'cs') {
-      console.log(`ℹ️ Clean Sheet pas trouvé direct, cherche 10Bet Home/Away variants...`);
-      if(idx <= 1) {
-        // cs[0]=Home YES, cs[1]=Home NO
-        result = getRealCotes('Clean Sheet - Home', ['10Bet', 'Unibet']);
-        adjustedIdx = idx;
-      } else {
-        // cs[2]=Away YES, cs[3]=Away NO
-        result = getRealCotes('Clean Sheet - Away', ['10Bet', 'Unibet']);
-        adjustedIdx = idx - 2;
-      }
-    }
-    
-    // ✅ Validation: vérifier que la cote existe et est valide
-    if(result && result.cotes && adjustedIdx < result.cotes.length) {
-      const coteObj = result.cotes[adjustedIdx];
-      if(coteObj && coteObj.odd) {
-        const oddValue = parseFloat(coteObj.odd);
-        if(!isNaN(oddValue) && oddValue > 0) {
+    // Chercher les vraies cotes
+    if(marketId) {
+      const marketName = marketMapping[marketId];
+      const result = getRealCotes(marketName);
+      
+      if(result && result.cotes && result.cotes[idx]) {
+        const oddValue = parseFloat(result.cotes[idx].odd);
+        if(!isNaN(oddValue) && oddValue > 1) {
           opt.realCote = oddValue;
-          console.log(`✅ 💰 ${marketId}[${idx}] = ${oddValue} (label: "${label}") chez ${result.bookmaker}`);
+          console.log(`✅ 💰 ${marketId}[${idx}] = ${oddValue} chez ${result.bookmaker}`);
           return mkSel(label, est, rngLocal, opt, marketId);
         }
       }
     }
     
-    // Fallback: utiliser la probabilité calculée
-    if(marketId === 'cs') {
-      console.log(`ℹ️ ${marketId}[${idx}]: marché pas disponible, fallback probabiliste`);
-    } else if(!result) {
-      console.warn(`⚠️ ${marketId}[${idx}]: marché "${marketName}" introuvable`);
-    } else {
-      console.warn(`⚠️ ${marketId}[${adjustedIdx}]: index invalide (total: ${result.cotes?.length || 0})`);
-    }
-    
-    return mkSel(label, est, rngLocal, opt, marketId);
+    // ❌ PAS DE COTE TROUVÉE → GRISER LE PARI
+    console.log(`⚠️ ${marketId}[${idx}]: pas de cote réelle trouvée, pari grisé`);
+    return {
+      sel: label, 
+      cote: null, 
+      implied: null, 
+      est: est, 
+      value: null, 
+      kelly: null, 
+      color: 'gray', 
+      marketId,
+      realCote: null,
+      isEditable: true  // ✏️ Peut être édité manuellement
+    };
   };
   
   const mk=(l,e,o)=>mkSel(l,e,rng,o);
@@ -2187,6 +2171,10 @@ function buildMarkets(m,model){
     mkSmart('1X — '+H+' ou nul',model.dcX1 || (model.pH+model.pD),0,rng,'dc'),
     mkSmart('12 — pas de nul',model.dc12 || (model.pH+model.pA),1,rng,'dc'),
     mkSmart('X2 — nul ou '+A,model.dcX2 || (model.pD+model.pA),2,rng,'dc')]});
+
+  list.push({id:'dnb',name:'Draw No Bet',cols:2,sels:[
+    mkSmart(H+' (remb. si nul)',model.dnbHome || (model.pH/(model.pH+model.pA)),0,rng,'dnb'),
+    mkSmart(A+' (remb. si nul)',model.dnbAway || (model.pA/(model.pH+model.pA)),1,rng,'dnb')]})
 
   list.push({id:'btts',name:'Les deux équipes marquent (BTTS)',cols:2,sels:[
     mkSmart('Oui',model.pBTTS || model.btts || 0.5,0,rng,'btts'),
@@ -2217,8 +2205,27 @@ function buildMarkets(m,model){
     mkSmart(A+' à la pause',model.pHT_2 || model.HT[2] || 0.5,2,rng,'htr')]});
 
   const htftLabels={'1/1':H+' / '+H,'1/N':H+' / Nul','1/2':H+' / '+A,'N/1':'Nul / '+H,'N/N':'Nul / Nul','N/2':'Nul / '+A,'2/1':A+' / '+H,'2/N':A+' / Nul','2/2':A+' / '+A};
-  list.push({id:'htft',name:'Mi-temps / Fin de match',cols:3,sels:Object.keys(model.HTFT).map(k=>
-    mk(htftLabels[k],model.HTFT[k],{allowGray:true,grayChance:0.05}))});
+  
+  // Chercher les cotes HT/FT (essaie Unibet → 10Bet → autres bookmakers)
+  let htftIndex = 0;
+  list.push({id:'htft',name:'Mi-temps / Fin de match',cols:3,sels:Object.keys(model.HTFT).map(k=>{
+    const result = getRealCotes('Mi-temps / Fin de match');
+    const htftSel = mkSel(htftLabels[k], model.HTFT[k], rng, {allowGray:true,grayChance:0.05}, 'htft');
+    
+    // Si vraie cote trouvée, l'utiliser
+    if(result && result.cotes && result.cotes[htftIndex]) {
+      const realCote = parseFloat(result.cotes[htftIndex].odd);
+      if(realCote && !isNaN(realCote)) {
+        console.log(`💰 HT/FT[${htftIndex}] = ${realCote} chez ${result.bookmaker}`);
+        htftSel.cote = realCote;
+        htftSel.realCote = realCote;
+        htftSel.implied = 1 / realCote;
+        htftSel.value = model.HTFT[k] * realCote - 1;
+      }
+    }
+    htftIndex++;
+    return htftSel;
+  })});
 
   // HOME OVER/UNDER
   list.push({id:'hou',name:H+' Over/Under',cols:3,sels:[
@@ -2232,69 +2239,28 @@ function buildMarkets(m,model){
     mkSmart(A+' > 2.5',model.ou25Away || 0.5,1,rng,'aou'),
     mkSmart(A+' > 3.5',model.ou35Away || 0.5,2,rng,'aou')]});
 
-  // EXACT SCORE - Top 10 scores probables (calculés dans buildModel avec Poisson FM complète)
-  const topScores = (model.topExactScores || []).map((s,idx)=>mk(s.score,s.p,{allowGray:true}));
-  if(topScores.length > 0) {
-    list.push({id:'score',name:'Score exact',cols:3,sels:topScores});
-  }
+  // CORRECT SCORE - Top 10 scores probables
+  let correctScores=[];
+  for(let i=0;i<=5;i++)for(let j=0;j<=5;j++){
+    const p = FM[i] && FM[i][j] ? FM[i][j] : pois(i,m.lambdaHome)*pois(j,m.lambdaAway);
+    correctScores.push({score:`${i}-${j}`,p});}
+  correctScores.sort((a,b)=>b.p-a.p);
+  const topScores = correctScores.slice(0,9).map((s,idx)=>mk(s.score,s.p,{allowGray:true}));
+  list.push({id:'score',name:'Score exact',cols:3,sels:topScores});
 
   // European handicap (-1 / +1) lines from FM
-  // AMÉLIORATION: Ajuster λ selon handicap pour plus de précision
-  // Home -1: Home a besoin de marquer 1+ but de plus → augmente pression offensive
-  // Home +1: Home a handicap avantageux → peut jouer plus défensivement
-  
-  // Créer FM ajustée pour chaque scénario de handicap
-  const createAdjustedFM = (lambdaH, lambdaA, handicap) => {
-    // handicap = 'h-1' (Home -1), 'h+1' (Home +1), 'a-1' (Away -1), 'a+1' (Away +1)
-    let lH = lambdaH, lA = lambdaA;
-    
-    if (handicap === 'h-1') {
-      // Home doit marquer davantage (+1), augmente son attaque
-      lH *= 1.15; // +15% attaque Home
-      lA *= 0.95; // Léger impact psych Away
-    } else if (handicap === 'h+1') {
-      // Home a avantage, peut défendre plus
-      lH *= 1.05;
-      lA *= 1.10; // Away doit marquer
-    } else if (handicap === 'a-1') {
-      // Away doit marquer davantage
-      lA *= 1.15;
-      lH *= 0.95;
-    } else if (handicap === 'a+1') {
-      // Away a avantage
-      lA *= 1.05;
-      lH *= 1.10;
-    }
-    
-    return { lH, lA };
-  };
-  
-  // Calculer handicaps avec λ ajustés
-  const calcHandicap = (lambdaH, lambdaA, handicap) => {
-    const adj = createAdjustedFM(lambdaH, lambdaA, handicap);
-    let h=0, d=0, a=0;
-    for(let i=0;i<=12;i++) {
-      for(let j=0;j<=12;j++) {
-        const p = pois(i, adj.lH) * pois(j, adj.lA);
-        const shift = handicap.includes('h') ? i - (handicap.includes('-') ? 1 : -1) - j : i - (j + (handicap.includes('-') ? 1 : -1));
-        if(shift > 0) h += p;
-        else if(shift === 0) d += p;
-        else a += p;
-      }
-    }
-    return { h, d, a };
-  };
-  
-  const eh = calcHandicap(model.lambdaHome, model.lambdaAway, 'h-1');
-  const ea = calcHandicap(model.lambdaHome, model.lambdaAway, 'h+1');
-  
+  let eh_h=0,eh_d=0,eh_a=0; // home -1
+  let ea_h=0,ea_d=0,ea_a=0; // away -1
+  for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;
+    const d=i-1-j; if(d>0)eh_h+=p;else if(d===0)eh_d+=p;else eh_a+=p;
+    const d2=i-(j-1); if(d2>0)ea_h+=p;else if(d2===0)ea_d+=p;else ea_a+=p;}
   list.push({id:'eh',name:'Handicap européen',cols:3,sels:[
-    mkSmart(H+' (-1)',eh.h,0,rng,'eh'),
-    mkSmart('Nul (-1)',eh.d,1,rng,'eh'),
-    mkSmart(A+' (+1)',eh.a,2,rng,'eh'),
-    mkSmart(H+' (+1)',ea.a,3,rng,'eh'),
-    mkSmart('Nul (+1)',ea.d,4,rng,'eh'),
-    mkSmart(A+' (-1)',calcHandicap(model.lambdaHome, model.lambdaAway, 'a-1').h,5,rng,'eh')]});
+    mkSmart(H+' (-1)',eh_h,0,rng,'eh'),
+    mkSmart('Nul (-1)',eh_d,1,rng,'eh'),
+    mkSmart(A+' (+1)',eh_a,2,rng,'eh'),
+    mkSmart(H+' (+1)',ea_a,3,rng,'eh'),
+    mkSmart('Nul (+1)',ea_d,4,rng,'eh'),
+    mkSmart(A+' (-1)',ea_h,5,rng,'eh')]});
 
   // Asian handicap
   let ah05_h=0,ah05_a=0,ah1_h=0,ah1_a=0,ah1_null=0;
@@ -2325,8 +2291,7 @@ function buildMarkets(m,model){
     if(i>j){b?r1b+=p:r1n+=p}else if(i<j){b?r2b+=p:r2n+=p}else{b?rNb+=p:rNn+=p}}
   list.push({id:'rbtts',name:'Résultat + BTTS',cols:2,sels:[
     mkSmart(H+' & BTTS Oui',r1b,0,rng,'rbtts'),mkSmart(H+' & BTTS Non',r1n,1,rng,'rbtts'),
-    mkSmart('Nul & BTTS Oui',rNb,2,rng,'rbtts'),mkSmart('Nul & BTTS Non (0-0)',rNn,3,rng,'rbtts'),
-    mkSmart(A+' & BTTS Oui',r2b,4,rng,'rbtts'),mkSmart(A+' & BTTS Non',r2n,5,rng,'rbtts')]});
+    mkSmart('Nul & BTTS Oui',rNb,2,rng,'rbtts'),mkSmart(A+' & BTTS Oui',r2b,3,rng,'rbtts'),mkSmart(A+' & BTTS Non',r2n,4,rng,'rbtts')]});
 
   return list;
 }
@@ -3372,13 +3337,14 @@ function oddButton(mk,s,i){
   
   // Cas spécial: N/A (pas de cote)
   if(s.color==='gray'||s.cote==null){
-    return `<div class="odd-btn gray">
+    return `<div class="odd-btn gray" onclick='editOddCote("${mk.id}",${i}); event.stopPropagation();' style="cursor:pointer; opacity:0.7; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
       <div class="ob-top">
         <span class="ob-sel">${s.sel}</span>
         <span class="voyant v-gray"></span>
       </div>
       <div class="ob-cote-row">
         <span class="ob-cote-display">N/A</span>
+        <div class="btn-edit" title="Cliquer pour rentrer la cote">✏️</div>
       </div>
       <div class="ob-scores">
         <div class="ob-score-item">
@@ -3429,9 +3395,10 @@ function editOddCote(marketId, selIdx) {
   const mk = d.markets.find(x => x.id === marketId);
   const s = mk.sels[selIdx];
   
-  if(!s || s.cote == null) return;
+  if(!s) return;
   
-  const nouvelleCote = prompt(`Éditer la cote pour "${s.sel}"\n\nCote actuelle: ${s.cote.toFixed(2)}\nNouvelle cote:`, s.cote.toFixed(2));
+  const coteCourante = s.cote ? s.cote.toFixed(2) : '';
+  const nouvelleCote = prompt(`Éditer la cote pour "${s.sel}"\n\nNouvelle cote:`, coteCourante);
   
   if(nouvelleCote === null) return; // Annulé
   
@@ -3444,17 +3411,19 @@ function editOddCote(marketId, selIdx) {
   // Mettre à jour la cote
   s.cote = newCote;
   s.implied = 1 / newCote;
+  s.est = s.est || 0.5; // Si pas d'estimation, utiliser 0.5
   s.value = s.est * newCote - 1;
   s.kelly = ((newCote - 1) * s.est - (1 - s.est)) / (newCote - 1);
   s.color = voyantColor(s.value, s.est);
   s.coteManuellementModifiee = true;
+  s.realCote = null; // Indiquer que c'est une cote manuelle
   
   console.log(`✏️ Cote modifiée: ${s.sel}`);
-  console.log(`  Ancienne: ${s.cote.toFixed(2)} → Nouvelle: ${newCote.toFixed(2)}`);
+  console.log(`  Nouvelle: ${newCote.toFixed(2)}`);
   console.log(`  Nouvelle value: ${(s.value * 100).toFixed(1)}%`);
   console.log(`  Nouveau Kelly: ${(s.kelly * 100).toFixed(1)}%`);
   
-  toast(`✏️ Cote modifiée: ${s.cote.toFixed(2)} • Value: ${(s.value*100).toFixed(1)}%`);
+  toast(`✏️ Cote modifiée: ${newCote.toFixed(2)} • Value: ${(s.value*100).toFixed(1)}%`);
   
   // Invalider le cache pour forcer le re-render
   delete matchCache[state.selectedMatchId];
@@ -3656,6 +3625,34 @@ function generateMarketAnalysis(b) {
           <strong>Votre sélection: ${sel.label}</strong>
           <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
             P(${sel.label}) = <strong style="color: var(--accent); font-size: 13px;">${(sel.prob * 100).toFixed(1)}%</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Draw No Bet
+  if (b.marketId === 'dnb') {
+    const isHome = b.selIdx === 0;
+    const team = isHome ? b.home.name : b.away.name;
+    const prob = isHome ? m.dnbHome : m.dnbAway;
+    const probHome = m.pH || 0.5;
+    const probAway = m.pA || 0.5;
+    const probDraw = m.pD || 0.5;
+    const pWin = isHome ? probHome : probAway;
+    const pOrDraw = isHome ? probHome + probDraw : probAway + probDraw;
+    
+    return `
+      <div class="detail-section">
+        <h4>📊 L'analyse Draw No Bet</h4>
+        <p><strong>${b.matchName}:</strong> Parions sur ${team} (remboursé si nul)</p>
+        
+        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <div style="margin-bottom: 8px;"><strong>Calcul DNB</strong></div>
+          <div style="margin-left: 12px; color: var(--txt2);">
+            P(${team} gagne) = <strong>${(pWin * 100).toFixed(1)}%</strong><br>
+            P(${team} ou Nul) = <strong>${(pOrDraw * 100).toFixed(1)}%</strong><br>
+            <strong style="margin-top: 6px; display: block;">P(${team} remboursé) = ${(prob * 100).toFixed(1)}%</strong>
           </div>
         </div>
       </div>
