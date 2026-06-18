@@ -1710,6 +1710,7 @@ async function fetchOddsFromAPIFootball(fixtureId) {
     });
     
     console.log(`✅✅✅ Cotes finales:`, oddsMap);
+    console.log(`📌 BOOKMAKERS DISPONIBLES: ${Object.keys(oddsMap).join(', ')}`);
     return oddsMap;
     
   } catch(err) {
@@ -2000,7 +2001,8 @@ function mkSel(label, est, rng, opt, marketId) {
     kelly,
     color: voyantColor(value, est),
     marketId,
-    realCote: opt.realCote || null // Indiquer si c'est une vraie cote
+    realCote: opt.realCote || null,
+    bookmaker: opt.bookmaker || null  // ✅ Ajouter le bookmaker
   };
 }
 // 🎯 CALCUL BTTS - Both Teams To Score
@@ -2086,6 +2088,11 @@ function buildMarkets(m,model){
     // D'abord essayer les bookmakers prioritaires
     for(let bm of bookmakerPriority) {
       if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
+        const cotes = realOdds[bm].markets[marketName];
+        // 🔍 DEBUG: Afficher la structure des cotes
+        if(marketName === 'Double Chance') {
+          console.log(`📊 DOUBLE CHANCE chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
+        }
         console.log(`✅ Cotes trouvées: ${marketName} chez ${bm}`);
         return {cotes: realOdds[bm].markets[marketName], bookmaker: bm};
       }
@@ -2135,6 +2142,7 @@ function buildMarkets(m,model){
         const oddValue = parseFloat(result.cotes[idx].odd);
         if(!isNaN(oddValue) && oddValue > 1) {
           opt.realCote = oddValue;
+          opt.bookmaker = result.bookmaker;  // ✅ Ajouter le bookmaker
           console.log(`✅ 💰 ${marketId}[${idx}] = ${oddValue} chez ${result.bookmaker}`);
           return mkSel(label, est, rngLocal, opt, marketId);
         }
@@ -2153,6 +2161,7 @@ function buildMarkets(m,model){
       color: 'gray', 
       marketId,
       realCote: null,
+      bookmaker: null,
       isEditable: true  // ✏️ Peut être édité manuellement
     };
   };
@@ -3371,7 +3380,7 @@ function oddButton(mk,s,i){
       </div>
     </div>
     <div class="ob-cote-row">
-      <span class="ob-cote-display">${s.cote.toFixed(2)}</span>
+      <span class="ob-cote-display">${s.cote.toFixed(2)} ${s.bookmaker ? `<small style="opacity:0.7">(${s.bookmaker})</small>` : ''}</span>
       <div class="btn-edit" onclick="editOddCote('${mk.id}',${i}); event.stopPropagation();" title="Éditer la cote">✏️</div>
     </div>
     <div class="ob-scores">
