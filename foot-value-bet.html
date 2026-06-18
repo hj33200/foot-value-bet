@@ -2285,8 +2285,8 @@ function buildMarkets(m,model){
     return { h, d, a };
   };
   
-  const eh = calcHandicap(lambdaHome, lambdaAway, 'h-1');
-  const ea = calcHandicap(lambdaHome, lambdaAway, 'h+1');
+  const eh = calcHandicap(model.lambdaHome, model.lambdaAway, 'h-1');
+  const ea = calcHandicap(model.lambdaHome, model.lambdaAway, 'h+1');
   
   list.push({id:'eh',name:'Handicap européen',cols:3,sels:[
     mkSmart(H+' (-1)',eh.h,0,rng,'eh'),
@@ -2294,7 +2294,7 @@ function buildMarkets(m,model){
     mkSmart(A+' (+1)',eh.a,2,rng,'eh'),
     mkSmart(H+' (+1)',ea.a,3,rng,'eh'),
     mkSmart('Nul (+1)',ea.d,4,rng,'eh'),
-    mkSmart(A+' (-1)',calcHandicap(lambdaHome, lambdaAway, 'a-1').h,5,rng,'eh')]});
+    mkSmart(A+' (-1)',calcHandicap(model.lambdaHome, model.lambdaAway, 'a-1').h,5,rng,'eh')]});
 
   // Asian handicap
   let ah05_h=0,ah05_a=0,ah1_h=0,ah1_a=0,ah1_null=0;
