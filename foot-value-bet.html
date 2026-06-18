@@ -578,10 +578,15 @@ function calculateBTTSEmpirical(homeMatches, awayMatches) {
   const pAway_pois = 1 - Math.exp(-awayMatches.reduce((s, m) => s + (m?.goals?.for || 0), 0) / n);
   const poissonBTTS = pHome_pois * pAway_pois;
   
-  // Corrélation = empirique / théorique
-  const corrFactor = poissonBTTS > 0 ? empiricalBTTS / poissonBTTS : 1.0;
+  // Corrélation = empirique / théorique (avec régularisation Bayésienne)
+  // Blend: (1 - confidence) * prior + confidence * empirique
+  // Confidence basée sur nombre de dataPoints (min 5)
+  const confidence = Math.min(n / 10, 1.0); // 0 à 1
+  const corrFactor_empirical = poissonBTTS > 0 ? empiricalBTTS / poissonBTTS : 1.0;
+  const corrFactor_prior = 1.0; // Poisson non ajusté
+  const corrFactor = (1 - confidence) * corrFactor_prior + confidence * corrFactor_empirical;
   
-  console.log(`📊 BTTS EMPIRIQUE: Home=${(pHome_emp*100).toFixed(1)}% Away=${(pAway_emp*100).toFixed(1)}% → BTTS=${(empiricalBTTS*100).toFixed(1)}% vs Poisson=${(poissonBTTS*100).toFixed(1)}% → CorrFactor=${corrFactor.toFixed(3)}`);
+  console.log(`📊 BTTS EMPIRIQUE: Home=${(pHome_emp*100).toFixed(1)}% Away=${(pAway_emp*100).toFixed(1)}% → BTTS=${(empiricalBTTS*100).toFixed(1)}% vs Poisson=${(poissonBTTS*100).toFixed(1)}% → CorrFactor=${corrFactor.toFixed(3)} (Bayesian, confidence=${(confidence*100).toFixed(0)}%)`);
   
   return { corrFactor, empiricalBTTS, poissonBTTS, pHome_emp, pAway_emp, dataPoints: n };
 }
@@ -623,12 +628,12 @@ const TEAMS={
 };
 function M(id,lg,h,a,time,status){return{id,lg,home:TEAMS[h],away:TEAMS[a],time,status,date:'2026-05-29'}}
 const MATCHES=[
-  M('m1','l1','psg','mco','21:00','up'),
-  M('m2','l1','lil','lyo','18:00','up'),
-  M('m3','l1','bst','nic','16:30','live'),
-  M('m4','l1','mar','tls','21:00','up'),
-  M('m5','l1','ren','nan','20:45','up'),
-  M('m6','l1','len','str','15:30','up'),
+  M('m1','wc','fra','sen','21:00','up'),
+  M('m2','wc','arg','ger','18:00','up'),
+  M('m3','wc','bra','esp','16:30','live'),
+  M('m4','wc','ita','ned','21:00','up'),
+  M('m5','wc','eng','bel','20:45','up'),
+  M('m6','wc','por','fra','15:30','up'),
 ];
 
 /* ---------- match model (Poisson) ---------- */
@@ -962,15 +967,18 @@ function getWinProbabilityFromElo(eloHome, eloAway) {
 }
 
 // 🎯 MODÈLE AVANCÉ: Calculer les probabilités avec TOUTES les données réelles
-function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
+function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey='l1') {
   console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS (v3 avec ELO RATING) ===`);
   console.log(`🏠 Home: ${home.name} (id: ${home.id})`);
   console.log(`✈️ Away: ${away.name} (id: ${away.id})`);
   
   // 🌍 DÉTECTER TYPE DE COMPÉTITION
-  // TODO: Récupérer leagueName et competitionName depuis les données du match
-  const leagueName = 'World Cup'; // Pour l'instant, on utilise World Cup par défaut
-  const competitionType = detectCompetitionType(leagueName, '');
+  // Récupérer leagueName depuis le LEAGUES dict basé sur leagueKey
+  const leagueName = LEAGUES[leagueKey]?.name || 'Championnat';
+  const leagueId = LEAGUES[leagueKey]?.id || 61;
+  const isWorldCup = leagueKey === 'wc'; // Coupe du Monde = terrain neutre
+  
+  const competitionType = detectCompetitionType(leagueName, isWorldCup ? 'World Cup' : '');
   const compProps = getCompetitionProperties(competitionType);
   
   console.log(`\n🌍 COMPÉTITION: ${compProps.name} ${compProps.description}`);
@@ -1276,6 +1284,25 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   console.log(`\n⏱️ FIRST HALF: 1=${(pHT_1*100).toFixed(1)}% / X=${(pHT_D*100).toFixed(1)}% / 2=${(pHT_2*100).toFixed(1)}%`);
   
+  // EXACT SCORE - Calculer les probabilités pour tous les scores probables
+  const exactScores = {};
+  const topScores = [];
+  for(let i=0;i<=10;i++) {
+    for(let j=0;j<=10;j++) {
+      const p = pois(i, lambdaHome) * pois(j, lambdaAway);
+      if(p > 0) {
+        const scoreKey = `${i}-${j}`;
+        exactScores[scoreKey] = p;
+        topScores.push({score: scoreKey, p: p});
+      }
+    }
+  }
+  // Trier par probabilité et garder top 10
+  topScores.sort((a,b) => b.p - a.p);
+  const topExactScores = topScores.slice(0, 10);
+  console.log(`\n🎯 EXACT SCORES (Top 10):`);
+  topExactScores.forEach(s => console.log(`   ${s.score}: ${(s.p*100).toFixed(2)}%`));
+  
   return { 
     lambdaHome, lambdaAway, homeFormMult, awayFormMult,
     // 📊 DONNÉES MARCHÉ 1N2
@@ -1307,7 +1334,10 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
     ou25Away: ou25Away,
     ou35Away: ou35Away,
     // 📊 DONNÉES MARCHÉ HT/FT DOUBLE
-    HTFT: htftProbs
+    HTFT: htftProbs,
+    // 📊 DONNÉES MARCHÉ EXACT SCORE
+    exactScores: exactScores,
+    topExactScores: topExactScores
   };
 }
 
@@ -1442,10 +1472,10 @@ function poissonProb(lambda, k) {
   return numerator / denominator;
 }
 
-function buildModel(home,away,homeForm,awayForm,rng){
+function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
   try {
     // 🎯 UTILISER LE MODÈLE AVANCÉ POUR CALCULER LES LAMBDAS
-    const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm);
+    const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey);
     if (!advanced) {
       console.error('❌ calculateAdvancedProbabilities retourné undefined!');
       return null;
@@ -2202,28 +2232,69 @@ function buildMarkets(m,model){
     mkSmart(A+' > 2.5',model.ou25Away || 0.5,1,rng,'aou'),
     mkSmart(A+' > 3.5',model.ou35Away || 0.5,2,rng,'aou')]});
 
-  // CORRECT SCORE - Top 10 scores probables
-  let correctScores=[];
-  for(let i=0;i<=5;i++)for(let j=0;j<=5;j++){
-    const p = FM[i] && FM[i][j] ? FM[i][j] : pois(i,m.lambdaHome)*pois(j,m.lambdaAway);
-    correctScores.push({score:`${i}-${j}`,p});}
-  correctScores.sort((a,b)=>b.p-a.p);
-  const topScores = correctScores.slice(0,9).map((s,idx)=>mk(s.score,s.p,{allowGray:true}));
-  list.push({id:'score',name:'Score exact',cols:3,sels:topScores});
+  // EXACT SCORE - Top 10 scores probables (calculés dans buildModel avec Poisson FM complète)
+  const topScores = (model.topExactScores || []).map((s,idx)=>mk(s.score,s.p,{allowGray:true}));
+  if(topScores.length > 0) {
+    list.push({id:'score',name:'Score exact',cols:3,sels:topScores});
+  }
 
   // European handicap (-1 / +1) lines from FM
-  let eh_h=0,eh_d=0,eh_a=0; // home -1
-  let ea_h=0,ea_d=0,ea_a=0; // away -1
-  for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;
-    const d=i-1-j; if(d>0)eh_h+=p;else if(d===0)eh_d+=p;else eh_a+=p;
-    const d2=i-(j-1); if(d2>0)ea_h+=p;else if(d2===0)ea_d+=p;else ea_a+=p;}
+  // AMÉLIORATION: Ajuster λ selon handicap pour plus de précision
+  // Home -1: Home a besoin de marquer 1+ but de plus → augmente pression offensive
+  // Home +1: Home a handicap avantageux → peut jouer plus défensivement
+  
+  // Créer FM ajustée pour chaque scénario de handicap
+  const createAdjustedFM = (lambdaH, lambdaA, handicap) => {
+    // handicap = 'h-1' (Home -1), 'h+1' (Home +1), 'a-1' (Away -1), 'a+1' (Away +1)
+    let lH = lambdaH, lA = lambdaA;
+    
+    if (handicap === 'h-1') {
+      // Home doit marquer davantage (+1), augmente son attaque
+      lH *= 1.15; // +15% attaque Home
+      lA *= 0.95; // Léger impact psych Away
+    } else if (handicap === 'h+1') {
+      // Home a avantage, peut défendre plus
+      lH *= 1.05;
+      lA *= 1.10; // Away doit marquer
+    } else if (handicap === 'a-1') {
+      // Away doit marquer davantage
+      lA *= 1.15;
+      lH *= 0.95;
+    } else if (handicap === 'a+1') {
+      // Away a avantage
+      lA *= 1.05;
+      lH *= 1.10;
+    }
+    
+    return { lH, lA };
+  };
+  
+  // Calculer handicaps avec λ ajustés
+  const calcHandicap = (lambdaH, lambdaA, handicap) => {
+    const adj = createAdjustedFM(lambdaH, lambdaA, handicap);
+    let h=0, d=0, a=0;
+    for(let i=0;i<=12;i++) {
+      for(let j=0;j<=12;j++) {
+        const p = pois(i, adj.lH) * pois(j, adj.lA);
+        const shift = handicap.includes('h') ? i - (handicap.includes('-') ? 1 : -1) - j : i - (j + (handicap.includes('-') ? 1 : -1));
+        if(shift > 0) h += p;
+        else if(shift === 0) d += p;
+        else a += p;
+      }
+    }
+    return { h, d, a };
+  };
+  
+  const eh = calcHandicap(lambdaHome, lambdaAway, 'h-1');
+  const ea = calcHandicap(lambdaHome, lambdaAway, 'h+1');
+  
   list.push({id:'eh',name:'Handicap européen',cols:3,sels:[
-    mkSmart(H+' (-1)',eh_h,0,rng,'eh'),
-    mkSmart('Nul (-1)',eh_d,1,rng,'eh'),
-    mkSmart(A+' (+1)',eh_a,2,rng,'eh'),
-    mkSmart(H+' (+1)',ea_a,3,rng,'eh'),
-    mkSmart('Nul (+1)',ea_d,4,rng,'eh'),
-    mkSmart(A+' (-1)',ea_h,5,rng,'eh')]});
+    mkSmart(H+' (-1)',eh.h,0,rng,'eh'),
+    mkSmart('Nul (-1)',eh.d,1,rng,'eh'),
+    mkSmart(A+' (+1)',eh.a,2,rng,'eh'),
+    mkSmart(H+' (+1)',ea.a,3,rng,'eh'),
+    mkSmart('Nul (+1)',ea.d,4,rng,'eh'),
+    mkSmart(A+' (-1)',calcHandicap(lambdaHome, lambdaAway, 'a-1').h,5,rng,'eh')]});
 
   // Asian handicap
   let ah05_h=0,ah05_a=0,ah1_h=0,ah1_a=0,ah1_null=0;
@@ -2254,7 +2325,8 @@ function buildMarkets(m,model){
     if(i>j){b?r1b+=p:r1n+=p}else if(i<j){b?r2b+=p:r2n+=p}else{b?rNb+=p:rNn+=p}}
   list.push({id:'rbtts',name:'Résultat + BTTS',cols:2,sels:[
     mkSmart(H+' & BTTS Oui',r1b,0,rng,'rbtts'),mkSmart(H+' & BTTS Non',r1n,1,rng,'rbtts'),
-    mkSmart('Nul & BTTS Oui',rNb,2,rng,'rbtts'),mkSmart(A+' & BTTS Oui',r2b,3,rng,'rbtts'),mkSmart(A+' & BTTS Non',r2n,4,rng,'rbtts')]});
+    mkSmart('Nul & BTTS Oui',rNb,2,rng,'rbtts'),mkSmart('Nul & BTTS Non (0-0)',rNn,3,rng,'rbtts'),
+    mkSmart(A+' & BTTS Oui',r2b,4,rng,'rbtts'),mkSmart(A+' & BTTS Non',r2n,5,rng,'rbtts')]});
 
   return list;
 }
@@ -2668,7 +2740,7 @@ function getMatchData(id){
   const homeForm = calcForm(m.home);
   const awayForm = calcForm(m.away);
   
-  const model = buildModel(m.home, m.away, homeForm, awayForm, rng);
+  const model = buildModel(m.home, m.away, homeForm, awayForm, rng, m.lg);
   const data = {
     meta: m,
     model,
