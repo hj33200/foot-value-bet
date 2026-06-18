@@ -1711,6 +1711,16 @@ async function fetchOddsFromAPIFootball(fixtureId) {
     
     console.log(`✅✅✅ Cotes finales:`, oddsMap);
     console.log(`📌 BOOKMAKERS DISPONIBLES: ${Object.keys(oddsMap).join(', ')}`);
+    
+    // 🔍 DEBUG: Afficher TOUS les noms de marchés disponibles
+    console.log(`\n📋 TOUS LES MARCHÉS DISPONIBLES:`);
+    Object.keys(oddsMap).slice(0, 3).forEach(bm => {  // Afficher seulement les 3 premiers pour éviter spam
+      console.log(`\n  ${bm}:`);
+      Object.keys(oddsMap[bm].markets).forEach(marketName => {
+        console.log(`    - "${marketName}"`);
+      });
+    });
+    
     return oddsMap;
     
   } catch(err) {
