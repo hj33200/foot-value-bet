@@ -2042,8 +2042,18 @@ function buildMarkets(m,model){
   // Récupérer les vraies cotes si disponibles
   let realOdds = null;
   if(window.REAL_ODDS_CACHE && window.REAL_ODDS_CACHE[m.id]) {
-    realOdds = window.REAL_ODDS_CACHE[m.id];
-    console.log('📊 Vraies cotes trouvées pour le match:', realOdds);
+    const cached = window.REAL_ODDS_CACHE[m.id];
+    // Vérifier si le cache est valide (moins de 5 minutes)
+    const cacheAge = Date.now() - (cached.timestamp || 0);
+    const fiveMinutes = 5 * 60 * 1000;
+    
+    if(cacheAge < fiveMinutes) {
+      realOdds = cached.data || cached;  // Compatibilité avec anciens caches
+      console.log(`♻️ Cache des cotes valide (${Math.floor(cacheAge/1000)}s)`);
+    } else {
+      console.log(`⏰ Cache des cotes EXPIRÉ (${Math.floor(cacheAge/1000)}s > 300s), récupération nouvelle...`);
+      delete window.REAL_ODDS_CACHE[m.id];
+    }
   }
   
   // Extraire les cotes 1N2 des vraies cotes (chercher "Match Winner" au lieu de "1X2")
@@ -3143,9 +3153,12 @@ async function openDetail(id){
       
       if(realOdds) {
         console.log(`✅✅✅ VRAIES COTES REÇUES:`, realOdds);
-        // Stocker les cotes dans le cache global
+        // Stocker les cotes dans le cache global avec timestamp
         if(!window.REAL_ODDS_CACHE) window.REAL_ODDS_CACHE = {};
-        window.REAL_ODDS_CACHE[id] = realOdds;
+        window.REAL_ODDS_CACHE[id] = {
+          data: realOdds,
+          timestamp: Date.now()  // ⏰ Ajouter le timestamp
+        };
         
         // Invalider le cache et forcer le re-render
         delete matchCache[id];
@@ -4413,12 +4426,22 @@ async function loadRealOddsForDashboard() {
   for(let i = 0; i < MATCHES.length; i += batchSize) {
     const batch = MATCHES.slice(i, i + batchSize);
     const promises = batch.map(m => {
-      if(m.id && !window.REAL_ODDS_CACHE?.[m.id]) {
+      // Vérifier si le cache est valide (moins de 5 minutes)
+      let needsFetch = !window.REAL_ODDS_CACHE?.[m.id];
+      if(window.REAL_ODDS_CACHE?.[m.id]) {
+        const cacheAge = Date.now() - (window.REAL_ODDS_CACHE[m.id].timestamp || 0);
+        needsFetch = cacheAge > 5 * 60 * 1000;  // Plus de 5 minutes = rechargement
+      }
+      
+      if(needsFetch) {
         return fetchOddsFromAPIFootball(m.id)
           .then(odds => {
             if(odds) {
               if(!window.REAL_ODDS_CACHE) window.REAL_ODDS_CACHE = {};
-              window.REAL_ODDS_CACHE[m.id] = odds;
+              window.REAL_ODDS_CACHE[m.id] = {
+                data: odds,
+                timestamp: Date.now()  // ⏰ Ajouter le timestamp
+              };
               console.log(`✅ Cotes chargées pour ${m.home.name} vs ${m.away.name}`);
             }
           })
