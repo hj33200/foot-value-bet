@@ -1712,12 +1712,14 @@ async function fetchOddsFromAPIFootball(fixtureId) {
     console.log(`✅✅✅ Cotes finales:`, oddsMap);
     console.log(`📌 BOOKMAKERS DISPONIBLES: ${Object.keys(oddsMap).join(', ')}`);
     
-    // 🔍 DEBUG: Afficher TOUS les noms de marchés disponibles
-    console.log(`\n📋 TOUS LES MARCHÉS DISPONIBLES:`);
-    Object.keys(oddsMap).slice(0, 3).forEach(bm => {  // Afficher seulement les 3 premiers pour éviter spam
+    // 🔍 DEBUG: Afficher TOUS les noms de marchés disponibles pour CHAQUE bookmaker
+    console.log(`\n📋 TOUS LES MARCHÉS DISPONIBLES (COMPLET):`);
+    Object.keys(oddsMap).forEach(bm => {  // ✅ Afficher TOUS, pas juste les 3 premiers
       console.log(`\n  ${bm}:`);
       Object.keys(oddsMap[bm].markets).forEach(marketName => {
-        console.log(`    - "${marketName}"`);
+        if(marketName.includes('Double') || marketName.includes('Chance')) {
+          console.log(`    ✅ "${marketName}" = ${oddsMap[bm].markets[marketName].map(c => c.odd).join(', ')}`);
+        }
       });
     });
     
@@ -2096,20 +2098,26 @@ function buildMarkets(m,model){
     }
   }
   
-  // 🎯 FONCTION: Chercher les vraies cotes avec fallback COMPLET (tous les bookmakers)
-  const getRealCotes = (marketName, bookmakerPriority = ['Unibet', '10Bet']) => {
+  // 🎯 FONCTION: Chercher les vraies cotes avec fallback INTELLIGENT
+  const getRealCotes = (marketName, preferredBMs = ['Bet365', 'William Hill', '10Bet', 'Betfair', 'BetVictor']) => {
     if(!realOdds) return null;
     
-    // Pour Exact Score, chercher d'abord chez 10Bet (Unibet n'a pas ce marché)
-    if(marketName === 'Exact Score') {
-      bookmakerPriority = ['10Bet', 'Unibet'];
+    // ⚠️ VÉRIFIER SI UNIBET EXISTE RÉELLEMENT
+    if(realOdds['Unibet']) {
+      console.log(`✓ Unibet trouvé dans realOdds`);
+    } else {
+      console.warn(`❌ UNIBET N'EXISTE PAS pour ce match! Bookmakers disponibles: ${Object.keys(realOdds).join(', ')}`);
     }
     
+    // Ajouter Unibet à la priorité seulement s'il existe
+    let priority = [];
+    if(realOdds['Unibet']) priority.push('Unibet');
+    priority = priority.concat(preferredBMs);
+    
     // D'abord essayer les bookmakers prioritaires
-    for(let bm of bookmakerPriority) {
+    for(let bm of priority) {
       if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
         const cotes = realOdds[bm].markets[marketName];
-        // 🔍 DEBUG: Afficher la structure des cotes
         if(marketName === 'Double Chance') {
           console.log(`📊 DOUBLE CHANCE TROUVÉ chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
         }
@@ -2118,15 +2126,15 @@ function buildMarkets(m,model){
       }
     }
     
-    // FALLBACK: Essayer TOUS les autres bookmakers
-    console.log(`⚠️ ${marketName} pas trouvé chez prioritaires, cherche tous les bookmakers...`);
+    // FALLBACK: Essayer TOUS les autres bookmakers disponibles
+    console.log(`⚠️ ${marketName} pas trouvé chez prioritaires, fallback complet...`);
     for(let bm of Object.keys(realOdds)) {
-      if(!bookmakerPriority.includes(bm) && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
+      if(!priority.includes(bm) && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
         const cotes = realOdds[bm].markets[marketName];
         if(marketName === 'Double Chance') {
           console.log(`📊 DOUBLE CHANCE TROUVÉ (fallback) chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
         }
-        console.log(`✅ Cotes trouvées (fallback): ${marketName} chez ${bm}`);
+        console.log(`✅ Cotes trouvées: ${marketName} chez ${bm}`);
         return {cotes, bookmaker: bm};
       }
     }
