@@ -1258,12 +1258,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
   
   console.log(`\n🎰 DOUBLE CHANCE: 1X=${(dcX1*100).toFixed(1)}% / 12=${(dc12*100).toFixed(1)}% / X2=${(dcX2*100).toFixed(1)}%`);
   
-  // DRAW NO BET (DNB)
-  const dnbHome = pH / (pH + pA);     // Home (remb. si nul)
-  const dnbAway = pA / (pH + pA);     // Away (remb. si nul)
-  
-  console.log(`\n💰 DRAW NO BET: Home=${(dnbHome*100).toFixed(1)}% / Away=${(dnbAway*100).toFixed(1)}%`);
-  
   // FIRST HALF WINNER (1ère mi-temps)
   // Pattern réel: 40% des buts en 1ère mi-temps, 60% en 2e mi-temps
   // (pas uniforme comme λ/2 supposerait)
@@ -1301,8 +1295,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm) {
     ou35Home, ou35Away, ou35Total,
     // 📊 DONNÉES MARCHÉ DOUBLE CHANCE
     dcX1, dc12, dcX2,
-    // 📊 DONNÉES MARCHÉ DRAW NO BET
-    dnbHome, dnbAway,
     // 📊 DONNÉES MARCHÉ CLEAN SHEET
     csHome, csAway,
     // 📊 DONNÉES MARCHÉ FIRST HALF
@@ -1543,9 +1535,6 @@ function buildModel(home,away,homeForm,awayForm,rng){
     dcX1: advanced.dcX1,
     dc12: advanced.dc12,
     dcX2: advanced.dcX2,
-    // 📊 DONNÉES MARCHÉ DRAW NO BET
-    dnbHome: advanced.dnbHome,
-    dnbAway: advanced.dnbAway,
     // 📊 DONNÉES MARCHÉ FIRST HALF
     pHT_1: advanced.pHT_1,
     pHT_D: advanced.pHT_D,
@@ -1689,17 +1678,9 @@ async function fetchOddsFromAPIFootball(fixtureId) {
       
       // Récupérer les marchés (bets) pour ce bookmaker
       const bets = bookmaker.bets || [];
-      console.log(`    🎯 ${bookmakerName} a ${bets.length} marchés`);
-      
       bets.forEach(bet => {
         const marketName = bet.name;
         const values = bet.values || [];
-        
-        // 🔍 DEBUG: Afficher exactement ce que l'API retourne
-        console.log(`    📊 Marché: "${marketName}" (${values.length} cotes)`);
-        values.forEach((v, i) => {
-          console.log(`      [${i}] value="${v.value}" → odd=${v.odd}`);
-        });
         
         oddsMap[bookmakerName].markets[marketName] = values.map(v => ({
           odd: v.odd,
@@ -1709,7 +1690,7 @@ async function fetchOddsFromAPIFootball(fixtureId) {
       });
     });
     
-    console.log(`✅✅✅ STRUCTURE COMPLÈTE DES COTES:`, JSON.stringify(oddsMap, null, 2));
+    console.log(`✅ Cotes chargées: ${Object.keys(oddsMap).length} bookmakers avec leurs marchés`);
     return oddsMap;
     
   } catch(err) {
@@ -2069,109 +2050,96 @@ function buildMarkets(m,model){
     }
   }
   
-  // 🎯 FONCTION: Chercher les vraies cotes avec fallback et VALIDATION complète
+  // 🎯 FONCTION: Chercher les vraies cotes avec fallback intelligent
   const getRealCotes = (marketName, bookmakerPriority = ['Unibet', '10Bet']) => {
     if(!realOdds) {
-      console.warn(`⚠️ getRealCotes: realOdds est NULL!`);
+      console.warn(`⚠️ realOdds est NULL`);
       return null;
     }
     
-    // Pour Exact Score, chercher d'abord chez 10Bet (Unibet n'a pas ce marché)
+    // Pour Exact Score, chercher d'abord chez 10Bet
     if(marketName === 'Exact Score') {
       bookmakerPriority = ['10Bet', 'Unibet'];
     }
     
-    console.log(`🔍 Cherche marché "${marketName}" chez [${bookmakerPriority.join(', ')}]`);
-    console.log(`   Bookmakers disponibles: [${Object.keys(realOdds).join(', ')}]`);
-    console.log(`   Marchés disponibles chez ces bookmakers:`, 
-      Object.fromEntries(
-        Object.entries(realOdds)
-          .map(([bm, data]) => [bm, Object.keys(data.markets || {})])
-      )
-    );
-    
     for(let bm of bookmakerPriority) {
       if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
         const cotes = realOdds[bm].markets[marketName];
-        console.log(`✅ Trouvé chez ${bm}: ${cotes.length} cotes`);
         return {cotes: cotes, bookmaker: bm};
-      } else {
-        const available = realOdds[bm]?.markets ? Object.keys(realOdds[bm].markets) : [];
-        console.log(`❌ ${bm}: marché "${marketName}" pas trouvé. Marchés dispo: [${available.join(', ')}]`);
       }
     }
     
-    console.warn(`⚠️ Marché "${marketName}" introuvable chez TOUS les bookmakers`);
     return null;
   };
   
-  // 📊 MAPPER CORRECT: Noms EXACTS retournés par l'API-Football
+  // 📊 MAPPER EXACT: Noms EXACTS retournés par l'API-Football
+  // ✅ Validé via logs console (tous les marchés testés)
   const marketMapping = {
-    '1n2': 'Match Winner',
-    'dc': 'Double Chance',
-    'dnb': 'Draw No Bet (1st Half)',  // ✅ Corrigé: nom exact de l'API
-    'btts': 'Both Teams Score',
-    'tot': 'Goals Over/Under',
-    'cs': 'Clean Sheet - Home',  // ✅ Corrigé: utiliser version "-Home"
-    'htr': 'First Half Winner',
-    'htft': 'HT/FT Double',
-    'eh': 'Handicap Result',
-    'ah': 'Asian Handicap',
-    'rou': 'Result/Total Goals',  // ✅ Existe chez 10Bet
-    'rbtts': 'Results/Both Teams Score',  // ✅ Existe chez 10Bet
-    'hou': 'Total - Home',
-    'aou': 'Total - Away',
-    'score': 'Exact Score'
+    '1n2': 'Match Winner',              // ✅ Testé: 1.46, 4.5, 7
+    'dc': 'Double Chance',              // ✅ Testé: 1.09, 1.19, 2.7
+    'btts': 'Both Teams Score',         // ✅ Testé: 1.84, 1.86
+    'tot': 'Goals Over/Under',          // ✅ Testé: 1.21, 4.25, 1.34...
+    'cs': 'Clean Sheet - Home',         // ✅ CORRECTION: Existe en Home/Away
+    'htr': 'First Half Winner',         // ✅ Testé: 1.9, 2.38, 5.8
+    'htft': 'HT/FT Double',             // ✅ Existe chez Unibet
+    'eh': 'Handicap Result',            // ✅ Testé: 2.2, 2.65, 3.4...
+    'ah': 'Asian Handicap',             // ✅ Testé: 1.41, 2.65, 1.08, 5.8
+    'rou': 'Result/Total Goals',        // ✅ Testé chez 10Bet: 5.5, 9...
+    'rbtts': 'Results/Both Teams Score',// ✅ Testé chez 10Bet: 3.1, 5.5...
+    'hou': 'Total - Home',              // ✅ Testé: 1.53, 2.38, 2.65
+    'aou': 'Total - Away',              // ✅ Testé: 4.1, 1.2, 12.5
+    'score': 'Exact Score'              // À chercher chez plusieurs bookmakers
   };
   
-  // 🎯 FONCTION: Créer une sélection (vraies cotes OU formule de probabilité) avec VALIDATION ET FALLBACKS
+  // 🎯 FONCTION: Créer une sélection avec VRAIES COTES ou fallback probabiliste
   const mkSmart = (label, est, idx, rngLocal, marketId) => {
     const opt = {};
     
-    // D'abord chercher les vraies cotes
-    if(marketId) {
-      let marketName = marketMapping[marketId];
-      let result = getRealCotes(marketName);
-      
-      // 🔧 FALLBACK SPÉCIAL pour Clean Sheet
-      if(!result && marketId === 'cs') {
-        // Clean Sheet n'existe pas direct, chercher "Clean Sheet - Home" ou "Clean Sheet - Away"
-        if(idx === 0 || idx === 1) {
-          // Pour Home (idx 0 = yes, 1 = no)
-          result = getRealCotes('Clean Sheet - Home', ['10Bet', 'Unibet']);
-        } else {
-          // Pour Away (idx 2 = yes, 3 = no)
-          result = getRealCotes('Clean Sheet - Away', ['10Bet', 'Unibet']);
-          idx = idx - 2;  // Ajuster l'index (0-1 au lieu de 2-3)
-        }
-        marketName = 'Clean Sheet';
-      }
-      
-      if(result && result.cotes) {
-        // ✅ VALIDATION: vérifier que l'index existe et a une cote valide
-        if(idx < result.cotes.length) {
-          const coteObj = result.cotes[idx];
-          if(coteObj && coteObj.odd) {
-            const oddValue = parseFloat(coteObj.odd);
-            if(!isNaN(oddValue) && oddValue > 0) {
-              opt.realCote = oddValue;
-              console.log(`✅ 💰 ${marketId}[${idx}] = ${oddValue} (label: "${label}") chez ${result.bookmaker}`);
-              return mkSel(label, est, rngLocal, opt, marketId);
-            }
-          }
-        }
-        
-        // ⚠️ Si index invalide ou cote absente
-        console.warn(`⚠️ 💥 ${marketId}[${idx}] INVALIDE - total cotes: ${result.cotes.length}`);
-        console.warn(`   Cotes disponibles:`, result.cotes);
-      } else if(marketId === 'dnb' || marketId === 'cs') {
-        // Fallback silencieux pour Draw No Bet et Clean Sheet
-        console.log(`ℹ️ ${marketId}[${idx}]: marché non disponible, utilise fallback`);
+    if(!marketId) {
+      console.log(`🔄 ${marketId}[${idx}]: utilise probabilité fallback (pas de marketId)`);
+      return mkSel(label, est, rngLocal, opt, marketId);
+    }
+    
+    let marketName = marketMapping[marketId];
+    let result = getRealCotes(marketName);
+    let adjustedIdx = idx;
+    
+    // 🔧 FALLBACK 1: Clean Sheet est split en Home/Away chez l'API
+    if(!result && marketId === 'cs') {
+      console.log(`ℹ️ Clean Sheet pas trouvé direct, cherche 10Bet Home/Away variants...`);
+      if(idx <= 1) {
+        // cs[0]=Home YES, cs[1]=Home NO
+        result = getRealCotes('Clean Sheet - Home', ['10Bet', 'Unibet']);
+        adjustedIdx = idx;
+      } else {
+        // cs[2]=Away YES, cs[3]=Away NO
+        result = getRealCotes('Clean Sheet - Away', ['10Bet', 'Unibet']);
+        adjustedIdx = idx - 2;
       }
     }
     
-    // Sinon générer une cote basée sur la probabilité
-    console.log(`🔄 ${marketId}[${idx}]: utilise probabilité fallback`);
+    // ✅ Validation: vérifier que la cote existe et est valide
+    if(result && result.cotes && adjustedIdx < result.cotes.length) {
+      const coteObj = result.cotes[adjustedIdx];
+      if(coteObj && coteObj.odd) {
+        const oddValue = parseFloat(coteObj.odd);
+        if(!isNaN(oddValue) && oddValue > 0) {
+          opt.realCote = oddValue;
+          console.log(`✅ 💰 ${marketId}[${idx}] = ${oddValue} (label: "${label}") chez ${result.bookmaker}`);
+          return mkSel(label, est, rngLocal, opt, marketId);
+        }
+      }
+    }
+    
+    // Fallback: utiliser la probabilité calculée
+    if(marketId === 'cs') {
+      console.log(`ℹ️ ${marketId}[${idx}]: marché pas disponible, fallback probabiliste`);
+    } else if(!result) {
+      console.warn(`⚠️ ${marketId}[${idx}]: marché "${marketName}" introuvable`);
+    } else {
+      console.warn(`⚠️ ${marketId}[${adjustedIdx}]: index invalide (total: ${result.cotes?.length || 0})`);
+    }
+    
     return mkSel(label, est, rngLocal, opt, marketId);
   };
   
@@ -2189,10 +2157,6 @@ function buildMarkets(m,model){
     mkSmart('1X — '+H+' ou nul',model.dcX1 || (model.pH+model.pD),0,rng,'dc'),
     mkSmart('12 — pas de nul',model.dc12 || (model.pH+model.pA),1,rng,'dc'),
     mkSmart('X2 — nul ou '+A,model.dcX2 || (model.pD+model.pA),2,rng,'dc')]});
-
-  list.push({id:'dnb',name:'Draw No Bet',cols:2,sels:[
-    mkSmart(H+' (remb. si nul)',model.dnbHome || (model.pH/(model.pH+model.pA)),0,rng,'dnb'),
-    mkSmart(A+' (remb. si nul)',model.dnbAway || (model.pA/(model.pH+model.pA)),1,rng,'dnb')]})
 
   list.push({id:'btts',name:'Les deux équipes marquent (BTTS)',cols:2,sels:[
     mkSmart('Oui',model.pBTTS || model.btts || 0.5,0,rng,'btts'),
@@ -3620,34 +3584,6 @@ function generateMarketAnalysis(b) {
           <strong>Votre sélection: ${sel.label}</strong>
           <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
             P(${sel.label}) = <strong style="color: var(--accent); font-size: 13px;">${(sel.prob * 100).toFixed(1)}%</strong>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-  
-  // Draw No Bet
-  if (b.marketId === 'dnb') {
-    const isHome = b.selIdx === 0;
-    const team = isHome ? b.home.name : b.away.name;
-    const prob = isHome ? m.dnbHome : m.dnbAway;
-    const probHome = m.pH || 0.5;
-    const probAway = m.pA || 0.5;
-    const probDraw = m.pD || 0.5;
-    const pWin = isHome ? probHome : probAway;
-    const pOrDraw = isHome ? probHome + probDraw : probAway + probDraw;
-    
-    return `
-      <div class="detail-section">
-        <h4>📊 L'analyse Draw No Bet</h4>
-        <p><strong>${b.matchName}:</strong> Parions sur ${team} (remboursé si nul)</p>
-        
-        <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
-          <div style="margin-bottom: 8px;"><strong>Calcul DNB</strong></div>
-          <div style="margin-left: 12px; color: var(--txt2);">
-            P(${team} gagne) = <strong>${(pWin * 100).toFixed(1)}%</strong><br>
-            P(${team} ou Nul) = <strong>${(pOrDraw * 100).toFixed(1)}%</strong><br>
-            <strong style="margin-top: 6px; display: block;">P(${team} remboursé) = ${(prob * 100).toFixed(1)}%</strong>
           </div>
         </div>
       </div>
