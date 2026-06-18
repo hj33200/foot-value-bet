@@ -2101,10 +2101,10 @@ function buildMarkets(m,model){
         const cotes = realOdds[bm].markets[marketName];
         // 🔍 DEBUG: Afficher la structure des cotes
         if(marketName === 'Double Chance') {
-          console.log(`📊 DOUBLE CHANCE chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
+          console.log(`📊 DOUBLE CHANCE TROUVÉ chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
         }
         console.log(`✅ Cotes trouvées: ${marketName} chez ${bm}`);
-        return {cotes: realOdds[bm].markets[marketName], bookmaker: bm};
+        return {cotes, bookmaker: bm};
       }
     }
     
@@ -2112,8 +2112,12 @@ function buildMarkets(m,model){
     console.log(`⚠️ ${marketName} pas trouvé chez prioritaires, cherche tous les bookmakers...`);
     for(let bm of Object.keys(realOdds)) {
       if(!bookmakerPriority.includes(bm) && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
+        const cotes = realOdds[bm].markets[marketName];
+        if(marketName === 'Double Chance') {
+          console.log(`📊 DOUBLE CHANCE TROUVÉ (fallback) chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
+        }
         console.log(`✅ Cotes trouvées (fallback): ${marketName} chez ${bm}`);
-        return {cotes: realOdds[bm].markets[marketName], bookmaker: bm};
+        return {cotes, bookmaker: bm};
       }
     }
     
