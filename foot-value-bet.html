@@ -2139,29 +2139,6 @@ function buildMarkets(m,model){
   }
   
   // 🎯 FONCTION: Chercher les vraies cotes avec fallback INTELLIGENT
-  // 🎯 NOUVELLE FONCTION: Récupérer les cotes de TOUS les 4 bookmakers en ordre de priorité
-  const getAllRealCotesOrdered = (marketName, cotIndex = null) => {
-    if(!realOdds) return {};
-    
-    const priority = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
-    const result = {};
-    
-    priority.forEach(bm => {
-      if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
-        const cotes = realOdds[bm].markets[marketName];
-        
-        // Si cotIndex spécifié (pour HT/FT), prendre cet index
-        if(cotIndex !== null && cotes[cotIndex]) {
-          result[bm] = parseFloat(cotes[cotIndex].odd || cotes[cotIndex].value);
-        } else if(cotIndex === null && cotes.length > 0) {
-          // Si pas d'index, retourner toutes les cotes
-          result[bm] = cotes;
-        }
-      }
-    });
-    
-    return result;
-  };
 
   const getRealCotes = (marketName, preferredBMs = ['Bet365', '1xBet', 'William Hill']) => {
     if(!realOdds) return null;
@@ -2468,9 +2445,6 @@ function buildMarkets(m,model){
     mkSmart('12 — pas de nul',model.dc12 || (model.pH+model.pA),1,rng,'dc'),
     mkSmart('X2 — nul ou '+A,model.dcX2 || (model.pD+model.pA),2,rng,'dc')]});
 
-  list.push({id:'dnb',name:'Draw No Bet',cols:2,sels:[
-    mkSmart(H+' (remb. si nul)',model.dnbHome || (model.pH/(model.pH+model.pA)),0,rng,'dnb'),
-    mkSmart(A+' (remb. si nul)',model.dnbAway || (model.pA/(model.pH+model.pA)),1,rng,'dnb')]})
 
   list.push({id:'btts',name:'Les deux équipes marquent (BTTS)',cols:2,sels:[
     mkSmart('Oui',model.pBTTS || model.btts || 0.5,0,rng,'btts'),
@@ -2488,11 +2462,34 @@ function buildMarkets(m,model){
   tg.push(mkSmart('Moins de 3.5 buts', model.ou35Total?.pUnder || (1-model.over[3.5]) || 0.5, totIdx++, rng, 'tot'));
   list.push({id:'tot',name:'Total de buts (Over / Under)',cols:2,sels:tg});
 
-  list.push({id:'cs',name:'Clean sheet (ne pas encaisser)',cols:2,sels:[
-    mkSmart(H+' — oui',model.csHome || model.cs_h || 0.5,0,rng,'cs'),
-    mkSmart(H+' — non',1-(model.csHome || model.cs_h || 0.5),1,rng,'cs'),
-    mkSmart(A+' — oui',model.csAway || model.cs_a || 0.5,2,rng,'cs'),
-    mkSmart(A+' — non',1-(model.csAway || model.cs_a || 0.5),3,rng,'cs')]});
+  // CLEAN SHEET - Chercher les vraies cotes
+  const cleanSheetSelsList = [];
+  ['Clean Sheet Home', 'Clean Sheet Away'].forEach((csMarket, csIdx) => {
+    const cshResult = getRealCotes(csMarket);
+    const csLabel = csIdx === 0 ? (H + ' — oui') : (A + ' — oui');
+    const csProb = csIdx === 0 ? (model.csHome || model.cs_h || 0.5) : (model.csAway || model.cs_a || 0.5);
+    
+    const csSel = mkSmart(csLabel, csProb, csIdx*2, rng, 'cs');
+    
+    // Si vraie cote trouvée, l'utiliser
+    if(cshResult && cshResult.cotes && cshResult.cotes[0]) {
+      const realCote = parseFloat(cshResult.cotes[0].odd);
+      if(realCote && !isNaN(realCote)) {
+        console.log(`💰 ${csMarket} = ${realCote} chez ${cshResult.bookmaker}`);
+        csSel.cote = realCote;
+        csSel.realCote = realCote;
+        csSel.bookmaker = cshResult.bookmaker;
+        csSel.implied = 1 / realCote;
+        csSel.value = csProb * realCote - 1;
+      }
+    }
+    
+    cleanSheetSelsList.push(csSel);
+    // Ajouter le "non" (inverse)
+    cleanSheetSelsList.push(mkSmart(csLabel.replace(' — oui', ' — non'), 1-csProb, csIdx*2+1, rng, 'cs'));
+  });
+  
+  list.push({id:'cs',name:'Clean sheet (ne pas encaisser)',cols:2,sels:cleanSheetSelsList});
 
   // First Half (résultat HT)
   list.push({id:'htr',name:'Résultat à la mi-temps (1N2)',cols:3,sels:[
@@ -2502,26 +2499,40 @@ function buildMarkets(m,model){
 
   const htftLabels={'1/1':H+' / '+H,'1/N':H+' / Nul','1/2':H+' / '+A,'N/1':'Nul / '+H,'N/N':'Nul / Nul','N/2':'Nul / '+A,'2/1':A+' / '+H,'2/N':A+' / Nul','2/2':A+' / '+A};
   
+  // 🎯 Mapping: L'ordre de l'API est DIFFÉRENT de l'ordre logique!
+  // API retourne dans cet ordre: H/D, H/A, D/A, D/D, H/H, D/H, A/H, A/D, A/A
+  // Donc position [0] = H/D (label '1/N'), position [1] = H/A (label '1/2'), etc.
+  const htftApiOrder = ['1/N', '1/2', 'N/2', 'N/N', '1/1', 'N/1', '2/1', '2/N', '2/2'];
+  // Explication:
+  // [0] = '1/N' (Home/Draw) = Brésil-N
+  // [1] = '1/2' (Home/Away) = Brésil-Haïti
+  // [2] = 'N/2' (Draw/Away) = N-Haïti
+  // [3] = 'N/N' (Draw/Draw) = N-N
+  // [4] = '1/1' (Home/Home) = Brésil-Brésil
+  // [5] = 'N/1' (Draw/Home) = N-Brésil
+  // [6] = '2/1' (Away/Home) = Haïti-Brésil
+  // [7] = '2/N' (Away/Draw) = Haïti-N
+  // [8] = '2/2' (Away/Away) = Haïti-Haïti
+  
   // Chercher les cotes HT/FT (essaie Unibet → 10Bet → autres bookmakers)
-  let htftIndex = 0;
-  list.push({id:'htft',name:'HT/FT',cols:3,sels:Object.keys(model.HTFT).map(k=>{
+  list.push({id:'htft',name:'HT/FT',cols:3,sels:htftApiOrder.map((k, apiIndex)=>{
     const result = getRealCotes('HT/FT Double');
     
     // 🔍 DEBUG: Afficher le détail complet de HT/FT Double avec les noms des paris
-    if(result && result.cotes) {
-      console.log(`🎯 DÉTAIL HT/FT Double (${result.bookmaker}):`);
+    if(result && result.cotes && apiIndex === 0) {
+      console.log(`🎯 DÉTAIL HT/FT Double (${result.bookmaker}) avec mapping:`);
       result.cotes.forEach((cote, idx) => {
-        console.log(`  [${idx}] ${cote.name || 'SANS NOM'} = ${parseFloat(cote.odd).toFixed(2)}`);
+        console.log(`  [${idx}] ${cote.name} → Label: ${htftApiOrder[idx]} = ${parseFloat(cote.odd).toFixed(2)}`);
       });
     }
     
     const htftSel = mkSel(htftLabels[k], model.HTFT[k], rng, {allowGray:true,grayChance:0.05}, 'htft');
     
-    // Si vraie cote trouvée, l'utiliser
-    if(result && result.cotes && result.cotes[htftIndex]) {
-      const realCote = parseFloat(result.cotes[htftIndex].odd);
+    // Si vraie cote trouvée, l'utiliser (utiliser apiIndex au lieu de htftIndex!)
+    if(result && result.cotes && result.cotes[apiIndex]) {
+      const realCote = parseFloat(result.cotes[apiIndex].odd);
       if(realCote && !isNaN(realCote)) {
-        console.log(`💰 HT/FT[${htftIndex}] = ${realCote} chez ${result.bookmaker}`);
+        console.log(`💰 HT/FT[${k}] (position API [${apiIndex}]) = ${realCote} chez ${result.bookmaker}`);
         htftSel.cote = realCote;
         htftSel.realCote = realCote;
         htftSel.bookmaker = result.bookmaker;
@@ -2529,7 +2540,6 @@ function buildMarkets(m,model){
         htftSel.value = model.HTFT[k] * realCote - 1;
       }
     }
-    htftIndex++;
     return htftSel;
   })});
 
@@ -2560,24 +2570,6 @@ function buildMarkets(m,model){
   for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;
     const d=i-1-j; if(d>0)eh_h+=p;else if(d===0)eh_d+=p;else eh_a+=p;
     const d2=i-(j-1); if(d2>0)ea_h+=p;else if(d2===0)ea_d+=p;else ea_a+=p;}
-  list.push({id:'eh',name:'Handicap européen',cols:3,sels:[
-    mkSmart(H+' (-1)',eh_h,0,rng,'eh'),
-    mkSmart('Nul (-1)',eh_d,1,rng,'eh'),
-    mkSmart(A+' (+1)',eh_a,2,rng,'eh'),
-    mkSmart(H+' (+1)',ea_a,3,rng,'eh'),
-    mkSmart('Nul (+1)',ea_d,4,rng,'eh'),
-    mkSmart(A+' (-1)',ea_h,5,rng,'eh')]});
-
-  // Asian handicap
-  let ah05_h=0,ah05_a=0,ah1_h=0,ah1_a=0,ah1_null=0;
-  for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;
-    if(i-0.5>j)ah05_h+=p;else ah05_a+=p;
-    if(i-1>j){ah1_h+=p}else if(i-1===j){ah1_null+=p}else if(i-1<j){ah1_a+=p} }
-  list.push({id:'ah',name:'Handicap asiatique',cols:2,sels:[
-    mkSmart(H+' -0.5',ah05_h,0,rng,'ah'),
-    mkSmart(A+' +0.5',ah05_a,1,rng,'ah'),
-    mkSmart(H+' -1.0',ah1_h+ah1_null*0.5,2,rng,'ah'),
-    mkSmart(A+' +1.0',ah1_a+ah1_null*0.5,3,rng,'ah')]});
 
   // Result + Over/Under 2.5
   let r1o=0,r1u=0,rNo=0,rNu=0,r2o=0,r2u=0;
