@@ -2256,7 +2256,7 @@ function buildMarkets(m,model){
   // Appeler automatiquement quand les cotes sont chargées
   // debugMarketNames();  // Décommenter pour debug
   
-  // 🎯 MAPPING: Noms de marchés par bookmaker (à mettre à jour après audit!)
+  // 🎯 MAPPING: Noms de marchés par bookmaker (MIS À JOUR AVEC AUDIT RÉEL!)
   const marketNamesByBookmaker = {
     'Unibet': {
       'Match Winner': ['Match Winner'],
@@ -2268,43 +2268,47 @@ function buildMarkets(m,model){
       'Handicap Result': ['Handicap Result'],
       'Asian Handicap': ['Asian Handicap'],
       'Exact Score': ['Exact Score'],
-      'HT/FT Double': ['HT/FT Double']
+      'HT/FT Double': ['HT/FT Double'],
+      'Clean Sheet': [] // Unibet n'a pas ce marché
     },
     'Bet365': {
-      'Match Winner': ['Match Winner', '1N2', 'Result', 'Full Time Result'],
-      'Double Chance': ['Double Chance', 'Two Way'],
-      'Both Teams Score': ['Both Teams Score', 'BTTS'],
-      'Goals Over/Under': ['Goals Over/Under', 'Total Goals'],
-      'First Half Winner': ['First Half Winner', 'First Half Result'],
+      'Match Winner': ['Match Winner'],
+      'Double Chance': ['Double Chance'],
+      'Both Teams Score': ['Both Teams Score'],
+      'Goals Over/Under': ['Goals Over/Under'],
+      'First Half Winner': ['First Half Winner'],
       'Draw No Bet': ['Draw No Bet'],
-      'Handicap Result': ['Handicap Result', 'European Handicap'],
+      'Handicap Result': ['Handicap Result'],
       'Asian Handicap': ['Asian Handicap'],
-      'Exact Score': ['Exact Score', 'Correct Score'],
-      'HT/FT Double': ['HT/FT Double']
+      'Exact Score': ['Exact Score'],
+      'HT/FT Double': ['HT/FT Double'],
+      'Clean Sheet': ['Clean Sheet - Home', 'Clean Sheet - Away']
     },
     '1xBet': {
-      'Match Winner': ['Match Winner', '1N2', 'Result', 'Full Time Result'],
-      'Double Chance': ['Double Chance', 'Two Way'],
-      'Both Teams Score': ['Both Teams Score', 'BTTS'],
-      'Goals Over/Under': ['Goals Over/Under', 'Total Goals'],
-      'First Half Winner': ['First Half Winner', 'First Half Result'],
+      'Match Winner': ['Match Winner'],
+      'Double Chance': ['Double Chance'],
+      'Both Teams Score': ['Both Teams Score'],
+      'Goals Over/Under': ['Goals Over/Under'],
+      'First Half Winner': ['First Half Winner'],
       'Draw No Bet': ['Draw No Bet'],
-      'Handicap Result': ['Handicap Result', 'European Handicap'],
+      'Handicap Result': [], // 1xBet n'a pas ce marché
       'Asian Handicap': ['Asian Handicap'],
-      'Exact Score': ['Exact Score', 'Correct Score'],
-      'HT/FT Double': ['HT/FT Double']
+      'Exact Score': ['Exact Score'],
+      'HT/FT Double': ['HT/FT Double'],
+      'Clean Sheet': [] // 1xBet n'a pas ce marché
     },
     'William Hill': {
-      'Match Winner': ['Match Winner', '1N2', 'Result', 'Full Time Result'],
-      'Double Chance': ['Double Chance', 'Two Way'],
-      'Both Teams Score': ['Both Teams Score', 'BTTS'],
-      'Goals Over/Under': ['Goals Over/Under', 'Total Goals'],
-      'First Half Winner': ['First Half Winner', 'First Half Result'],
+      'Match Winner': ['Match Winner'],
+      'Double Chance': ['Double Chance'],
+      'Both Teams Score': ['Both Teams Score'],
+      'Goals Over/Under': ['Goals Over/Under', 'Goals Over/Under First Half', 'Goals Over/Under - Second Half'], // WH décompose en 1ère et 2e mi-temps!
+      'First Half Winner': ['First Half Winner'],
       'Draw No Bet': ['Draw No Bet'],
-      'Handicap Result': ['Handicap Result', 'European Handicap'],
-      'Asian Handicap': ['Asian Handicap'],
-      'Exact Score': ['Exact Score', 'Correct Score'],
-      'HT/FT Double': ['HT/FT Double']
+      'Handicap Result': [], // William Hill n'a pas ce marché
+      'Asian Handicap': [], // William Hill n'a pas ce marché
+      'Exact Score': ['Exact Score'],
+      'HT/FT Double': [], // William Hill n'a pas ce marché (a seulement Half Winners)
+      'Clean Sheet': [] // William Hill n'a pas ce marché
     }
   };
   
