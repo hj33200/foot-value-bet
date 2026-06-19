@@ -1717,20 +1717,45 @@ async function fetchOddsFromAPIFootball(fixtureId) {
       });
     });
     
-    console.log(`✅✅✅ Cotes finales:`, oddsMap);
-    console.log(`📌 BOOKMAKERS DISPONIBLES: ${Object.keys(oddsMap).join(', ')}`);
+    console.log(`✅✅✅ Cotes finales (4 bookmakers autorisés):`, oddsMap);
     
-    // 🔍 DEBUG: Afficher TOUS les noms de marchés de Unibet (UPDATED)
-    console.log(`\n📋 TOUS LES MARCHÉS DE UNIBET (v2):`);
-    if(oddsMap['Unibet']) {
-      console.log(`Total marchés Unibet: ${Object.keys(oddsMap['Unibet'].markets).length}`);
-      Object.keys(oddsMap['Unibet'].markets).forEach((marketName, idx) => {
-        const cotes = oddsMap['Unibet'].markets[marketName];
-        console.log(`  [${idx}] "${marketName}" = ${cotes.map(c => c.odd).join(', ')}`);
-      });
-    } else {
-      console.warn(`❌ UNIBET N'EXISTE PAS!`);
-    }
+    // 🔴 FILTRER: Garder UNIQUEMENT les 4 bookmakers autorisés
+    const bookmakersAutorisés = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+    Object.keys(oddsMap).forEach(bm => {
+      if (!bookmakersAutorisés.includes(bm)) {
+        console.log(`❌ ${bm} SUPPRIMÉ (non autorisé)`);
+        delete oddsMap[bm];
+      }
+    });
+    
+    console.log(`📌 BOOKMAKERS GARDÉS: ${Object.keys(oddsMap).join(', ')}`);
+    console.log(`📌 BOOKMAKERS SUPPRIMÉS (autres): ${bookmakersAutorisés.filter(b => !oddsMap[b]).join(', ')}`);
+    
+    
+    // 🔍 DEBUG COMPLET: Afficher TOUS les noms de marchés pour CHAQUE bookmaker
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`🔍 AUDIT DES NOMS DE MARCHÉS - TOUS LES 4 BOOKMAKERS`);
+    console.log(`${'='.repeat(80)}\n`);
+    
+    const bookmakersToAudit = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+    
+    bookmakersToAudit.forEach(bm => {
+      if (oddsMap[bm]) {
+        console.log(`\n📌 ${bm.toUpperCase()} - ${Object.keys(oddsMap[bm].markets).length} marchés:`);
+        console.log(`${'─'.repeat(70)}`);
+        Object.keys(oddsMap[bm].markets).forEach((marketName, idx) => {
+          const cotes = oddsMap[bm].markets[marketName];
+          const cotesStr = cotes.map(c => c.odd || c.value).join(', ');
+          console.log(`  [${String(idx).padStart(2)}] "${marketName}" = [${cotesStr}]`);
+        });
+      } else {
+        console.warn(`\n❌ ${bm} N'EXISTE PAS DANS LES COTES!`);
+      }
+    });
+    
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`✅ Copie les noms EXACTS ci-dessus pour créer le VRAI mapping!`);
+    console.log(`${'='.repeat(80)}\n`);
     
     return oddsMap;
     
@@ -2080,7 +2105,7 @@ function buildMarkets(m,model){
   // Extraire les cotes 1N2 des vraies cotes (chercher "Match Winner" au lieu de "1X2")
   let realCotes1N2 = null;
   let usedBookmaker = null;
-  const preferredBookmakers = ['Unibet', 'Bet365', 'William Hill', 'BetVictor', '10Bet', 'Betfair'];
+  const preferredBookmakers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];  // 🎯 UNIQUEMENT ces 4
   
   if(realOdds) {
     // D'abord essayer les bookmakers préférés
@@ -2108,7 +2133,7 @@ function buildMarkets(m,model){
   }
   
   // 🎯 FONCTION: Chercher les vraies cotes avec fallback INTELLIGENT
-  const getRealCotes = (marketName, preferredBMs = ['Bet365', 'William Hill', '10Bet', 'Betfair', 'BetVictor']) => {
+  const getRealCotes = (marketName, preferredBMs = ['Bet365', '1xBet', 'William Hill']) => {
     if(!realOdds) return null;
     
     // ⚠️ VÉRIFIER SI UNIBET EXISTE RÉELLEMENT
@@ -2186,12 +2211,7 @@ function buildMarkets(m,model){
         
         if(marketName === 'Double Chance') {
           console.log(`📊 DOUBLE CHANCE TROUVÉ chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
-          
-          // Valider les cotes
-          if(!validateDoubleChance(cotes, bm)) {
-            console.warn(`❌ ${bm} Double Chance rejeté - cherche un autre bookmaker...`);
-            continue; // Passer au suivant
-          }
+          // ✅ SANS VALIDATION - On prend les vraies cotes telles qu'elles sont
         }
         
         console.log(`✅ Cotes trouvées: ${marketName} chez ${bm}`);
@@ -2199,31 +2219,118 @@ function buildMarkets(m,model){
       }
     }
     
-    // FALLBACK: Essayer TOUS les autres bookmakers disponibles
-    console.log(`⚠️ ${marketName} pas trouvé chez prioritaires, fallback complet...`);
-    for(let bm of Object.keys(realOdds)) {
-      if(!priority.includes(bm) && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
-        const cotes = realOdds[bm].markets[marketName];
-        
-        if(marketName === 'Double Chance') {
-          console.log(`📊 DOUBLE CHANCE TROUVÉ (fallback) chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
-          
-          // Valider les cotes
-          if(!validateDoubleChance(cotes, bm)) {
-            console.warn(`❌ ${bm} Double Chance rejeté - cherche un autre bookmaker...`);
-            continue;
-          }
-        }
-        
-        console.log(`✅ Cotes trouvées: ${marketName} chez ${bm}`);
-        return {cotes, bookmaker: bm};
-      }
-    }
+    // ❌ FALLBACK SUPPRIMÉ - On a UNIQUEMENT 4 bookmakers, pas d'autres à chercher
+    // Si pas trouvé dans les 4 → retourner null
     
     return null;
   };
   
-  // Mapper les noms de marchés de notre app avec les noms de l'API-Football
+  // 🔍 DEBUG: Afficher TOUS les noms de marchés pour CHAQUE bookmaker
+  const debugMarketNames = () => {
+    const realOdds = window.REAL_ODDS_CACHE?.[Object.keys(window.REAL_ODDS_CACHE)[0]]?.data;
+    if (!realOdds) {
+      console.warn('❌ Pas de cotes en cache');
+      return;
+    }
+    
+    console.log('\n🔍 === AUDIT DES NOMS DE MARCHÉS PAR BOOKMAKER ===\n');
+    
+    const bookmakers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+    
+    bookmakers.forEach(bm => {
+      if (realOdds[bm]) {
+        console.log(`\n📌 ${bm}:`);
+        const markets = Object.keys(realOdds[bm].markets || {});
+        markets.forEach(market => {
+          const count = realOdds[bm].markets[market].length;
+          console.log(`   • "${market}" (${count} cotes)`);
+        });
+      } else {
+        console.warn(`   ❌ ${bm} pas trouvé`);
+      }
+    });
+    
+    console.log('\n✅ Copie les noms exactes ci-dessus pour mettre à jour le mapping!\n');
+  };
+  
+  // Appeler automatiquement quand les cotes sont chargées
+  // debugMarketNames();  // Décommenter pour debug
+  
+  // 🎯 MAPPING: Noms de marchés par bookmaker (à mettre à jour après audit!)
+  const marketNamesByBookmaker = {
+    'Unibet': {
+      'Match Winner': ['Match Winner'],
+      'Double Chance': ['Double Chance'],
+      'Both Teams Score': ['Both Teams Score'],
+      'Goals Over/Under': ['Goals Over/Under'],
+      'First Half Winner': ['First Half Winner'],
+      'Draw No Bet': ['Draw No Bet (1st Half)', 'Draw No Bet (2nd Half)', 'Draw No Bet'],
+      'Handicap Result': ['Handicap Result'],
+      'Asian Handicap': ['Asian Handicap'],
+      'Exact Score': ['Exact Score'],
+      'HT/FT Double': ['HT/FT Double']
+    },
+    'Bet365': {
+      'Match Winner': ['Match Winner', '1N2', 'Result', 'Full Time Result'],
+      'Double Chance': ['Double Chance', 'Two Way'],
+      'Both Teams Score': ['Both Teams Score', 'BTTS'],
+      'Goals Over/Under': ['Goals Over/Under', 'Total Goals'],
+      'First Half Winner': ['First Half Winner', 'First Half Result'],
+      'Draw No Bet': ['Draw No Bet'],
+      'Handicap Result': ['Handicap Result', 'European Handicap'],
+      'Asian Handicap': ['Asian Handicap'],
+      'Exact Score': ['Exact Score', 'Correct Score'],
+      'HT/FT Double': ['HT/FT Double']
+    },
+    '1xBet': {
+      'Match Winner': ['Match Winner', '1N2', 'Result', 'Full Time Result'],
+      'Double Chance': ['Double Chance', 'Two Way'],
+      'Both Teams Score': ['Both Teams Score', 'BTTS'],
+      'Goals Over/Under': ['Goals Over/Under', 'Total Goals'],
+      'First Half Winner': ['First Half Winner', 'First Half Result'],
+      'Draw No Bet': ['Draw No Bet'],
+      'Handicap Result': ['Handicap Result', 'European Handicap'],
+      'Asian Handicap': ['Asian Handicap'],
+      'Exact Score': ['Exact Score', 'Correct Score'],
+      'HT/FT Double': ['HT/FT Double']
+    },
+    'William Hill': {
+      'Match Winner': ['Match Winner', '1N2', 'Result', 'Full Time Result'],
+      'Double Chance': ['Double Chance', 'Two Way'],
+      'Both Teams Score': ['Both Teams Score', 'BTTS'],
+      'Goals Over/Under': ['Goals Over/Under', 'Total Goals'],
+      'First Half Winner': ['First Half Winner', 'First Half Result'],
+      'Draw No Bet': ['Draw No Bet'],
+      'Handicap Result': ['Handicap Result', 'European Handicap'],
+      'Asian Handicap': ['Asian Handicap'],
+      'Exact Score': ['Exact Score', 'Correct Score'],
+      'HT/FT Double': ['HT/FT Double']
+    }
+  };
+  
+  // 🔍 Fonction: Chercher le marché en essayant plusieurs noms selon le bookmaker
+  const findMarketName = (bookmaker, marketId) => {
+    const standardName = marketMapping[marketId];
+    if (!standardName) return null;
+    
+    const possibleNames = marketNamesByBookmaker[bookmaker]?.[standardName];
+    if (!possibleNames) return null;
+    
+    const realOdds = window.REAL_ODDS_CACHE?.[Object.keys(window.REAL_ODDS_CACHE)[0]]?.data;
+    if (!realOdds?.[bookmaker]) return null;
+    
+    // Chercher le PREMIER nom qui existe chez ce bookmaker
+    for (const name of possibleNames) {
+      if (realOdds[bookmaker].markets?.[name]) {
+        console.log(`✅ Trouvé "${name}" pour ${marketId} chez ${bookmaker}`);
+        return name;
+      }
+    }
+    
+    console.warn(`⚠️ Marché ${marketId} NON TROUVÉ chez ${bookmaker}. Noms essayés: ${possibleNames.join(', ')}`);
+    return null;
+  };
+  
   const marketMapping = {
     '1n2': 'Match Winner',
     'dc': 'Double Chance',
@@ -2235,11 +2342,44 @@ function buildMarkets(m,model){
     'htft': 'HT/FT Double',
     'eh': 'Handicap Result',
     'ah': 'Asian Handicap',
-    'rou': 'Result/Total Goals',  // Cherche les vraies cotes composées
-    'rbtts': 'Results/Both Teams Score',  // Cherche les vraies cotes composées
+    'rou': 'Result/Total Goals',
+    'rbtts': 'Results/Both Teams Score',
     'hou': 'Total - Home',
     'aou': 'Total - Away',
     'score': 'Exact Score'
+  };
+  
+  // 🔧 NOMS ALTERNATIFS: Si un marché n'est pas trouvé avec le nom principal, cherche ces alternatives
+  const alternativeNames = {
+    'Double Chance': ['Double Chance', 'DC', 'Two Way', 'Home/Draw', 'Home/Away', 'Draw/Away'],
+    'Match Winner': ['Match Winner', '1N2', 'Full Time Result', '1x2'],
+    'Draw No Bet': ['Draw No Bet', 'DNB', 'No Draw'],
+    'Both Teams Score': ['Both Teams Score', 'BTTS', 'Both to Score'],
+    'Goals Over/Under': ['Goals Over/Under', 'Over/Under', 'Total Goals', 'Over 2.5'],
+    'Clean Sheet': ['Clean Sheet', 'To Keep a Clean Sheet'],
+    'First Half Winner': ['First Half Winner', 'HT Result', 'Half Time Result'],
+    'HT/FT Double': ['HT/FT Double', 'Half Time/Full Time']
+  };
+  
+  // 🔍 FONCTION: Cherche un marché par noms principaux + alternatifs
+  const findMarketInBookmaker = (bookmaker, searchName) => {
+    if(!bookmaker.markets) return null;
+    
+    // D'abord chercher le nom exact
+    if(bookmaker.markets[searchName]) {
+      return bookmaker.markets[searchName];
+    }
+    
+    // Ensuite chercher les noms alternatifs
+    const alternatives = alternativeNames[searchName] || [];
+    for(const altName of alternatives) {
+      if(bookmaker.markets[altName]) {
+        console.log(`   📍 Trouvé via alternative: "${altName}" pour "${searchName}"`);
+        return bookmaker.markets[altName];
+      }
+    }
+    
+    return null;  // Marché pas trouvé
   };
   
   // 🎯 FONCTION: Créer une sélection (VRAIES COTES SEULEMENT)
