@@ -1693,6 +1693,14 @@ async function fetchOddsFromAPIFootball(fixtureId) {
         const values = bet.values || [];
         
         // 🔍 DEBUG: Afficher la structure exacte des cotes
+        if(marketName === 'Double Chance' && bookmakerName === 'Unibet') {
+          console.log(`\n🚨🚨🚨 DOUBLE CHANCE UNIBET - RAW API DATA 🚨🚨🚨`);
+          console.log(`API retourne ${values.length} éléments:`);
+          values.forEach((v, i) => {
+            console.log(`  [${i}] odd="${v.odd}" value="${v.value}"`);
+          });
+        }
+        
         if(values.length > 0) {
           console.log(`   📌 ${bookmakerName} - Marché ${marketName}:`);
           values.slice(0, 3).forEach((v, i) => {
@@ -1712,16 +1720,17 @@ async function fetchOddsFromAPIFootball(fixtureId) {
     console.log(`✅✅✅ Cotes finales:`, oddsMap);
     console.log(`📌 BOOKMAKERS DISPONIBLES: ${Object.keys(oddsMap).join(', ')}`);
     
-    // 🔍 DEBUG: Afficher TOUS les noms de marchés disponibles pour CHAQUE bookmaker
-    console.log(`\n📋 TOUS LES MARCHÉS DISPONIBLES (COMPLET):`);
-    Object.keys(oddsMap).forEach(bm => {  // ✅ Afficher TOUS, pas juste les 3 premiers
-      console.log(`\n  ${bm}:`);
-      Object.keys(oddsMap[bm].markets).forEach(marketName => {
-        if(marketName.includes('Double') || marketName.includes('Chance')) {
-          console.log(`    ✅ "${marketName}" = ${oddsMap[bm].markets[marketName].map(c => c.odd).join(', ')}`);
-        }
+    // 🔍 DEBUG: Afficher TOUS les noms de marchés de Unibet (UPDATED)
+    console.log(`\n📋 TOUS LES MARCHÉS DE UNIBET (v2):`);
+    if(oddsMap['Unibet']) {
+      console.log(`Total marchés Unibet: ${Object.keys(oddsMap['Unibet'].markets).length}`);
+      Object.keys(oddsMap['Unibet'].markets).forEach((marketName, idx) => {
+        const cotes = oddsMap['Unibet'].markets[marketName];
+        console.log(`  [${idx}] "${marketName}" = ${cotes.map(c => c.odd).join(', ')}`);
       });
-    });
+    } else {
+      console.warn(`❌ UNIBET N'EXISTE PAS!`);
+    }
     
     return oddsMap;
     
@@ -2114,13 +2123,63 @@ function buildMarkets(m,model){
     if(realOdds['Unibet']) priority.push('Unibet');
     priority = priority.concat(preferredBMs);
     
+    // 🎯 FONCTION HELPER: Valider les cotes Double Chance (détecter les fictives)
+    const validateDoubleChance = (cotes, bm) => {
+      if(cotes.length !== 3) {
+        console.warn(`⚠️ ${bm} Double Chance n'a pas 3 cotes (${cotes.length}), validation échouée`);
+        return false;
+      }
+      
+      const odds = cotes.map(c => parseFloat(c.odd || c.value));
+      if(odds.some(isNaN)) {
+        console.warn(`⚠️ ${bm} Double Chance contient des cotes invalides:`, odds);
+        return false;
+      }
+      
+      // Calculer les implicites
+      const impl = odds.map(o => 1/o);
+      const totalImpl = impl.reduce((a,b) => a+b, 0);
+      
+      console.log(`🔍 ${bm} Double Chance validation:`);
+      console.log(`   Cotes: ${odds.map(o => o.toFixed(2)).join(', ')}`);
+      console.log(`   Implicites: ${impl.map(i => (i*100).toFixed(1)).join('%, ')}%`);
+      console.log(`   Total implicite: ${(totalImpl*100).toFixed(1)}% (attendu 120-200%)`);
+      
+      // Les implicites d'une double chance devraient sommer à ~1.7-2.0 (avec marge bookmaker ~15-25%)
+      // Si trop haut (>2.5) ou trop bas (<1.1), c'est suspect
+      if(totalImpl < 1.1 || totalImpl > 2.5) {
+        console.warn(`❌ ${bm} Double Chance INVALIDE: total implicite ${(totalImpl*100).toFixed(1)}% hors limites [110%-250%]`);
+        return false;
+      }
+      
+      // Vérifier les anomalies: si une cote est BEAUCOUP plus haute que les autres, c'est suspect
+      const maxOdd = Math.max(...odds);
+      const minOdd = Math.min(...odds);
+      const ratio = maxOdd / minOdd;
+      if(ratio > 4) {
+        console.warn(`❌ ${bm} Double Chance anomalie: écart excessif (${maxOdd.toFixed(2)}/${minOdd.toFixed(2)} = ${ratio.toFixed(1)}x) - SUSPECTE FICTIVE`);
+        return false;
+      }
+      
+      console.log(`✅ ${bm} Double Chance VALIDE!`);
+      return true;
+    };
+    
     // D'abord essayer les bookmakers prioritaires
     for(let bm of priority) {
       if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
         const cotes = realOdds[bm].markets[marketName];
+        
         if(marketName === 'Double Chance') {
           console.log(`📊 DOUBLE CHANCE TROUVÉ chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
+          
+          // Valider les cotes
+          if(!validateDoubleChance(cotes, bm)) {
+            console.warn(`❌ ${bm} Double Chance rejeté - cherche un autre bookmaker...`);
+            continue; // Passer au suivant
+          }
         }
+        
         console.log(`✅ Cotes trouvées: ${marketName} chez ${bm}`);
         return {cotes, bookmaker: bm};
       }
@@ -2131,9 +2190,17 @@ function buildMarkets(m,model){
     for(let bm of Object.keys(realOdds)) {
       if(!priority.includes(bm) && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
         const cotes = realOdds[bm].markets[marketName];
+        
         if(marketName === 'Double Chance') {
           console.log(`📊 DOUBLE CHANCE TROUVÉ (fallback) chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
+          
+          // Valider les cotes
+          if(!validateDoubleChance(cotes, bm)) {
+            console.warn(`❌ ${bm} Double Chance rejeté - cherche un autre bookmaker...`);
+            continue;
+          }
         }
+        
         console.log(`✅ Cotes trouvées: ${marketName} chez ${bm}`);
         return {cotes, bookmaker: bm};
       }
