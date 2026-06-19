@@ -2506,6 +2506,15 @@ function buildMarkets(m,model){
   let htftIndex = 0;
   list.push({id:'htft',name:'HT/FT',cols:3,sels:Object.keys(model.HTFT).map(k=>{
     const result = getRealCotes('HT/FT Double');
+    
+    // 🔍 DEBUG: Afficher le détail complet de HT/FT Double avec les noms des paris
+    if(result && result.cotes) {
+      console.log(`🎯 DÉTAIL HT/FT Double (${result.bookmaker}):`);
+      result.cotes.forEach((cote, idx) => {
+        console.log(`  [${idx}] ${cote.name || 'SANS NOM'} = ${parseFloat(cote.odd).toFixed(2)}`);
+      });
+    }
+    
     const htftSel = mkSel(htftLabels[k], model.HTFT[k], rng, {allowGray:true,grayChance:0.05}, 'htft');
     
     // Si vraie cote trouvée, l'utiliser
