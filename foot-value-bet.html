@@ -2156,8 +2156,22 @@ function buildMarkets(m,model){
       const maxOdd = Math.max(...odds);
       const minOdd = Math.min(...odds);
       const ratio = maxOdd / minOdd;
-      if(ratio > 4) {
-        console.warn(`❌ ${bm} Double Chance anomalie: écart excessif (${maxOdd.toFixed(2)}/${minOdd.toFixed(2)} = ${ratio.toFixed(1)}x) - SUSPECTE FICTIVE`);
+      if(ratio > 3) {  // Baissé de 4 à 3 (3.45 > 3)
+        console.warn(`❌ ${bm} Double Chance anomalie RATIO: écart excessif (${maxOdd.toFixed(2)}/${minOdd.toFixed(2)} = ${ratio.toFixed(1)}x) - SUSPECTE FICTIVE`);
+        return false;
+      }
+      
+      // 🎯 VÉRIFIER INCOHÉRENCE INTERNE: Si une implicite est trop différente des autres
+      const maxImpl = Math.max(...impl);
+      const minImpl = Math.min(...impl);
+      const ratioImpl = maxImpl / minImpl;
+      
+      console.log(`   Ratio implicite max/min: ${ratioImpl.toFixed(2)}x (97% vs 28% = 3.4x → détecté!)`);
+      
+      // Double Chance normal: les implicites devraient être relativement équilibrées
+      // Pas normal si une est 2.5x+ plus haute que l'autre (ex: 97.1% vs 28.2% = 3.4x!)
+      if(ratioImpl > 2.5) {  // ← FIX: Detecter 97% vs 28% = 3.4x
+        console.warn(`❌ ${bm} Double Chance INCOHÉRENT: implicites trop déséquilibrées (${(maxImpl*100).toFixed(1)}% vs ${(minImpl*100).toFixed(1)}% = ${ratioImpl.toFixed(1)}x) - UNE COTE EST FICTIVE!`);
         return false;
       }
       
