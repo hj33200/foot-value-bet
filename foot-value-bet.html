@@ -2466,6 +2466,15 @@ function buildMarkets(m,model){
   const cleanSheetSelsList = [];
   ['Clean Sheet Home', 'Clean Sheet Away'].forEach((csMarket, csIdx) => {
     const cshResult = getRealCotes(csMarket);
+    
+    // 🔍 DEBUG: Afficher la structure exacte
+    if(cshResult && cshResult.cotes && csIdx === 0) {
+      console.log(`🔍 Structure Clean Sheet ${csMarket}:`);
+      console.log(`   cshResult:`, cshResult);
+      console.log(`   cotes[0]:`, cshResult.cotes[0]);
+      console.log(`   typeof cotes[0]:`, typeof cshResult.cotes[0]);
+    }
+    
     const csLabel = csIdx === 0 ? (H + ' — oui') : (A + ' — oui');
     const csProb = csIdx === 0 ? (model.csHome || model.cs_h || 0.5) : (model.csAway || model.cs_a || 0.5);
     
