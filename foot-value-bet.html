@@ -2469,17 +2469,18 @@ function buildMarkets(m,model){
     const csLabel = csIdx === 0 ? (H + ' — oui') : (A + ' — oui');
     const csProb = csIdx === 0 ? (model.csHome || model.cs_h || 0.5) : (model.csAway || model.cs_a || 0.5);
     
-    // 🔍 CHERCHER LA COTE AVANT mkSel!
-    let realCote = null;
+    // 🔍 CHERCHER LES 2 COTES (OUI et NON)!
+    let coteOui = null, coteNon = null;
     let bookmaker = null;
     const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
     for(let bm of bookmarkers) {
       if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[csMarket]) {
         const cotes = realOdds[bm].markets[csMarket];
         if(cotes && cotes[0]) {
-          realCote = parseFloat(cotes[0].odd || cotes[0].value);
-          if(realCote && !isNaN(realCote)) {
-            console.log(`💰 ${csMarket} = ${realCote} chez ${bm}`);
+          coteOui = parseFloat(cotes[0].odd || cotes[0].value);
+          coteNon = cotes[1] ? parseFloat(cotes[1].odd || cotes[1].value) : null;
+          if(coteOui && !isNaN(coteOui)) {
+            console.log(`💰 ${csMarket} = Oui: ${coteOui}, Non: ${coteNon || 'N/A'} chez ${bm}`);
             bookmaker = bm;
             break;
           }
@@ -2487,17 +2488,22 @@ function buildMarkets(m,model){
       }
     }
     
-    // Créer le pari avec la cote réelle si trouvée
-    const opt = {};
-    if(realCote && bookmaker) {
-      opt.realCote = realCote;
-      opt.bookmaker = bookmaker;
+    // Créer le pari OUI avec la cote réelle
+    const optOui = {};
+    if(coteOui && bookmaker) {
+      optOui.realCote = coteOui;
+      optOui.bookmaker = bookmaker;
     }
-    const csSel = mkSel(csLabel, csProb, rng, opt, 'cs'); // ✅ Sans chercher automatiquement!
-    
+    const csSel = mkSel(csLabel, csProb, rng, optOui, 'cs');
     cleanSheetSelsList.push(csSel);
-    // Ajouter le "non" (inverse)
-    cleanSheetSelsList.push(mkSel(csLabel.replace(' — oui', ' — non'), 1-csProb, rng, {}, 'cs'));
+    
+    // Créer le pari NON avec la vraie cote si disponible
+    const optNon = {};
+    if(coteNon && bookmaker) {
+      optNon.realCote = coteNon;
+      optNon.bookmaker = bookmaker;
+    }
+    cleanSheetSelsList.push(mkSel(csLabel.replace(' — oui', ' — non'), 1-csProb, rng, optNon, 'cs'));
   });
   
   list.push({id:'cs',name:'Clean sheet (ne pas encaisser)',cols:2,sels:cleanSheetSelsList});
