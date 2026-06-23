@@ -2578,6 +2578,19 @@ function buildMarkets(m,model){
     const p = FM[i] && FM[i][j] ? FM[i][j] : pois(i,m.lambdaHome)*pois(j,m.lambdaAway);
     correctScores.push({score:`${i}-${j}`,p});}
   correctScores.sort((a,b)=>b.p-a.p);
+  
+  // 🔍 DEBUG: Afficher la structure des cotes Exact Score
+  console.log(`🔍 EXACT SCORE - Structure des cotes dans l'API:`);
+  const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+  for(let bm of bookmarkers) {
+    if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets['Exact Score']) {
+      const cotes = realOdds[bm].markets['Exact Score'];
+      console.log(`📊 ${bm}: ${cotes.length} cotes`);
+      if(cotes[0]) console.log(`   [0]: ${JSON.stringify(cotes[0])}`);
+      break;
+    }
+  }
+  
   const topScores = correctScores.slice(0,9).map((s,idx)=>mk(s.score,s.p,{allowGray:true}));
   list.push({id:'score',name:'Score exact',cols:3,sels:topScores});
 
