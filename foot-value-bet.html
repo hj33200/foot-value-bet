@@ -2561,6 +2561,15 @@ function buildMarkets(m,model){
   })});
 
   // HOME OVER/UNDER
+  // 🔍 DEBUG: Afficher l'ordre complet de Total - Home
+  console.log(`🔍 TOTAL - HOME - Ordre complet:`);
+  if(realOdds && realOdds['Unibet'] && realOdds['Unibet'].markets && realOdds['Unibet'].markets['Total - Home']) {
+    const cotes = realOdds['Unibet'].markets['Total - Home'];
+    cotes.forEach((c, idx) => {
+      console.log(`  [${idx}] ${c.name || c.value || '?'} = ${c.odd}`);
+    });
+  }
+
   list.push({id:'hou',name:H+' Over/Under',cols:3,sels:[
     mkSmart(H+' > 1.5',model.ou15Home || 0.5,0,rng,'hou'),
     mkSmart(H+' > 2.5',model.ou25Home || 0.5,1,rng,'hou'),
@@ -2575,11 +2584,11 @@ function buildMarkets(m,model){
     });
   }
 
-  // AWAY OVER/UNDER
+  // AWAY OVER/UNDER - Corriger les indices: [0]=Over 1.5, [2]=Over 2.5, [4]=Over 0.5
   list.push({id:'aou',name:A+' Over/Under',cols:3,sels:[
     mkSmart(A+' > 1.5',model.ou15Away || 0.5,0,rng,'aou'),
-    mkSmart(A+' > 2.5',model.ou25Away || 0.5,1,rng,'aou'),
-    mkSmart(A+' > 3.5',model.ou35Away || 0.5,2,rng,'aou')]});
+    mkSmart(A+' > 2.5',model.ou25Away || 0.5,2,rng,'aou'),
+    mkSmart(A+' > 0.5',model.ou05Away || 0.5,4,rng,'aou')]});
 
   // CORRECT SCORE - Top 10 scores probables avec vraies cotes
   let correctScores=[];
