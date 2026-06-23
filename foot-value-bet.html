@@ -2469,7 +2469,7 @@ function buildMarkets(m,model){
     const csLabel = csIdx === 0 ? (H + ' — oui') : (A + ' — oui');
     const csProb = csIdx === 0 ? (model.csHome || model.cs_h || 0.5) : (model.csAway || model.cs_a || 0.5);
     
-    // 🔍 CHERCHER LA COTE AVANT mkSmart!
+    // 🔍 CHERCHER LA COTE AVANT mkSel!
     let realCote = null;
     let bookmaker = null;
     const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
@@ -2488,18 +2488,16 @@ function buildMarkets(m,model){
     }
     
     // Créer le pari avec la cote réelle si trouvée
-    const csSel = mkSmart(csLabel, csProb, csIdx*2, rng, 'cs');
+    const opt = {};
     if(realCote && bookmaker) {
-      csSel.cote = realCote;
-      csSel.realCote = realCote;
-      csSel.bookmaker = bookmaker;
-      csSel.implied = 1 / realCote;
-      csSel.value = csProb * realCote - 1;
+      opt.realCote = realCote;
+      opt.bookmaker = bookmaker;
     }
+    const csSel = mkSel(csLabel, csProb, rng, opt, 'cs'); // ✅ Sans chercher automatiquement!
     
     cleanSheetSelsList.push(csSel);
     // Ajouter le "non" (inverse)
-    cleanSheetSelsList.push(mkSmart(csLabel.replace(' — oui', ' — non'), 1-csProb, csIdx*2+1, rng, 'cs'));
+    cleanSheetSelsList.push(mkSel(csLabel.replace(' — oui', ' — non'), 1-csProb, rng, {}, 'cs'));
   });
   
   list.push({id:'cs',name:'Clean sheet (ne pas encaisser)',cols:2,sels:cleanSheetSelsList});
