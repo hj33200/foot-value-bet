@@ -2462,34 +2462,32 @@ function buildMarkets(m,model){
   tg.push(mkSmart('Moins de 3.5 buts', model.ou35Total?.pUnder || (1-model.over[3.5]) || 0.5, totIdx++, rng, 'tot'));
   list.push({id:'tot',name:'Total de buts (Over / Under)',cols:2,sels:tg});
 
-  // CLEAN SHEET - Chercher les vraies cotes
+  // CLEAN SHEET - Chercher les vraies cotes (directement dans realOdds)
   const cleanSheetSelsList = [];
-  ['Clean Sheet Home', 'Clean Sheet Away'].forEach((csMarket, csIdx) => {
-    const cshResult = getRealCotes(csMarket);
-    
-    // 🔍 DEBUG: Afficher la structure exacte
-    if(cshResult && cshResult.cotes && csIdx === 0) {
-      console.log(`🔍 Structure Clean Sheet ${csMarket}:`);
-      console.log(`   cshResult:`, cshResult);
-      console.log(`   cotes[0]:`, cshResult.cotes[0]);
-      console.log(`   typeof cotes[0]:`, typeof cshResult.cotes[0]);
-    }
-    
+  const csMarkets = ['Clean Sheet Home', 'Clean Sheet Away'];
+  csMarkets.forEach((csMarket, csIdx) => {
     const csLabel = csIdx === 0 ? (H + ' — oui') : (A + ' — oui');
     const csProb = csIdx === 0 ? (model.csHome || model.cs_h || 0.5) : (model.csAway || model.cs_a || 0.5);
     
     const csSel = mkSmart(csLabel, csProb, csIdx*2, rng, 'cs');
     
-    // Si vraie cote trouvée, l'utiliser
-    if(cshResult && cshResult.cotes && cshResult.cotes[0]) {
-      const realCote = parseFloat(cshResult.cotes[0].odd);
-      if(realCote && !isNaN(realCote)) {
-        console.log(`💰 ${csMarket} = ${realCote} chez ${cshResult.bookmaker}`);
-        csSel.cote = realCote;
-        csSel.realCote = realCote;
-        csSel.bookmaker = cshResult.bookmaker;
-        csSel.implied = 1 / realCote;
-        csSel.value = csProb * realCote - 1;
+    // Chercher dans realOdds directement (ordre priorité: Unibet, Bet365, 1xBet, William Hill)
+    const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+    for(let bm of bookmarkers) {
+      if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[csMarket]) {
+        const cotes = realOdds[bm].markets[csMarket];
+        if(cotes && cotes[0]) {
+          const realCote = parseFloat(cotes[0].odd || cotes[0].value);
+          if(realCote && !isNaN(realCote)) {
+            console.log(`💰 ${csMarket} = ${realCote} chez ${bm}`);
+            csSel.cote = realCote;
+            csSel.realCote = realCote;
+            csSel.bookmaker = bm;
+            csSel.implied = 1 / realCote;
+            csSel.value = csProb * realCote - 1;
+            break; // Prendre le premier bookmaker qui a la cote
+          }
+        }
       }
     }
     
