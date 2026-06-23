@@ -2572,26 +2572,46 @@ function buildMarkets(m,model){
     mkSmart(A+' > 2.5',model.ou25Away || 0.5,1,rng,'aou'),
     mkSmart(A+' > 3.5',model.ou35Away || 0.5,2,rng,'aou')]});
 
-  // CORRECT SCORE - Top 10 scores probables
+  // CORRECT SCORE - Top 10 scores probables avec vraies cotes
   let correctScores=[];
   for(let i=0;i<=5;i++)for(let j=0;j<=5;j++){
     const p = FM[i] && FM[i][j] ? FM[i][j] : pois(i,m.lambdaHome)*pois(j,m.lambdaAway);
     correctScores.push({score:`${i}-${j}`,p});}
   correctScores.sort((a,b)=>b.p-a.p);
   
-  // 🔍 DEBUG: Afficher la structure des cotes Exact Score
-  console.log(`🔍 EXACT SCORE - Structure des cotes dans l'API:`);
-  const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
-  for(let bm of bookmarkers) {
-    if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets['Exact Score']) {
-      const cotes = realOdds[bm].markets['Exact Score'];
-      console.log(`📊 ${bm}: ${cotes.length} cotes`);
-      if(cotes[0]) console.log(`   [0]: ${JSON.stringify(cotes[0])}`);
-      break;
+  // Fonction pour chercher la vraie cote d'un score
+  const getExactScoreCote = (scoreStr) => {
+    // scoreStr format: "1-0" → chercher "1:0" ou "1-0" dans l'API
+    const searchValue = scoreStr.replace('-', ':'); // "1-0" → "1:0"
+    const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+    
+    for(let bm of bookmarkers) {
+      if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets['Exact Score']) {
+        const cotes = realOdds[bm].markets['Exact Score'];
+        // Chercher la cote qui correspond à ce score
+        const cotescore = cotes.find(c => (c.value === searchValue || c.value === scoreStr || c.name === searchValue || c.name === scoreStr));
+        if(cotescore) {
+          const realCote = parseFloat(cotescore.odd);
+          if(realCote && !isNaN(realCote)) {
+            console.log(`💰 Score ${scoreStr} = ${realCote} chez ${bm}`);
+            return { cote: realCote, bookmaker: bm };
+          }
+        }
+      }
     }
-  }
+    return null; // Pas de cote trouvée
+  };
   
-  const topScores = correctScores.slice(0,9).map((s,idx)=>mk(s.score,s.p,{allowGray:true}));
+  const topScores = correctScores.slice(0,9).map((s,idx)=> {
+    // Chercher la vraie cote pour ce score
+    const scoreData = getExactScoreCote(s.score);
+    const opt = {allowGray:true};
+    if(scoreData) {
+      opt.realCote = scoreData.cote;
+      opt.bookmaker = scoreData.bookmaker;
+    }
+    return mkSel(s.score, s.p, rng, opt, 'score');
+  });
   list.push({id:'score',name:'Score exact',cols:3,sels:topScores});
 
   // European handicap (-1 / +1) lines from FM
