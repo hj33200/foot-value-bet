@@ -2469,26 +2469,32 @@ function buildMarkets(m,model){
     const csLabel = csIdx === 0 ? (H + ' — oui') : (A + ' — oui');
     const csProb = csIdx === 0 ? (model.csHome || model.cs_h || 0.5) : (model.csAway || model.cs_a || 0.5);
     
-    const csSel = mkSmart(csLabel, csProb, csIdx*2, rng, 'cs');
-    
-    // Chercher dans realOdds directement (ordre priorité: Unibet, Bet365, 1xBet, William Hill)
+    // 🔍 CHERCHER LA COTE AVANT mkSmart!
+    let realCote = null;
+    let bookmaker = null;
     const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
     for(let bm of bookmarkers) {
       if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[csMarket]) {
         const cotes = realOdds[bm].markets[csMarket];
         if(cotes && cotes[0]) {
-          const realCote = parseFloat(cotes[0].odd || cotes[0].value);
+          realCote = parseFloat(cotes[0].odd || cotes[0].value);
           if(realCote && !isNaN(realCote)) {
             console.log(`💰 ${csMarket} = ${realCote} chez ${bm}`);
-            csSel.cote = realCote;
-            csSel.realCote = realCote;
-            csSel.bookmaker = bm;
-            csSel.implied = 1 / realCote;
-            csSel.value = csProb * realCote - 1;
-            break; // Prendre le premier bookmaker qui a la cote
+            bookmaker = bm;
+            break;
           }
         }
       }
+    }
+    
+    // Créer le pari avec la cote réelle si trouvée
+    const csSel = mkSmart(csLabel, csProb, csIdx*2, rng, 'cs');
+    if(realCote && bookmaker) {
+      csSel.cote = realCote;
+      csSel.realCote = realCote;
+      csSel.bookmaker = bookmaker;
+      csSel.implied = 1 / realCote;
+      csSel.value = csProb * realCote - 1;
     }
     
     cleanSheetSelsList.push(csSel);
