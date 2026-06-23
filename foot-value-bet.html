@@ -2566,6 +2566,15 @@ function buildMarkets(m,model){
     mkSmart(H+' > 2.5',model.ou25Home || 0.5,1,rng,'hou'),
     mkSmart(H+' > 3.5',model.ou35Home || 0.5,2,rng,'hou')]});
 
+  // 🔍 DEBUG: Afficher l'ordre complet de Total - Away
+  console.log(`🔍 TOTAL - AWAY - Ordre complet:`);
+  if(realOdds && realOdds['Unibet'] && realOdds['Unibet'].markets && realOdds['Unibet'].markets['Total - Away']) {
+    const cotes = realOdds['Unibet'].markets['Total - Away'];
+    cotes.forEach((c, idx) => {
+      console.log(`  [${idx}] ${c.name || c.value || '?'} = ${c.odd}`);
+    });
+  }
+
   // AWAY OVER/UNDER
   list.push({id:'aou',name:A+' Over/Under',cols:3,sels:[
     mkSmart(A+' > 1.5',model.ou15Away || 0.5,0,rng,'aou'),
