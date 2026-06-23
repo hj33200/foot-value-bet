@@ -2464,7 +2464,7 @@ function buildMarkets(m,model){
 
   // CLEAN SHEET - Chercher les vraies cotes (directement dans realOdds)
   const cleanSheetSelsList = [];
-  const csMarkets = ['Clean Sheet Home', 'Clean Sheet Away'];
+  const csMarkets = ['Clean Sheet - Home', 'Clean Sheet - Away']; // 🎯 Avec tirets!
   csMarkets.forEach((csMarket, csIdx) => {
     const csLabel = csIdx === 0 ? (H + ' — oui') : (A + ' — oui');
     const csProb = csIdx === 0 ? (model.csHome || model.cs_h || 0.5) : (model.csAway || model.cs_a || 0.5);
