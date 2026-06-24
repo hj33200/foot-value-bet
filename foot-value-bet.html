@@ -581,7 +581,6 @@ function calculateBTTSEmpirical(homeMatches, awayMatches) {
   // Corrélation = empirique / théorique
   const corrFactor = poissonBTTS > 0 ? empiricalBTTS / poissonBTTS : 1.0;
   
-  console.log(`📊 BTTS EMPIRIQUE: Home=${(pHome_emp*100).toFixed(1)}% Away=${(pAway_emp*100).toFixed(1)}% → BTTS=${(empiricalBTTS*100).toFixed(1)}% vs Poisson=${(poissonBTTS*100).toFixed(1)}% → CorrFactor=${corrFactor.toFixed(3)}`);
   
   return { corrFactor, empiricalBTTS, poissonBTTS, pHome_emp, pAway_emp, dataPoints: n };
 }
@@ -740,11 +739,9 @@ function getLastMatches(teamId, limit = 10) {
     
     // Vérifier si les matchs sont en cache
     if (stats && Array.isArray(stats.lastMatches) && stats.lastMatches.length > 0) {
-      console.log(`✅ ${stats.lastMatches.length} matchs trouvés en cache pour équipe ${teamId}`);
       return stats.lastMatches.slice(-limit);
     }
     
-    console.log(`⚠️ Pas de matchs en cache pour équipe ${teamId} - utilisant valeurs par défaut`);
     return []; // Retourner array vide, JAMAIS undefined
   } catch (e) {
     console.warn(`Erreur getLastMatches:`, e);
@@ -841,7 +838,6 @@ function getOpponentStrength(teamId, teamName) {
 // 🎯 Calculer SOS (Strength of Schedule) - force des adversaires
 function calculateSOS(teamId, teamName, matches, competitionType = 'CHAMPIONSHIP') {
   if (!matches || !Array.isArray(matches) || matches.length === 0) {
-    console.log(`⚠️ Pas de matchs pour SOS de ${teamName} - utilisant SOS neutre (1.0)`);
     return { sos: 1.0, competitionType };
   }
   
@@ -850,12 +846,10 @@ function calculateSOS(teamId, teamName, matches, competitionType = 'CHAMPIONSHIP
   let totalPoids = 0;
   let validMatches = 0;
   
-  console.log(`\n🎯 CALCUL SOS pour ${teamName} (${matches.length} matchs):`);
   
   try {
     matches.forEach((m, idx) => {
       if (!m || !m.teams || !m.teams.home || !m.teams.away) {
-        console.log(`  ⚠️ Match ${idx + 1}: structure incomplète`);
         return;
       }
       
@@ -877,7 +871,6 @@ function calculateSOS(teamId, teamName, matches, competitionType = 'CHAMPIONSHIP
       validMatches++;
       
       const posLabel = isHome ? '🏠 dom.' : '✈️ ext.';
-      console.log(`  Match ${idx + 1}: ${opponent.name} (Elo: ${opponentElo.toFixed(0)}) ${posLabel}`);
     });
   } catch (e) {
     console.warn(`⚠️ Erreur lors du calcul SOS:`, e);
@@ -885,12 +878,10 @@ function calculateSOS(teamId, teamName, matches, competitionType = 'CHAMPIONSHIP
   }
   
   if (validMatches === 0 || totalPoids === 0) {
-    console.log(`⚠️ Aucun match valide - utilisant SOS neutre`);
     return { sos: 1.0, competitionType };
   }
   
   const sos = totalAdversaire / totalPoids;
-  console.log(`  📊 SOS Final: ${sos.toFixed(3)}`);
   
   return { sos, competitionType };
 }
@@ -899,49 +890,39 @@ function calculateEloFromResults(teamName, form, gf, ga, matches) {
   const PRIOR_ELO = 1600;
   if (!form || form.length === 0) return PRIOR_ELO;
   
-  console.log(`\n  📍 Calcul Elo pour ${teamName}:`);
-  console.log(`    Form: ${form}, GF: ${gf}, GA: ${ga}, Matches: ${matches}`);
   
   // 1️⃣ WIN RATE
   const winCount = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0);
   const drawCount = form.split('').reduce((s,c) => s + (c==='D'?1:0), 0);
   const winRate = (winCount * 3 + drawCount) / (form.length * 3);
   
-  console.log(`    Win Count: ${winCount}, Draw Count: ${drawCount}, Win Rate: ${(winRate*100).toFixed(1)}%`);
   
   // RÉDUIT de 600 → 350 (moins extrême)
   const performanceBonus = (winRate - 0.5) * 350;
-  console.log(`    Performance Bonus: ${performanceBonus.toFixed(0)}`);
   
   // 2️⃣ BUTS/MATCH
   const goalsFor = gf / Math.max(1, matches);
   const goalsAgainst = ga / Math.max(1, matches);
   const goalsDiff = goalsFor - goalsAgainst;
   
-  console.log(`    Goals For/Match: ${goalsFor.toFixed(2)}, Goals Against/Match: ${goalsAgainst.toFixed(2)}, Diff: ${goalsDiff.toFixed(2)}`);
   
   // RÉDUIT de 250 → 120 (moins extrême)
   const goalsBonus = goalsDiff * 120;
-  console.log(`    Goals Bonus: ${goalsBonus.toFixed(0)}`);
   
   // Elo brut
   let eloRaw = PRIOR_ELO + performanceBonus + goalsBonus;
-  console.log(`    Elo brut: ${eloRaw.toFixed(0)}`);
   
   // 3️⃣ FACTEUR DE CONFIANCE (basé sur le nombre de matchs)
   // 5 matches = 70% confident
   // 10 matches = 85% confident
   // 20 matches = 95% confident
   const confidence = Math.min(0.95, 0.4 + (matches / 30));
-  console.log(`    Confiance (${matches} matches): ${(confidence*100).toFixed(0)}%`);
   
   // Blend: Prior + Elo_calculé pondéré par confiance
   let elo = PRIOR_ELO * (1 - confidence) + eloRaw * confidence;
-  console.log(`    Elo blendé (Prior + Calc): ${elo.toFixed(0)}`);
   
   // LISSER LES EXTRÊMES: min 1200, max 2000 (au lieu de 800-2800)
   elo = clamp(elo, 1200, 2000);
-  console.log(`    Elo final: ${elo.toFixed(0)}`);
   
   return elo;
 }
@@ -963,17 +944,12 @@ function getWinProbabilityFromElo(eloHome, eloAway) {
 
 // 🎯 MODÈLE AVANCÉ: Calculer les probabilités avec TOUTES les données réelles
 function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey='l1') {
-  console.log(`\n📊 === CALCUL AVANCÉ DES PROBABILITÉS (v3 avec ELO RATING) ===`);
-  console.log(`🏠 Home: ${home.name} (id: ${home.id})`);
-  console.log(`✈️ Away: ${away.name} (id: ${away.id})`);
   
   // 🌍 DÉTECTER TYPE DE COMPÉTITION
   const leagueName = LEAGUES[leagueKey]?.name || 'Championnat';
   const competitionType = detectCompetitionType(leagueName, '');
   const compProps = getCompetitionProperties(competitionType);
   
-  console.log(`\n🌍 COMPÉTITION: ${compProps.name} ${compProps.description}`);
-  console.log(`   Home Advantage: ×${compProps.homeAdvantage.toFixed(2)}`);
   
   // Récupérer les vraies stats
   const homeStats = FOOTBALL_API.getTeamStats(home.id) || {};
@@ -993,9 +969,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const awayOffense = awayGF / awayMatches;
   const awayDefense = awayGA / awayMatches;
   
-  console.log(`\n⚔️ FORCES BRUTES:`);
-  console.log(`  ${home.name} - Attaque: ${homeOffense.toFixed(2)}/match, Défense: ${homeDefense.toFixed(2)}/match`);
-  console.log(`  ${away.name} - Attaque: ${awayOffense.toFixed(2)}/match, Défense: ${awayDefense.toFixed(2)}/match`);
   
   // 2️⃣ RATIO DE VICTOIRES
   const calcWinRate = (form) => {
@@ -1008,9 +981,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const homeWinRate = calcWinRate(homeForm);
   const awayWinRate = calcWinRate(awayForm);
   
-  console.log(`\n🏆 TAUX DE VICTOIRES:`);
-  console.log(`  ${home.name}: ${(homeWinRate*100).toFixed(1)}%`);
-  console.log(`  ${away.name}: ${(awayWinRate*100).toFixed(1)}%`);
   
   // 3️⃣ FORM MULTIPLIER AMÉLIORÉ
   const calcAdvancedFormMult = (form) => {
@@ -1030,12 +1000,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const homeFormMult = calcAdvancedFormMult(homeForm);
   const awayFormMult = calcAdvancedFormMult(awayForm);
   
-  console.log(`\n📈 MULTIPLICATEUR DE FORME (pondéré):`);
-  console.log(`  ${home.name}: ${homeFormMult.toFixed(3)}`);
-  console.log(`  ${away.name}: ${awayFormMult.toFixed(3)}`);
   
   // 4️⃣ ELO RATING - Pondération scientifiquement validée
-  console.log(`\n🏆 CALCUL ELO RATING:`);
   ELO_CACHE = {}; // ← VIDER LE CACHE pour recalculer!
   const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches);
   const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches);
@@ -1045,23 +1011,14 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const homeEloMult = eloWinProb; // Entre 0 et 1
   const awayEloMult = 1 - eloWinProb;
   
-  console.log(`\n🏆 ELO RATING FINAL:`);
-  console.log(`  ${home.name} ELO: ${homeElo.toFixed(0)} (Prob victoire: ${(eloWinProb*100).toFixed(1)}%)`);
-  console.log(`  ${away.name} ELO: ${awayElo.toFixed(0)} (Prob victoire: ${(awayEloMult*100).toFixed(1)}%)`);
-  console.log(`  📝 Basé sur: Win Rate (40%) + Buts/match (60%)`);
-  console.log(`  📝 Différence Elo: ${(homeElo - awayElo).toFixed(0)} points`);
   
   // 4️⃣.5️⃣ CALCUL SOS (Strength of Schedule) - Force des adversaires
-  console.log(`\n📋 RÉCUPÉRATION DES MATCHS POUR SOS...`);
   const homeLastMatches = getLastMatches(home.id, 10) || [];
   const awayLastMatches = getLastMatches(away.id, 10) || [];
   
   const sosHome = calculateSOS(home.id, home.name, homeLastMatches, competitionType);
   const sosAway = calculateSOS(away.id, away.name, awayLastMatches, competitionType);
   
-  console.log(`\n📊 SOS RÉSUMÉ:`);
-  console.log(`  ${home.name} SOS: ${sosHome.sos.toFixed(3)} (adversaires ${sosHome.sos > 1 ? 'plus forts' : 'plus faibles'} que moyenne)`);
-  console.log(`  ${away.name} SOS: ${sosAway.sos.toFixed(3)} (adversaires ${sosAway.sos > 1 ? 'plus forts' : 'plus faibles'} que moyenne)`);
   
   // 5️⃣ LAMBDAS POISSON FINALES avec ELO + SOS
   const homeAdvantage = compProps.homeAdvantage; // ✅ Utilise le type de compétition
@@ -1075,10 +1032,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
   
-  console.log(`\n🎲 LAMBDAS POISSON FINALES (avec ELO + SOS):`);
-  console.log(`  ${home.name}: ${lambdaHome.toFixed(3)}`);
-  console.log(`  ${away.name}: ${lambdaAway.toFixed(3)}`);
-  console.log(`  📝 Formule: (Attaque × ELO × 1.8 × SOS) / (Défense × SOS_adversaire)`);
   
   // 🎯 CALCULER PROBABILITÉ POISSON FINALE
   // Utiliser la distribution Poisson pour estimer P(Home > Away)
@@ -1090,11 +1043,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const poissonImpact = (poissonWinProb * 100) - eloRawProb; // Impact Poisson
   const finalProb = poissonWinProb * 100;
   
-  console.log(`\n📈 IMPACTS:`);
-  console.log(`  Elo brut: ${eloRawProb.toFixed(1)}%`);
-  console.log(`  Impact SOS: ${sosImpact.toFixed(1)}%`);
-  console.log(`  Impact Poisson: ${poissonImpact.toFixed(1)}%`);
-  console.log(`  Probabilité finale: ${finalProb.toFixed(1)}%`);
   
   // 🎯 CALCULS SPÉCIALISÉS PAR MARCHÉ
   // BTTS: Both Teams To Score
@@ -1108,7 +1056,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const bttsAnalysis = calculateBTTSEmpirical(homeLastMatches, awayLastMatches);
   const pBTTS = pBTTS_indep * bttsAnalysis.corrFactor;
   
-  console.log(`\n🎯 BTTS (Poisson + correction empirique): ${(pBTTS_indep*100).toFixed(1)}% × ${(bttsAnalysis.corrFactor*100).toFixed(0)}% = ${(pBTTS*100).toFixed(1)}% (empirique: ${bttsAnalysis.empiricalBTTS ? (bttsAnalysis.empiricalBTTS*100).toFixed(1) : 'N/A'}%, dataPoints: ${bttsAnalysis.dataPoints})`);
   
   // OVER/UNDER: Distribution Poisson simple (NB blend ne change rien)
   const calculateOU = (lambda, threshold) => {
@@ -1191,7 +1138,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const csHome = csHome_pois * 0.8 + csHome_nb * 0.2;
   const csAway = csAway_pois * 0.8 + csAway_nb * 0.2;
   
-  console.log(`\n🧹 CLEAN SHEET: Home=${(csHome*100).toFixed(1)}% / Away=${(csAway*100).toFixed(1)}% (Poisson: ${(csHome_pois*100).toFixed(1)}% / ${(csAway_pois*100).toFixed(1)}%)`);
   
   // HOME/AWAY OVER/UNDER - Poisson individuel pour chaque équipe
   const ou15Home = 1 - (Math.exp(-lambdaHome) + lambdaHome * Math.exp(-lambdaHome));
@@ -1233,9 +1179,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     return { pUnder, pOver: 1 - pUnder };
   })();
   
-  console.log(`\n📊 OVER/UNDER 2.5 Total: Over=${(ou25Total.pOver*100).toFixed(1)}%`);
-  console.log(`\n🏠 HOME OU: >1.5=${(ou15Home*100).toFixed(1)}% / >2.5=${(ou25Home*100).toFixed(1)}% / >3.5=${(ou35Home*100).toFixed(1)}%`);
-  console.log(`✈️ AWAY OU: >1.5=${(ou15Away*100).toFixed(1)}% / >2.5=${(ou25Away*100).toFixed(1)}% / >3.5=${(ou35Away*100).toFixed(1)}%`);
   
   // PROBABILITÉS 1N2 (à partir de matrice FM)
   let pH = 0, pD = 0, pA = 0;
@@ -1248,20 +1191,17 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     }
   }
   
-  console.log(`\n1N2: Home=${(pH*100).toFixed(1)}% / Draw=${(pD*100).toFixed(1)}% / Away=${(pA*100).toFixed(1)}%`);
   
   // DOUBLE CHANCE
   const dcX1 = pH + pD;      // 1X (Home ou nul)
   const dc12 = pH + pA;      // 12 (pas de nul)
   const dcX2 = pD + pA;      // X2 (nul ou Away)
   
-  console.log(`\n🎰 DOUBLE CHANCE: 1X=${(dcX1*100).toFixed(1)}% / 12=${(dc12*100).toFixed(1)}% / X2=${(dcX2*100).toFixed(1)}%`);
   
   // DRAW NO BET (DNB)
   const dnbHome = pH / (pH + pA);     // Home (remb. si nul)
   const dnbAway = pA / (pH + pA);     // Away (remb. si nul)
   
-  console.log(`\n💰 DRAW NO BET: Home=${(dnbHome*100).toFixed(1)}% / Away=${(dnbAway*100).toFixed(1)}%`);
   
   // FIRST HALF WINNER (1ère mi-temps)
   // Pattern réel: 40% des buts en 1ère mi-temps, 60% en 2e mi-temps
@@ -1279,7 +1219,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     }
   }
   
-  console.log(`\n⏱️ FIRST HALF: 1=${(pHT_1*100).toFixed(1)}% / X=${(pHT_D*100).toFixed(1)}% / 2=${(pHT_2*100).toFixed(1)}%`);
   
   return { 
     lambdaHome, lambdaAway, homeFormMult, awayFormMult,
@@ -1462,7 +1401,6 @@ function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
     const formMultH = advanced.homeFormMult;
     const formMultA = advanced.awayFormMult;
     
-    console.log(`\n✅ Lambdas finales: lH=${lH.toFixed(3)}, lA=${lA.toFixed(3)}\n`);
   
   const CAP = 7;
   const FM = Array.from({length:13}, () => new Array(13).fill(0));
@@ -1561,11 +1499,9 @@ function buildStats(team, form, kind){
   const realStats = FOOTBALL_API.getTeamStats(team.id);
   
   if (realStats && realStats.totalMatches > 0) {
-    console.log(`✓ Stats réelles pour ${team.name} (10 derniers): ${realStats.wins}V-${realStats.draws}D-${realStats.losses}L, ${realStats.gf}GF-${realStats.ga}GA`);
     
     // ✅ UTILISER LA VRAIE FORME DE L'API, pas celle générée!
     const trueForm = realStats.form || form;
-    console.log(`✓✓✓ VRAIE FORME pour ${team.name}:`, trueForm);
     
     const matches = 10; // On utilise 10 matchs
     const gf = realStats.gf || 1;
@@ -1614,7 +1550,6 @@ function buildStats(team, form, kind){
   const cs = Math.round((1 - ga/matches/2.2) * matches * 0.3);
   const bttsPct = (gf/matches/2.2) * 0.6;
   
-  console.log(`⚠️ FALLBACK buildStats pour ${team.name}: form=${form}`);
   return {
     played: matches,
     wins, draws, losses,
@@ -1632,7 +1567,6 @@ function buildStats(team, form, kind){
 
 async function fetchOddsFromAPIFootball(fixtureId) {
   const apiKey = state.settings.apiKey;
-  console.log(`🔑 Clé API trouvée:`, apiKey ? '✅ OUI' : '❌ NON');
   
   if(!apiKey) {
     console.error('❌❌❌ Clé API-Football NON CONFIGURÉE!');
@@ -1642,10 +1576,8 @@ async function fetchOddsFromAPIFootball(fixtureId) {
   try {
     // ✅ Utiliser l'URL Vercel (hardcodée) au lieu de location.origin
     const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=odds&fixture=${fixtureId}`;
-    console.log(`📡 Appel PROXY URL:`, url);
     
     const res = await fetch(url);
-    console.log(`📨 Réponse HTTP:`, res.status, res.statusText);
     
     if(!res.ok) {
       console.error(`❌ API HTTP ${res.status}`);
@@ -1655,10 +1587,8 @@ async function fetchOddsFromAPIFootball(fixtureId) {
     }
     
     const data = await res.json();
-    console.log(`📦 Données reçues:`, data);
     
     const oddsData = data.response || [];
-    console.log(`📊 Nombre d'éléments:`, oddsData.length);
     
     if(oddsData.length === 0) {
       console.warn(`⚠️ Aucune cote trouvée pour fixture ${fixtureId}`);
@@ -1672,7 +1602,6 @@ async function fetchOddsFromAPIFootball(fixtureId) {
     const fixtureOdds = oddsData[0];
     const bookmakers = fixtureOdds?.bookmakers || [];
     
-    console.log(`📊 ${bookmakers.length} bookmakers trouvés`);
     
     bookmakers.forEach(bookmaker => {
       const bookmakerName = bookmaker.name;
@@ -1694,17 +1623,12 @@ async function fetchOddsFromAPIFootball(fixtureId) {
         
         // 🔍 DEBUG: Afficher la structure exacte des cotes
         if(marketName === 'Double Chance' && bookmakerName === 'Unibet') {
-          console.log(`\n🚨🚨🚨 DOUBLE CHANCE UNIBET - RAW API DATA 🚨🚨🚨`);
-          console.log(`API retourne ${values.length} éléments:`);
           values.forEach((v, i) => {
-            console.log(`  [${i}] odd="${v.odd}" value="${v.value}"`);
           });
         }
         
         if(values.length > 0) {
-          console.log(`   📌 ${bookmakerName} - Marché ${marketName}:`);
           values.slice(0, 3).forEach((v, i) => {
-            console.log(`      [${i}] odd="${v.odd}" value="${v.value}" (type: ${typeof v.odd})`);
           });
         }
         
@@ -1713,49 +1637,35 @@ async function fetchOddsFromAPIFootball(fixtureId) {
           value: v.value,
           name: v.value
         }));
-        console.log(`  📌 ${bookmakerName} - Marché ${marketName}:`, oddsMap[bookmakerName].markets[marketName]);
       });
     });
     
-    console.log(`✅✅✅ Cotes finales (4 bookmakers autorisés):`, oddsMap);
     
     // 🔴 FILTRER: Garder UNIQUEMENT les 4 bookmakers autorisés
     const bookmakersAutorisés = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
     Object.keys(oddsMap).forEach(bm => {
       if (!bookmakersAutorisés.includes(bm)) {
-        console.log(`❌ ${bm} SUPPRIMÉ (non autorisé)`);
         delete oddsMap[bm];
       }
     });
     
-    console.log(`📌 BOOKMAKERS GARDÉS: ${Object.keys(oddsMap).join(', ')}`);
-    console.log(`📌 BOOKMAKERS SUPPRIMÉS (autres): ${bookmakersAutorisés.filter(b => !oddsMap[b]).join(', ')}`);
     
     
     // 🔍 DEBUG COMPLET: Afficher TOUS les noms de marchés pour CHAQUE bookmaker
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`🔍 AUDIT DES NOMS DE MARCHÉS - TOUS LES 4 BOOKMAKERS`);
-    console.log(`${'='.repeat(80)}\n`);
     
     const bookmakersToAudit = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
     
     bookmakersToAudit.forEach(bm => {
       if (oddsMap[bm]) {
-        console.log(`\n📌 ${bm.toUpperCase()} - ${Object.keys(oddsMap[bm].markets).length} marchés:`);
-        console.log(`${'─'.repeat(70)}`);
         Object.keys(oddsMap[bm].markets).forEach((marketName, idx) => {
           const cotes = oddsMap[bm].markets[marketName];
           const cotesStr = cotes.map(c => c.odd || c.value).join(', ');
-          console.log(`  [${String(idx).padStart(2)}] "${marketName}" = [${cotesStr}]`);
         });
       } else {
         console.warn(`\n❌ ${bm} N'EXISTE PAS DANS LES COTES!`);
       }
     });
     
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`✅ Copie les noms EXACTS ci-dessus pour créer le VRAI mapping!`);
-    console.log(`${'='.repeat(80)}\n`);
     
     return oddsMap;
     
@@ -1778,7 +1688,6 @@ async function fetchH2H(teamId1, teamId2) {
   try {
     // Endpoint H2H via proxy Vercel
     const url = FOOTBALL_API.BASE + '?endpoint=fixtures&h2h=' + teamId1 + '-' + teamId2;
-    console.log('📡 Fetching H2H:', url);
     
     const res = await fetch(url, {
       headers: { 'x-apisports-key': apiKey }
@@ -1795,7 +1704,6 @@ async function fetchH2H(teamId1, teamId2) {
       .sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date))
       .slice(-5); // 5 derniers
     
-    console.log(`✓ H2H trouvés: ${sorted.length} matches`, sorted);
     
     return sorted.map(m => ({
       date: m.fixture.date.slice(0,10),
@@ -1806,7 +1714,6 @@ async function fetchH2H(teamId1, teamId2) {
     }));
     
   } catch(err) {
-    console.log('ℹ️ H2H non disponible (probablement IDs fictifs), utilise fallback');
     return []; // Fallback silencieux
   }
 }
@@ -2062,7 +1969,6 @@ function calculateBTTS(lambdaHome, lambdaAway) {
   const pHomeScores = 1 - Math.exp(-lambdaHome);
   const pAwayScores = 1 - Math.exp(-lambdaAway);
   const pBTTS = pHomeScores * pAwayScores;
-  console.log(`\n🎯 BTTS: ${(pBTTS * 100).toFixed(1)}% (Home ${(pHomeScores * 100).toFixed(1)}% × Away ${(pAwayScores * 100).toFixed(1)}%)`);
   return pBTTS;
 }
 
@@ -2075,14 +1981,12 @@ function calculateOverUnder(lambdaHome, lambdaAway, threshold = 2.5) {
     }
   }
   const pOver = 1 - pUnder;
-  console.log(`\n📊 OVER/UNDER ${threshold}: Under ${(pUnder * 100).toFixed(1)}% / Over ${(pOver * 100).toFixed(1)}%`);
   return { pUnder, pOver };
 }
 
 // 🎯 CALCUL CLEAN SHEET
 function calculateCleanSheet(lambdaDefense) {
   const pClean = Math.exp(-lambdaDefense);
-  console.log(`\n🧹 CLEAN SHEET: ${(pClean * 100).toFixed(1)}%`);
   return pClean;
 }
 
@@ -2101,9 +2005,7 @@ function buildMarkets(m,model){
     
     if(cacheAge < fiveMinutes) {
       realOdds = cached.data || cached;  // Compatibilité avec anciens caches
-      console.log(`♻️ Cache des cotes valide (${Math.floor(cacheAge/1000)}s)`);
     } else {
-      console.log(`⏰ Cache des cotes EXPIRÉ (${Math.floor(cacheAge/1000)}s > 300s), récupération nouvelle...`);
       delete window.REAL_ODDS_CACHE[m.id];
     }
   }
@@ -2119,7 +2021,6 @@ function buildMarkets(m,model){
       if(realOdds[prefBm] && realOdds[prefBm].markets && realOdds[prefBm].markets['Match Winner']) {
         realCotes1N2 = realOdds[prefBm].markets['Match Winner'];
         usedBookmaker = prefBm;
-        console.log(`✅ Cotes 1N2 trouvées chez ${prefBm}`);
         break;
       }
     }
@@ -2131,7 +2032,6 @@ function buildMarkets(m,model){
         if(bm.markets && bm.markets['Match Winner']) {
           realCotes1N2 = bm.markets['Match Winner'];
           usedBookmaker = bookmakerName;
-          console.log(`✅ Cotes 1N2 trouvées chez ${bookmakerName} (fallback)`);
           break;
         }
       }
@@ -2145,7 +2045,6 @@ function buildMarkets(m,model){
     
     // ⚠️ VÉRIFIER SI UNIBET EXISTE RÉELLEMENT
     if(realOdds['Unibet']) {
-      console.log(`✓ Unibet trouvé dans realOdds`);
     } else {
       console.warn(`❌ UNIBET N'EXISTE PAS pour ce match! Bookmakers disponibles: ${Object.keys(realOdds).join(', ')}`);
     }
@@ -2172,10 +2071,6 @@ function buildMarkets(m,model){
       const impl = odds.map(o => 1/o);
       const totalImpl = impl.reduce((a,b) => a+b, 0);
       
-      console.log(`🔍 ${bm} Double Chance validation:`);
-      console.log(`   Cotes: ${odds.map(o => o.toFixed(2)).join(', ')}`);
-      console.log(`   Implicites: ${impl.map(i => (i*100).toFixed(1)).join('%, ')}%`);
-      console.log(`   Total implicite: ${(totalImpl*100).toFixed(1)}% (attendu 120-200%)`);
       
       // Les implicites d'une double chance devraient sommer à ~1.7-2.0 (avec marge bookmaker ~15-25%)
       // Si trop haut (>2.5) ou trop bas (<1.1), c'est suspect
@@ -2198,7 +2093,6 @@ function buildMarkets(m,model){
       const minImpl = Math.min(...impl);
       const ratioImpl = maxImpl / minImpl;
       
-      console.log(`   Ratio implicite max/min: ${ratioImpl.toFixed(2)}x (97% vs 28% = 3.4x → détecté!)`);
       
       // Double Chance normal: les implicites devraient être relativement équilibrées
       // Pas normal si une est 2.5x+ plus haute que l'autre (ex: 97.1% vs 28.2% = 3.4x!)
@@ -2207,7 +2101,6 @@ function buildMarkets(m,model){
         return false;
       }
       
-      console.log(`✅ ${bm} Double Chance VALIDE!`);
       return true;
     };
     
@@ -2217,11 +2110,9 @@ function buildMarkets(m,model){
         const cotes = realOdds[bm].markets[marketName];
         
         if(marketName === 'Double Chance') {
-          console.log(`📊 DOUBLE CHANCE TROUVÉ chez ${bm}:`, cotes.map((c, i) => `[${i}] ${c.name || c.value} = ${c.odd}`));
           // ✅ SANS VALIDATION - On prend les vraies cotes telles qu'elles sont
         }
         
-        console.log(`✅ Cotes trouvées: ${marketName} chez ${bm}`);
         return {cotes, bookmaker: bm};
       }
     }
@@ -2240,24 +2131,20 @@ function buildMarkets(m,model){
       return;
     }
     
-    console.log('\n🔍 === AUDIT DES NOMS DE MARCHÉS PAR BOOKMAKER ===\n');
     
     const bookmakers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
     
     bookmakers.forEach(bm => {
       if (realOdds[bm]) {
-        console.log(`\n📌 ${bm}:`);
         const markets = Object.keys(realOdds[bm].markets || {});
         markets.forEach(market => {
           const count = realOdds[bm].markets[market].length;
-          console.log(`   • "${market}" (${count} cotes)`);
         });
       } else {
         console.warn(`   ❌ ${bm} pas trouvé`);
       }
     });
     
-    console.log('\n✅ Copie les noms exactes ci-dessus pour mettre à jour le mapping!\n');
   };
   
   // Appeler automatiquement quand les cotes sont chargées
@@ -2333,7 +2220,6 @@ function buildMarkets(m,model){
     // Chercher le PREMIER nom qui existe chez ce bookmaker
     for (const name of possibleNames) {
       if (realOdds[bookmaker].markets?.[name]) {
-        console.log(`✅ Trouvé "${name}" pour ${marketId} chez ${bookmaker}`);
         return name;
       }
     }
@@ -2385,7 +2271,6 @@ function buildMarkets(m,model){
     const alternatives = alternativeNames[searchName] || [];
     for(const altName of alternatives) {
       if(bookmaker.markets[altName]) {
-        console.log(`   📍 Trouvé via alternative: "${altName}" pour "${searchName}"`);
         return bookmaker.markets[altName];
       }
     }
@@ -2407,14 +2292,12 @@ function buildMarkets(m,model){
         if(!isNaN(oddValue) && oddValue > 1) {
           opt.realCote = oddValue;
           opt.bookmaker = result.bookmaker;  // ✅ Ajouter le bookmaker
-          console.log(`✅ 💰 ${marketId}[${idx}] = ${oddValue} chez ${result.bookmaker}`);
           return mkSel(label, est, rngLocal, opt, marketId);
         }
       }
     }
     
     // ❌ PAS DE COTE TROUVÉE → GRISER LE PARI
-    console.log(`⚠️ ${marketId}[${idx}]: pas de cote réelle trouvée, pari grisé`);
     return {
       sel: label, 
       cote: null, 
@@ -2433,29 +2316,30 @@ function buildMarkets(m,model){
   const mk=(l,e,o)=>mkSel(l,e,rng,o);
   const list=[];
 
-  // 📊 AUDIT GLOBAL: Vérifier que tous les marchés ont des vraies cotes
-  console.log(`\n📊 AUDIT COMPLET - Vérifier les vraies cotes par marché:\n`);
+  // 🔍 VERIFICATION TEMPORAIRE: Afficher l'ordre de TOUS les marchés
+  console.log(`\n🔍 VÉRIFICATION - Ordre complet de TOUS les marchés:\n`);
   
-  const allMarkets = ['Match Winner', 'Double Chance', 'Both Teams Score', 'Goals Over/Under', 
-    'First Half Winner', 'HT/FT Double', 'Exact Score', 'Clean Sheet - Home', 'Clean Sheet - Away',
-    'Total - Home', 'Total - Away'];
-  
-  allMarkets.forEach(market => {
+  const verifyMarketOrder = (marketName) => {
     const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
-    let found = false;
     for(let bm of bookmarkers) {
-      if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[market]) {
-        const cotes = realOdds[bm].markets[market];
-        console.log(`✅ ${market.padEnd(25)} → ${bm.padEnd(12)} (${cotes.length} cotes)`);
-        found = true;
-        break;
+      if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
+        const cotes = realOdds[bm].markets[marketName];
+        console.log(`📊 ${marketName.padEnd(30)} (${bm}):`);
+        cotes.forEach((c, idx) => {
+          console.log(`   [${String(idx).padStart(2)}] ${(c.name || c.value || '?').padEnd(30)} = ${String(c.odd).padStart(7)}`);
+        });
+        console.log('');
+        return;
       }
     }
-    if(!found) {
-      console.log(`❌ ${market.padEnd(25)} → PAS TROUVÉ!`);
-    }
+  };
+  
+  // Vérifier TOUS les marchés
+  ['Match Winner', 'Double Chance', 'Both Teams Score', 'Goals Over/Under', 
+   'First Half Winner', 'HT/FT Double', 'Exact Score', 'Clean Sheet - Home', 'Clean Sheet - Away',
+   'Total - Home', 'Total - Away', 'Result/Total Goals', 'Results/Both Teams Score'].forEach(market => {
+    verifyMarketOrder(market);
   });
-  console.log(`\n`);
 
   // ✅ MARCHÉ 1N2: Utiliser les vraies cotes Unibet
   list.push({id:'1n2',name:'Résultat (1N2)',cols:3,sels:[
@@ -2504,7 +2388,6 @@ function buildMarkets(m,model){
           coteOui = parseFloat(cotes[0].odd || cotes[0].value);
           coteNon = cotes[1] ? parseFloat(cotes[1].odd || cotes[1].value) : null;
           if(coteOui && !isNaN(coteOui)) {
-            console.log(`💰 ${csMarket} = Oui: ${coteOui}, Non: ${coteNon || 'N/A'} chez ${bm}`);
             bookmaker = bm;
             break;
           }
@@ -2561,9 +2444,7 @@ function buildMarkets(m,model){
     
     // 🔍 DEBUG: Afficher le détail complet de HT/FT Double avec les noms des paris
     if(result && result.cotes && apiIndex === 0) {
-      console.log(`🎯 DÉTAIL HT/FT Double (${result.bookmaker}) avec mapping:`);
       result.cotes.forEach((cote, idx) => {
-        console.log(`  [${idx}] ${cote.name} → Label: ${htftApiOrder[idx]} = ${parseFloat(cote.odd).toFixed(2)}`);
       });
     }
     
@@ -2573,7 +2454,6 @@ function buildMarkets(m,model){
     if(result && result.cotes && result.cotes[apiIndex]) {
       const realCote = parseFloat(result.cotes[apiIndex].odd);
       if(realCote && !isNaN(realCote)) {
-        console.log(`💰 HT/FT[${k}] (position API [${apiIndex}]) = ${realCote} chez ${result.bookmaker}`);
         htftSel.cote = realCote;
         htftSel.realCote = realCote;
         htftSel.bookmaker = result.bookmaker;
@@ -2586,11 +2466,9 @@ function buildMarkets(m,model){
 
   // HOME OVER/UNDER
   // 🔍 DEBUG: Afficher l'ordre complet de Total - Home
-  console.log(`🔍 TOTAL - HOME - Ordre complet:`);
   if(realOdds && realOdds['Unibet'] && realOdds['Unibet'].markets && realOdds['Unibet'].markets['Total - Home']) {
     const cotes = realOdds['Unibet'].markets['Total - Home'];
     cotes.forEach((c, idx) => {
-      console.log(`  [${idx}] ${c.name || c.value || '?'} = ${c.odd}`);
     });
   }
 
@@ -2603,11 +2481,9 @@ function buildMarkets(m,model){
     mkSmart(H+' ≤ 3.5',1-(model.ou35Home || 0.5),5,rng,'hou')]});
 
   // 🔍 DEBUG: Afficher l'ordre complet de Total - Away
-  console.log(`🔍 TOTAL - AWAY - Ordre complet:`);
   if(realOdds && realOdds['Unibet'] && realOdds['Unibet'].markets && realOdds['Unibet'].markets['Total - Away']) {
     const cotes = realOdds['Unibet'].markets['Total - Away'];
     cotes.forEach((c, idx) => {
-      console.log(`  [${idx}] ${c.name || c.value || '?'} = ${c.odd}`);
     });
   }
 
@@ -2641,7 +2517,6 @@ function buildMarkets(m,model){
         if(cotescore) {
           const realCote = parseFloat(cotescore.odd);
           if(realCote && !isNaN(realCote)) {
-            console.log(`💰 Score ${scoreStr} = ${realCote} chez ${bm}`);
             return { cote: realCote, bookmaker: bm };
           }
         }
@@ -2670,27 +2545,21 @@ function buildMarkets(m,model){
     const d2=i-(j-1); if(d2>0)ea_h+=p;else if(d2===0)ea_d+=p;else ea_a+=p;}
 
   // 🔍 DEBUG: Afficher l'ordre complet de Result/Total Goals
-  console.log(`🔍 RESULT/TOTAL GOALS - Ordre complet:`);
   const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
   for(let bm of bookmarkers) {
     if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets['Result/Total Goals']) {
       const cotes = realOdds[bm].markets['Result/Total Goals'];
-      console.log(`  ${bm}:`);
       cotes.forEach((c, idx) => {
-        console.log(`    [${idx}] ${c.name || c.value || '?'} = ${c.odd}`);
       });
       break;
     }
   }
   
   // 🔍 DEBUG: Afficher l'ordre complet de Results/Both Teams Score
-  console.log(`\n🔍 RESULTS/BOTH TEAMS SCORE - Ordre complet:`);
   for(let bm of bookmarkers) {
     if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets['Results/Both Teams Score']) {
       const cotes = realOdds[bm].markets['Results/Both Teams Score'];
-      console.log(`  ${bm}:`);
       cotes.forEach((c, idx) => {
-        console.log(`    [${idx}] ${c.name || c.value || '?'} = ${c.odd}`);
       });
       break;
     }
@@ -2804,7 +2673,6 @@ const FOOTBALL_API = {
     }
     
     const season = (leagueKey === 'wc') ? '2026' : '2024'; const url = this.BASE + '?endpoint=standings&league=' + leagueId + '&season=' + season;
-    console.log('📡 Fetching:', url);
     
     const res = await fetch(url, {
       headers: {
@@ -2812,7 +2680,6 @@ const FOOTBALL_API = {
       }
     });
     
-    console.log('Response status:', res.status, res.statusText);
     
     if (!res.ok) {
       const text = await res.text();
@@ -2824,7 +2691,6 @@ const FOOTBALL_API = {
     }
     
     const json = await res.json();
-    console.log('✓ Standings loaded:', leagueKey, 'Teams:', json.response[0]?.league?.standings[0]?.length || 0);
     
     const standings = json.response[0].league.standings[0];
     const data = {
@@ -2851,14 +2717,12 @@ const FOOTBALL_API = {
     // Inclure la date dans la clé de cache pour chaque date = cache séparé
     const cacheKey = leagueKey + '_' + (dateStr || 'all');
     if (this.cache.matches[cacheKey]?.data && this.isCacheValid(this.cache.matches[cacheKey].timestamp, 2)) {
-      console.log('✓ Cache hit for:', cacheKey);
       return this.cache.matches[cacheKey].data;
     }
     
     const year = dateStr ? parseInt(dateStr.substring(0, 4)) : new Date().getFullYear();
     const season = (leagueKey === 'wc') ? '2026' : (year - 1);
     const url = this.BASE + '?endpoint=fixtures&league=' + leagueId + '&season=' + season + (dateStr ? '&date=' + dateStr : '');
-    console.log('📡 Fetching matches:', url);
     
     const res = await fetch(url, {
       headers: {
@@ -2866,7 +2730,6 @@ const FOOTBALL_API = {
       }
     });
     
-    console.log('Response status:', res.status);
     
     if (!res.ok) {
       const text = await res.text();
@@ -2875,8 +2738,6 @@ const FOOTBALL_API = {
     }
     
     const json = await res.json();
-    console.log('🔍 Raw API response:', json);
-    console.log('✓ Matches loaded:', json.response?.length || 0, 'matches');
     
     const allMatches = json.response.map(m => ({
       id: m.fixture.id.toString(),
@@ -2901,7 +2762,6 @@ const FOOTBALL_API = {
       const uniqueTeamIds = [...new Set(
         allMatches.flatMap(m => [m.homeTeamId, m.awayTeamId])
       )];
-      console.log('⚽ Équipes du jour:', uniqueTeamIds);
       await this.fetchStatsForTeams(uniqueTeamIds).catch(e => console.warn('Stats non chargées:', e));
       
       // Charger les H2H en arrière-plan pour chaque match
@@ -2930,7 +2790,6 @@ const FOOTBALL_API = {
       }
       hideLoadingOverlay();
       state.footballDataReady = true;
-      console.log('✅ Standings chargés!');
     } catch (err) {
       hideLoadingOverlay();
     }
@@ -2945,8 +2804,6 @@ const FOOTBALL_API = {
       // Plage: 2023-01-01 à 2026-06-30 (couvre toutes les confédérations + WC)
       const url = this.BASE + '?endpoint=fixtures&team=' + teamId + 
         '&from=2023-01-01&to=2026-06-30';
-      console.log('📡 Fetching team stats:', url);
-      console.log('   Team ID:', teamId);
       
       const res = await fetch(url, {
         headers: {
@@ -2959,8 +2816,6 @@ const FOOTBALL_API = {
       const json = await res.json();
       const matches = json.response || [];
       
-      console.log('📊 API Response pour team', teamId, ':', json);
-      console.log('📊 Matches trouvés:', matches.length, 'matches (incluant non-joués)');
       
       if (matches.length === 0) {
         console.warn('⚠️ ZÉRO match pour team', teamId, '- Parameters:', json.parameters);
@@ -2971,7 +2826,6 @@ const FOOTBALL_API = {
       const matchesWithResults = matches.filter(m => 
         m.goals.home !== null && m.goals.away !== null
       );
-      console.log('📊 Matches avec résultats:', matchesWithResults.length);
       
       if (matchesWithResults.length === 0) {
         console.warn('⚠️ ZÉRO match avec résultats pour team', teamId);
@@ -3010,7 +2864,6 @@ const FOOTBALL_API = {
       });
       
       // DEBUG: Afficher les 10 derniers matchs
-      console.log('\n📊 === 10 DERNIERS MATCHS POUR TEAM ' + teamId + ' ===');
       last10.forEach((m, idx) => {
         const isHome = m.teams.home.id == teamId;
         const myGoals = isHome ? m.goals.home : m.goals.away;
@@ -3020,9 +2873,7 @@ const FOOTBALL_API = {
           ? `${m.teams.home.name} ${myGoals}-${oppGoals} ${m.teams.away.name}`
           : `${m.teams.away.name} ${myGoals}-${oppGoals} ${m.teams.home.name}`;
         const marker = idx >= 5 ? '→ ' : '  '; // Marquer les 5 derniers
-        console.log(`${marker}${idx + 1}. [${m.fixture.date.slice(0,10)}] ${matchDisplay} → ${result}`);
       });
-      console.log('📊 === FIN (→ = les 5 derniers) ===\n');
       
       // Calculer la FORM sur les 10 derniers (pour calculs précis)
       form = '';
@@ -3040,8 +2891,6 @@ const FOOTBALL_API = {
         }
       });
       
-      console.log('✓ Stats sur les 10 derniers:', {wins, draws, losses, gf, ga});
-      console.log('✓ Form (5 derniers):', form);
       return { wins, draws, losses, gf, ga, form, totalMatches: matches.length, lastMatches: last10 };
       
     } catch (err) {
@@ -3056,7 +2905,6 @@ const FOOTBALL_API = {
     while (Date.now() - startTime < maxWaitMs) {
       const allLoaded = teamIds.every(id => this.cache.teamStats[id]);
       if (allLoaded) {
-        console.log('✓ Toutes les stats chargées!');
         return true;
       }
       await new Promise(r => setTimeout(r, 100)); // Attendre 100ms avant de revérifier
@@ -3070,22 +2918,18 @@ const FOOTBALL_API = {
     if (!teamIds?.length) return;
     
     try {
-      console.log('📊 Chargement stats pour les équipes du match:', teamIds);
       
       for (const teamId of teamIds) {
         if (this.cache.teamStats[teamId]) {
-          console.log(`✓ Stats en cache pour: ${teamId}`);
           continue;
         }
         
-        console.log(`⏳ Chargement stats team ${teamId}...`);
         const stats = await this.fetchTeamStats(teamId);
         if (stats) {
           this.cache.teamStats[teamId] = {
             ...stats,
             timestamp: Date.now()
           };
-          console.log(`✓ Stats chargées pour team ${teamId}:`, stats.form, `(${stats.totalMatches} matchs)`);
         } else {
           console.warn(`⚠️ Pas de stats pour team ${teamId}`);
         }
@@ -3100,7 +2944,6 @@ const FOOTBALL_API = {
       const league = this.LEAGUES[leagueKey];
       if (!league) return;
       
-      console.log('📊 Chargement des stats des équipes:', leagueKey);
       
       // Récupérer d'abord les standings pour avoir les équipes
       const standings = await this.fetchStandings(leagueKey);
@@ -3119,11 +2962,9 @@ const FOOTBALL_API = {
             teamName: team.name,
             timestamp: Date.now()
           };
-          console.log(`✓ ${team.name}:`, stats.form);
         }
       }
       
-      console.log('✓ Stats chargées!');
     } catch (err) {
       console.error('Erreur chargement stats:', err);
     }
@@ -3153,14 +2994,10 @@ function getMatchData(id){
   // Generate form from REAL stats via cache
   const calcForm = (team) => {
     // ✅ PRIORITÉ: Essayer d'obtenir les VRAIES stats du cache API
-    console.log(`🔍 Cherche forme pour team ${team.id} (${team.name})`);
     const realStats = FOOTBALL_API.getTeamStats(team.id);
-    console.log(`🔍 Cache teamStats[${team.id}]:`, realStats);
     if (realStats && realStats.form) {
-      console.log(`✓✓✓ VRAIE FORME TROUVÉE pour ${team.name}:`, realStats.form);
       return realStats.form;
     }
-    console.log(`⚠️ Pas de forme en cache pour ${team.id}, génération aléatoire`);
     
     // Fallback: générer à partir des stats du standings
     const matches = team.matches || 34;
@@ -3579,14 +3416,11 @@ function openDetailWrapper(id) {
 }
 
 async function openDetail(id){
-  console.log(`🔍 openDetail appelée pour match ID: ${id}`);
   state.selectedMatchId = id;
   const m = MATCHES.find(x => x.id === id);
   
-  console.log(`📋 Match trouvé:`, m);
   // L'ID du match EST le fixtureId de l'API-Football
   const fixtureId = m?.id || m?.fixture?.id;
-  console.log(`📌 fixtureId: ${fixtureId}`);
   
   // Invalider immédiatement le cache
   delete matchCache[id];
@@ -3596,20 +3430,16 @@ async function openDetail(id){
   
   // Récupérer les vraies cotes EN ARRIÈRE-PLAN
   if(m && fixtureId) {
-    console.log(`📡 🚀 DÉMARRAGE du chargement des vraies cotes pour fixture ${fixtureId}...`);
     
     // Afficher un spinner de chargement
     showLoadingOverlay('Chargement cotes réelles...');
     
     try {
-      console.log(`⏳ Appel à fetchOddsFromAPIFootball(${fixtureId})...`);
       const realOdds = await fetchOddsFromAPIFootball(fixtureId);
       hideLoadingOverlay();
       
-      console.log(`📊 Résultat fetchOdds:`, realOdds);
       
       if(realOdds) {
-        console.log(`✅✅✅ VRAIES COTES REÇUES:`, realOdds);
         // Stocker les cotes dans le cache global avec timestamp
         if(!window.REAL_ODDS_CACHE) window.REAL_ODDS_CACHE = {};
         window.REAL_ODDS_CACHE[id] = {
@@ -3897,10 +3727,6 @@ function editOddCote(marketId, selIdx) {
   s.coteManuellementModifiee = true;
   s.realCote = null; // Indiquer que c'est une cote manuelle
   
-  console.log(`✏️ Cote modifiée: ${s.sel}`);
-  console.log(`  Nouvelle: ${newCote.toFixed(2)}`);
-  console.log(`  Nouvelle value: ${(s.value * 100).toFixed(1)}%`);
-  console.log(`  Nouveau Kelly: ${(s.kelly * 100).toFixed(1)}%`);
   
   toast(`✏️ Cote modifiée: ${newCote.toFixed(2)} • Value: ${(s.value*100).toFixed(1)}%`);
   
@@ -4174,7 +4000,6 @@ function generateMarketAnalysis(b) {
   
   // Home Over/Under
   if (b.marketId === 'hou') {
-    console.log(`🔍 DEBUG HOU: m.ou15Home=${m.ou15Home}, m.ou25Home=${m.ou25Home}, m.ou35Home=${m.ou35Home}`);
     const opts = [{label:'> 1.5',prob:m.ou15Home},{label:'> 2.5',prob:m.ou25Home},{label:'> 3.5',prob:m.ou35Home}];
     const sel = opts[b.selIdx];
     return `<div class="detail-section"><h4>📊 ${b.home.name} Over/Under</h4><p>${b.matchName}</p><div style="background:var(--bg);border-radius:8px;padding:10px;margin:10px 0;font-size:12px;"><div style="margin-left:12px;color:var(--txt2);">${opts[0].label}: ${(opts[0].prob*100).toFixed(1)}%<br>${opts[1].label}: ${(opts[1].prob*100).toFixed(1)}%<br>${opts[2].label}: ${(opts[2].prob*100).toFixed(1)}%</div></div></div>`;
@@ -4876,7 +4701,6 @@ function computeStatsFromMatches(matches) {
 async function loadRealOddsForDashboard() {
   if(!MATCHES || MATCHES.length === 0) return;
   
-  console.log(`📡 Chargement des vraies cotes 1X2 pour ${MATCHES.length} matchs...`);
   
   // Charger les cotes en parallèle (max 5 à la fois pour ne pas surcharger)
   const batchSize = 5;
@@ -4899,7 +4723,6 @@ async function loadRealOddsForDashboard() {
                 data: odds,
                 timestamp: Date.now()  // ⏰ Ajouter le timestamp
               };
-              console.log(`✅ Cotes chargées pour ${m.home.name} vs ${m.away.name}`);
             }
           })
           .catch(err => console.warn(`⚠️ Erreur cotes ${m.id}:`, err));
@@ -4911,7 +4734,6 @@ async function loadRealOddsForDashboard() {
   
   // Re-rendre le dashboard avec les vraies cotes
   render();
-  console.log(`✅ Toutes les cotes chargées!`);
 }
 
 async function loadDashboardMatches() {
