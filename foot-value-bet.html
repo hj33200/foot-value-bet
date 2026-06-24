@@ -1063,7 +1063,7 @@ function calculateBookmakerAnalysis(homeLastMatches, awayLastMatches, homeId, aw
 // 🎯 CALCUL 1N2 AVANCÉ - HYBRIDE DATA + ANALYSE SPORTIVE
 // Combine win rates observés (60%) + Elo qualité adversaires (40%)
 // Ça c'est une analyse FINE comme demandé!
-function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, awayLastMatches) {
+function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, awayLastMatches, competitionType = 'CHAMPIONSHIP') {
   
   // 1️⃣ EXTRAIRE WIN RATES HISTORIQUES (DATA BRUTE - 60%)
   const homeWinRate = bookmakerData.homeStats.winRate;      // % réel de victoires
@@ -1083,26 +1083,36 @@ function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, aw
   const sosAway = calculateSOS(awayId, 'Away', awayLastMatches, 'CHAMPIONSHIP');
   
   // 5️⃣ COMBINER HISTORIQUE + QUALITÉ POUR PROBABILITÉS FINALES
-  // 60% historique réel (ce qui s'est passé)
-  // 40% analyse Elo/SOS (qualité des victoires/défaites)
+  // Pour Coupe du Monde: 30% historique, 70% Elo (car peu de matchs et données fiables)
+  // Pour autres: 60% historique, 40% Elo (plus de données)
+  const isWorldCup = competitionType === 'WORLD_CUP';
+  const historicalWeight = isWorldCup ? 0.3 : 0.6;
+  const eloWeight = isWorldCup ? 0.7 : 0.4;
   
   const pH_historical = homeWinRate;
   const pH_elo = eloWinProb;
-  const pH_mixed = (pH_historical * 0.6) + (pH_elo * 0.4);
+  const pH_mixed = (pH_historical * historicalWeight) + (pH_elo * eloWeight);
   
-  // Nuls: utiliser l'historique direct (pas d'ajustement Elo)
-  const pD_final = homeDrawRate;
+  // ⚠️ NULS: Réduire le poids de l'historique pour les matchs mal appairés
+  // Si les équipes sont très déséquilibrées (Elo > 2x différence), pD doit être très bas
+  const eloDiff = Math.abs(homeElo - awayElo);
+  const drawWeight = eloDiff > 500 ? 0.3 : (eloDiff > 300 ? 0.5 : 0.7);  // Moins de nuls si déséquilibré
+  const pD_final = homeDrawRate * drawWeight;  // ← Réduire basé sur déséquilibre
   
   // Away: même logique
   const pA_historical = awayWinRate;
   const pA_elo = 1 - eloWinProb;
-  const pA_mixed = (pA_historical * 0.6) + (pA_elo * 0.4);
+  const pA_mixed = (pA_historical * historicalWeight) + (pA_elo * eloWeight);
   
   // 6️⃣ NORMALISER (s'assurer que total = 100%)
-  const total = pH_mixed + pD_final + pA_mixed;
-  const pH = total > 0 ? pH_mixed / total : 1/3;
-  const pD = total > 0 ? pD_final / total : 1/3;
-  const pA = total > 0 ? pA_mixed / total : 1/3;
+  // ⚠️ IMPORTANT: Ne pas diviser par total! Renormaliser correctement!
+  // Calculer pH et pA, puis pD = 1 - pH - pA pour garantir total = 1.0
+  const total = pH_mixed + pA_mixed;
+  
+  // Renormaliser pH et pA pour qu'ils somment à (1 - pD_final)
+  const pH = (pH_mixed / total) * (1 - pD_final);
+  const pA = (pA_mixed / total) * (1 - pD_final);
+  const pD = pD_final;  // Les nuls restent comme calculés
   
   return { 
     pH, pD, pA,
@@ -1311,7 +1321,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   // 🎯 CALCULS BASÉS SUR L'ANALYSE RÉELLE (0% IMAGINATION, 100% DATA)
   
   // 1️⃣ RÉSULTAT 1N2 - ANALYSE FINE: 60% Historique + 40% Elo (Qualité adversaires)
-  const result1N2 = calculate1N2Advanced(bookmakerData, home.id, away.id, homeLastMatches, awayLastMatches);
+  // MAIS pour Coupe du Monde: 30% Historique + 70% Elo (données moins fiables)
+  const result1N2 = calculate1N2Advanced(bookmakerData, home.id, away.id, homeLastMatches, awayLastMatches, competitionType);
   const pH = result1N2.pH;
   const pD = result1N2.pD;
   const pA = result1N2.pA;
@@ -4360,7 +4371,7 @@ function generateMarketAnalysis(b) {
           Elo brut: <strong>${m.eloRawProb ? m.eloRawProb.toFixed(1) : '—'}%</strong><br>
           Impact SOS: <strong>${m.sosImpact ? (m.sosImpact > 0 ? '+' : '') + m.sosImpact.toFixed(1) : '—'}%</strong><br>
           Impact Poisson: <strong>${m.poissonImpact ? (m.poissonImpact > 0 ? '+' : '') + m.poissonImpact.toFixed(1) : '—'}%</strong><br>
-          <strong style="color: var(--accent); font-size: 13px;">Probabilité finale: ${m.finalProb ? m.finalProb.toFixed(1) : '—'}%</strong>
+          <strong style="color: var(--accent); font-size: 13px;">Probabilité finale: ${m.pH ? (m.pH * 100).toFixed(1) : '—'}%</strong>
         </div>
       </div>
     </div>
