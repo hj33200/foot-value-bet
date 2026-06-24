@@ -3600,7 +3600,8 @@ function matchCard(m){
   
   // Chercher les vraies cotes Unibet pour 1X2
   let o1, ox, o2;
-  const realOdds = window.REAL_ODDS_CACHE?.[m.id];
+  const cachedData = window.REAL_ODDS_CACHE?.[m.id];
+  const realOdds = cachedData?.data || cachedData;  // ← Extraire .data si présent!
   
   if(realOdds && realOdds['Unibet'] && realOdds['Unibet'].markets?.['Match Winner']) {
     const cotes = realOdds['Unibet'].markets['Match Winner'];
@@ -5022,8 +5023,10 @@ async function loadDashboardMatches() {
     matchCache = {};
     state.footballDataReady = true;
     toast(newMatches.length + ' match(s)');
-    // Charger les vraies cotes 1X2 en arrière-plan
-    loadRealOddsForDashboard();
+    
+    // 🔴 IMPORTANT: ATTENDRE le chargement des vraies cotes AVANT de re-render!
+    await loadRealOddsForDashboard();  // ← Ajouter await!
+    render();  // ← Appeler render() APRÈS les vraies cotes!
   } catch (err) {
     hideLoadingOverlay();
     console.error('Load error:', err);
