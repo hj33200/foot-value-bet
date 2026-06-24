@@ -2696,25 +2696,78 @@ function buildMarkets(m,model){
     }
   }
 
+  // 🎯 Fonction pour chercher une cote par label/nom peu importe le bookmaker
+  const findCoteByLabel = (marketName, searchLabel) => {
+    const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+    
+    for(let bm of bookmarkers) {
+      if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
+        const cotes = realOdds[bm].markets[marketName];
+        // Chercher la cote qui contient le label recherché
+        const cotesFound = cotes.find(c => {
+          const name = (c.name || c.value || '').toLowerCase();
+          const searchLower = searchLabel.toLowerCase();
+          // Chercher si tous les mots-clés du searchLabel sont dans le nom
+          const keywords = searchLower.split('/').map(k => k.trim());
+          return keywords.every(kw => name.includes(kw));
+        });
+        
+        if(cotesFound) {
+          const realCote = parseFloat(cotesFound.odd);
+          if(realCote && !isNaN(realCote)) {
+            return { cote: realCote, bookmaker: bm };
+          }
+        }
+      }
+    }
+    return null;
+  };
+
   // Result + Over/Under 2.5
   let r1o=0,r1u=0,rNo=0,rNu=0,r2o=0,r2u=0;
   for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;const o=(i+j)>2.5;
     if(i>j){o?r1o+=p:r1u+=p}else if(i<j){o?r2o+=p:r2u+=p}else{o?rNo+=p:rNu+=p}}
-  list.push({id:'rou',name:'Résultat + Over/Under 2.5',cols:2,sels:[
-    mkSmart(H+' & +2.5',r1o,0,rng,'rou'),
-    mkSmart(H+' & -2.5',r1u,1,rng,'rou'),
-    mkSmart('Nul & +2.5',rNo,2,rng,'rou'),
-    mkSmart('Nul & -2.5',rNu,3,rng,'rou'),
-    mkSmart(A+' & +2.5',r2o,4,rng,'rou'),
-    mkSmart(A+' & -2.5',r2u,5,rng,'rou')]});
+  
+  const rouSels = [
+    {prob: r1o, label: 'Home/Over 2.5', display: H+' & +2.5'},
+    {prob: r1u, label: 'Home/Under 2.5', display: H+' & -2.5'},
+    {prob: rNo, label: 'Draw/Over 2.5', display: 'Nul & +2.5'},
+    {prob: rNu, label: 'Draw/Under 2.5', display: 'Nul & -2.5'},
+    {prob: r2o, label: 'Away/Over 2.5', display: A+' & +2.5'},
+    {prob: r2u, label: 'Away/Under 2.5', display: A+' & -2.5'}
+  ].map(item => {
+    const coteData = findCoteByLabel('Result/Total Goals', item.label);
+    const opt = {allowGray:true};
+    if(coteData) {
+      opt.realCote = coteData.cote;
+      opt.bookmaker = coteData.bookmaker;
+    }
+    return mkSel(item.display, item.prob, rng, opt, 'rou');
+  });
+  list.push({id:'rou',name:'Résultat + Over/Under 2.5',cols:2,sels:rouSels});
 
   // Result + BTTS
   let r1b=0,r1n=0,rNb=0,rNn=0,r2b=0,r2n=0;
   for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;const b=(i>0&&j>0);
     if(i>j){b?r1b+=p:r1n+=p}else if(i<j){b?r2b+=p:r2n+=p}else{b?rNb+=p:rNn+=p}}
-  list.push({id:'rbtts',name:'Résultat + BTTS',cols:2,sels:[
-    mkSmart(H+' & BTTS Oui',r1b,0,rng,'rbtts'),mkSmart(H+' & BTTS Non',r1n,1,rng,'rbtts'),
-    mkSmart('Nul & BTTS Oui',rNb,2,rng,'rbtts'),mkSmart(A+' & BTTS Oui',r2b,3,rng,'rbtts'),mkSmart(A+' & BTTS Non',r2n,4,rng,'rbtts')]});
+  
+  const rbtsSels = [
+    {prob: r1b, label: 'Home/Yes', display: H+' & BTTS Oui'},
+    {prob: r1n, label: 'Home/No', display: H+' & BTTS Non'},
+    {prob: rNb, label: 'Draw/Yes', display: 'Nul & BTTS Oui'},
+    {prob: rNn, label: 'Draw/No', display: 'Nul & BTTS Non'},
+    {prob: r2b, label: 'Away/Yes', display: A+' & BTTS Oui'},
+    {prob: r2n, label: 'Away/No', display: A+' & BTTS Non'}
+  ].map(item => {
+    const coteData = findCoteByLabel('Results/Both Teams Score', item.label);
+    const opt = {allowGray:true};
+    if(coteData) {
+      opt.realCote = coteData.cote;
+      opt.bookmaker = coteData.bookmaker;
+    }
+    return mkSel(item.display, item.prob, rng, opt, 'rbtts');
+  });
+  list.push({id:'rbtts',name:'Résultat + BTTS',cols:2,sels:rbtsSels});
 
   return list;
 }
