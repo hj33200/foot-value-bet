@@ -2669,6 +2669,33 @@ function buildMarkets(m,model){
     const d=i-1-j; if(d>0)eh_h+=p;else if(d===0)eh_d+=p;else eh_a+=p;
     const d2=i-(j-1); if(d2>0)ea_h+=p;else if(d2===0)ea_d+=p;else ea_a+=p;}
 
+  // 🔍 DEBUG: Afficher l'ordre complet de Result/Total Goals
+  console.log(`🔍 RESULT/TOTAL GOALS - Ordre complet:`);
+  const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+  for(let bm of bookmarkers) {
+    if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets['Result/Total Goals']) {
+      const cotes = realOdds[bm].markets['Result/Total Goals'];
+      console.log(`  ${bm}:`);
+      cotes.forEach((c, idx) => {
+        console.log(`    [${idx}] ${c.name || c.value || '?'} = ${c.odd}`);
+      });
+      break;
+    }
+  }
+  
+  // 🔍 DEBUG: Afficher l'ordre complet de Results/Both Teams Score
+  console.log(`\n🔍 RESULTS/BOTH TEAMS SCORE - Ordre complet:`);
+  for(let bm of bookmarkers) {
+    if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets['Results/Both Teams Score']) {
+      const cotes = realOdds[bm].markets['Results/Both Teams Score'];
+      console.log(`  ${bm}:`);
+      cotes.forEach((c, idx) => {
+        console.log(`    [${idx}] ${c.name || c.value || '?'} = ${c.odd}`);
+      });
+      break;
+    }
+  }
+
   // Result + Over/Under 2.5
   let r1o=0,r1u=0,rNo=0,rNu=0,r2o=0,r2u=0;
   for(let i=0;i<=12;i++)for(let j=0;j<=12;j++){const p=FM[i][j];if(!p)continue;const o=(i+j)>2.5;
