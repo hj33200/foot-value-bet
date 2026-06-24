@@ -1914,17 +1914,24 @@ async function fetchH2H(teamId1, teamId2) {
   }
   
   const apiKey = FOOTBALL_API.getApiKey();
-  if (!apiKey) throw new Error('API key missing');
+  if (!apiKey) {
+    console.warn('⚠️ H2H: API key missing');
+    return [];
+  }
   
   try {
     // Endpoint H2H via proxy Vercel
     const url = FOOTBALL_API.BASE + '?endpoint=fixtures&h2h=' + teamId1 + '-' + teamId2;
+    console.log('🔍 H2H: Tentative fetch:', url);  // DEBUG
     
     const res = await fetch(url, {
       headers: { 'x-apisports-key': apiKey }
     });
     
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      console.warn(`⚠️ H2H API retour ${res.status} - Ignoré silencieusement`);  // DEBUG
+      return [];  // ← Retourner vide au lieu de throw
+    }
     
     const json = await res.json();
     const matches = json.response || [];
@@ -2270,9 +2277,25 @@ function buildMarkets(m,model){
   }
   
   // 🎯 FONCTION: Chercher les vraies cotes avec fallback INTELLIGENT
-
-  const getRealCotes = (marketName, preferredBMs = ['Bet365', '1xBet', 'William Hill']) => {
-    if(!realOdds) return null;
+  const getRealCotes = (marketName, preferredBMs = ['Bet365', '1xBet', 'William Hill'], matchId = null) => {
+    // 🔍 CHERCHER DANS LE BON CACHE (par matchId si disponible)
+    let realOdds = null;
+    if(matchId && window.REAL_ODDS_CACHE && window.REAL_ODDS_CACHE[matchId]) {
+      realOdds = window.REAL_ODDS_CACHE[matchId].data || window.REAL_ODDS_CACHE[matchId];
+      console.log(`✅ getRealCotes: Trouvé cache pour matchId=${matchId}`);  // DEBUG
+    } else if(window.REAL_ODDS_CACHE) {
+      // Fallback: chercher le premier disponible
+      const firstKey = Object.keys(window.REAL_ODDS_CACHE)[0];
+      if(firstKey) {
+        realOdds = window.REAL_ODDS_CACHE[firstKey].data || window.REAL_ODDS_CACHE[firstKey];
+        console.log(`⚠️ getRealCodes: Pas de cache pour matchId=${matchId}, utilisant ${firstKey}`);  // DEBUG
+      }
+    }
+    
+    if(!realOdds) {
+      console.warn(`❌ getRealCotes: Pas de cache du tout! REAL_ODDS_CACHE=`, window.REAL_ODDS_CACHE);  // DEBUG
+      return null;
+    }
     
     // ⚠️ VÉRIFIER SI UNIBET EXISTE RÉELLEMENT
     if(realOdds['Unibet']) {
@@ -2303,19 +2326,20 @@ function buildMarkets(m,model){
       const totalImpl = impl.reduce((a,b) => a+b, 0);
       
       
-      // Les implicites d'une double chance devraient sommer à ~1.7-2.0 (avec marge bookmaker ~15-25%)
-      // Si trop haut (>2.5) ou trop bas (<1.1), c'est suspect
-      if(totalImpl < 1.1 || totalImpl > 2.5) {
-        console.warn(`❌ ${bm} Double Chance INVALIDE: total implicite ${(totalImpl*100).toFixed(1)}% hors limites [110%-250%]`);
+      // Les implicites d'une cote 1N2 devraient sommer à ~0.95-1.0 (avec marge bookmaker ~5-15%)
+      // Les vraies cotes ont souvent une marge très basse ~5%, accepter à partir de 1.00
+      if(totalImpl < 1.00 || totalImpl > 2.5) {
+        console.warn(`❌ ${bm} Cotes INVALIDES: total implicite ${(totalImpl*100).toFixed(1)}% hors limites [100%-250%]`);
         return false;
       }
       
       // Vérifier les anomalies: si une cote est BEAUCOUP plus haute que les autres, c'est suspect
+      // Pour 1N2: les cotes peuvent varier beaucoup (ex: 1.71 vs 4.58 = 2.68x), c'est normal
       const maxOdd = Math.max(...odds);
       const minOdd = Math.min(...odds);
       const ratio = maxOdd / minOdd;
-      if(ratio > 3) {  // Baissé de 4 à 3 (3.45 > 3)
-        console.warn(`❌ ${bm} Double Chance anomalie RATIO: écart excessif (${maxOdd.toFixed(2)}/${minOdd.toFixed(2)} = ${ratio.toFixed(1)}x) - SUSPECTE FICTIVE`);
+      if(ratio > 5) {  // Augmenté de 3 à 5 (4.58/1.71 = 2.68x est OK)
+        console.warn(`❌ ${bm} Cotes anomalie RATIO: écart excessif (${maxOdd.toFixed(2)}/${minOdd.toFixed(2)} = ${ratio.toFixed(1)}x) - SUSPECTE FICTIVE`);
         return false;
       }
       
@@ -2327,8 +2351,8 @@ function buildMarkets(m,model){
       
       // Double Chance normal: les implicites devraient être relativement équilibrées
       // Pas normal si une est 2.5x+ plus haute que l'autre (ex: 97.1% vs 28.2% = 3.4x!)
-      if(ratioImpl > 2.5) {  // ← FIX: Detecter 97% vs 28% = 3.4x
-        console.warn(`❌ ${bm} Double Chance INCOHÉRENT: implicites trop déséquilibrées (${(maxImpl*100).toFixed(1)}% vs ${(minImpl*100).toFixed(1)}% = ${ratioImpl.toFixed(1)}x) - UNE COTE EST FICTIVE!`);
+      if(ratioImpl > 3.5) {  // Augmenté de 2.5 à 3.5 pour accepter les vraies cotes 1N2
+        console.warn(`❌ ${bm} Cotes INCOHÉRENTES: implicites trop déséquilibrées (${(maxImpl*100).toFixed(1)}% vs ${(minImpl*100).toFixed(1)}% = ${ratioImpl.toFixed(1)}x) - UNE COTE EST FICTIVE!`);
         return false;
       }
       
@@ -2339,6 +2363,7 @@ function buildMarkets(m,model){
     for(let bm of priority) {
       if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
         const cotes = realOdds[bm].markets[marketName];
+        console.log(`✅ TROUVÉ ${marketName} chez ${bm}:`, cotes);  // DEBUG
         
         if(marketName === 'Double Chance') {
           // ✅ SANS VALIDATION - On prend les vraies cotes telles qu'elles sont
@@ -2347,6 +2372,8 @@ function buildMarkets(m,model){
         return {cotes, bookmaker: bm};
       }
     }
+    
+    console.warn(`❌ PAS TROUVÉ: ${marketName} chez ${priority.join(', ')}`);  // DEBUG
     
     // ❌ FALLBACK SUPPRIMÉ - On a UNIQUEMENT 4 bookmakers, pas d'autres à chercher
     // Si pas trouvé dans les 4 → retourner null
@@ -2510,16 +2537,19 @@ function buildMarkets(m,model){
   };
   
   // 🎯 FONCTION: Créer une sélection (VRAIES COTES SEULEMENT)
-  const mkSmart = (label, est, idx, rngLocal, marketId) => {
+  const mkSmart = (label, est, idx, rngLocal, marketId, matchId = null) => {
     const opt = {};
     
     // Chercher les vraies cotes
     if(marketId) {
       const marketName = marketMapping[marketId];
-      const result = getRealCotes(marketName);
+      console.log(`🔍 mkSmart cherche ${marketName} (marketId=${marketId}, idx=${idx}, label=${label}, matchId=${matchId})`);  // DEBUG
+      const result = getRealCotes(marketName, ['Unibet', 'Bet365', '1xBet', 'William Hill'], matchId);  // ← Passer matchId!
+      console.log(`📊 getRealCotes retourne:`, result);  // DEBUG
       
       if(result && result.cotes && result.cotes[idx]) {
         const oddValue = parseFloat(result.cotes[idx].odd);
+        console.log(`✅ Cote trouvée: idx=${idx}, odd=${oddValue}, label=${label}`);  // DEBUG
         if(!isNaN(oddValue) && oddValue > 1) {
           opt.realCote = oddValue;
           opt.bookmaker = result.bookmaker;  // ✅ Ajouter le bookmaker
@@ -2529,6 +2559,7 @@ function buildMarkets(m,model){
     }
     
     // ❌ PAS DE COTE TROUVÉE → GRISER LE PARI
+    console.warn(`⚠️ mkSmart: Pas de cote trouvée pour ${label} (marketId=${marketId}, matchId=${matchId})`);  // DEBUG
     return {
       sel: label, 
       cote: null, 
@@ -2549,9 +2580,9 @@ function buildMarkets(m,model){
 
   // ✅ MARCHÉ 1N2: Utiliser les vraies cotes Unibet
   list.push({id:'1n2',name:'Résultat (1N2)',cols:3,sels:[
-    mkSmart(m.home.name, model.pH, 0, rng, '1n2'),
-    mkSmart('Match nul', model.pD, 1, rng, '1n2'),
-    mkSmart(m.away.name, model.pA, 2, rng, '1n2')
+    mkSmart(m.home.name, model.pH, 0, rng, '1n2', m.id),
+    mkSmart('Match nul', model.pD, 1, rng, '1n2', m.id),
+    mkSmart(m.away.name, model.pA, 2, rng, '1n2', m.id)
   ]});
 
   list.push({id:'dc',name:'Double chance',cols:3,sels:[
@@ -2566,13 +2597,13 @@ function buildMarkets(m,model){
 
   const tg=[];let totIdx=0;
   // 1.5 buts
-  tg.push(mkSmart('Plus de 1.5 buts', model.ou15Total?.pOver || model.over[1.5] || 0.5, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Plus de 1.5 buts', model.ou15Total?.pOver || model.over[1.5] || 0.5, totIdx++, rng, 'tot', m.id));
   tg.push(mkSmart('Moins de 1.5 buts', model.ou15Total?.pUnder || (1-model.over[1.5]) || 0.5, totIdx++, rng, 'tot'));
   // 2.5 buts
-  tg.push(mkSmart('Plus de 2.5 buts', model.ou25Total?.pOver || model.over[2.5] || 0.5, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Plus de 2.5 buts', model.ou25Total?.pOver || model.over[2.5] || 0.5, totIdx++, rng, 'tot', m.id));
   tg.push(mkSmart('Moins de 2.5 buts', model.ou25Total?.pUnder || (1-model.over[2.5]) || 0.5, totIdx++, rng, 'tot'));
   // 3.5 buts
-  tg.push(mkSmart('Plus de 3.5 buts', model.ou35Total?.pOver || model.over[3.5] || 0.5, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Plus de 3.5 buts', model.ou35Total?.pOver || model.over[3.5] || 0.5, totIdx++, rng, 'tot', m.id));
   tg.push(mkSmart('Moins de 3.5 buts', model.ou35Total?.pUnder || (1-model.over[3.5]) || 0.5, totIdx++, rng, 'tot'));
   list.push({id:'tot',name:'Total de buts (Over / Under)',cols:2,sels:tg});
 
