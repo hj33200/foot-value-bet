@@ -1128,57 +1128,45 @@ function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, aw
 // Même approche que 1N2: 60% Historique + 40% Analyse fine
 
 // 🎯 OVER/UNDER FINE
-function calculateOverUnderFine(bookmakerData, homeGoalsExpected, awayGoalsExpected) {
-  const totalGoalsExpected = homeGoalsExpected + awayGoalsExpected;
+function calculateOverUnderPoisson(lambdaHome, lambdaAway) {
+  // Calcule P(Total buts > threshold) pour différents seuils
+  const calculateOverThreshold = (lH, lA, threshold) => {
+    let pUnder = 0;
+    // Somme toutes les combinaisons où total ≤ threshold
+    for (let h = 0; h <= Math.ceil(threshold); h++) {
+      for (let a = 0; a <= Math.ceil(threshold - h); a++) {
+        if (h + a <= threshold) {
+          pUnder += poissonProb(lH, h) * poissonProb(lA, a);
+        }
+      }
+    }
+    return 1 - pUnder; // Over = 1 - Under
+  };
   
-  // Historique brut (60%)
-  const ou25_historical = (bookmakerData.homeMatches.over25Percent + bookmakerData.awayMatches.over25Percent) / 2;
+  const ou15 = calculateOverThreshold(lambdaHome, lambdaAway, 1.5);
+  const ou25 = calculateOverThreshold(lambdaHome, lambdaAway, 2.5);
+  const ou35 = calculateOverThreshold(lambdaHome, lambdaAway, 3.5);
   
-  // Analyse fine (40%): Basée sur l'offensive/défense attendue
-  // Utiliser Poisson pour estimer la proba théorique basée sur les buts attendus
-  const ou25_theoretical = calculatePoissonThreshold(totalGoalsExpected, 2.5);
-  
-  // Combiner
-  const ou25_final = (ou25_historical * 0.6) + (ou25_theoretical * 0.4);
-  
-  // Over 1.5 et 3.5 dérivés
-  const ou15_final = Math.min(1, ou25_final + 0.25);
-  const ou35_final = Math.max(0.05, ou25_final - 0.25);
-  
-  return { ou15: ou15_final, ou25: ou25_final, ou35: ou35_final };
+  return { ou15, ou25, ou35 };
 }
 
 // 🎯 BTTS FINE
-function calculateBTTSFine(bookmakerData) {
-  // Historique brut (60%)
-  const btts_historical = (bookmakerData.homeMatches.bttsPercent + bookmakerData.awayMatches.bttsPercent) / 2;
+function calculateBTTSPoisson(lambdaHome, lambdaAway) {
+  // Probabilité Poisson que chaque équipe marque ≥ 1 but
+  const pHomeScores = 1 - Math.exp(-lambdaHome);
+  const pAwayScores = 1 - Math.exp(-lambdaAway);
   
-  // Analyse fine (40%): Basée sur les taux de marquage réels
-  const pHomeScores = bookmakerData.homeMatches.scoredPercent;
-  const pAwayScores = bookmakerData.awayMatches.scoredPercent;
-  const btts_theoretical = pHomeScores * pAwayScores;
+  // BTTS = probabilité que les DEUX marquent
+  const pBTTS = pHomeScores * pAwayScores;
   
-  // Combiner
-  const btts_final = (btts_historical * 0.6) + (btts_theoretical * 0.4);
-  
-  return btts_final;
+  return { pBTTS, pHomeScores, pAwayScores };
 }
 
 // 🎯 CLEAN SHEET FINE
-function calculateCleanSheetFine(bookmakerData, goalsExpected, isHome) {
-  // Historique brut (60%)
-  const cs_historical = isHome ? 
-    bookmakerData.awayMatches.cleanSheetPercent : 
-    bookmakerData.homeMatches.cleanSheetPercent;
-  
-  // Analyse fine (40%): Basée sur les buts encaissés attendus
-  // P(0 buts) = exp(-lambda) via distribution Poisson
-  const cs_theoretical = Math.exp(-goalsExpected);
-  
-  // Combiner
-  const cs_final = (cs_historical * 0.6) + (cs_theoretical * 0.4);
-  
-  return cs_final;
+function calculateCleanSheetPoisson(lambdaDefense) {
+  // P(Clean Sheet) = P(0 buts encaissés) = e^(-lambda)
+  const pClean = Math.exp(-lambdaDefense);
+  return pClean;
 }
 
 // 🎯 SCORING PROBABILITY (Team marque) FINE
@@ -1308,9 +1296,19 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   // 5️⃣ LAMBDAS POISSON FINALES avec ELO + SOS
   const homeAdvantage = compProps.homeAdvantage; // ✅ Utilise le type de compétition
   
-  // ✅ NOUVEAU: Lambdas ajustés par SOS
-  let lambdaHome = (homeOffense * homeEloMult * 1.8 * sosHome.sos) / (awayDefense * sosAway.sos + 0.1);
-  let lambdaAway = (awayOffense * awayEloMult * 1.8 * sosAway.sos) / (homeDefense * sosHome.sos + 0.1);
+  // ✅ CALCUL CORRECT DES LAMBDAS:
+  // Base: homeOffense / awayDefense (ratio de force offensive/défensive)
+  // Ajustement Elo: Multiplicateur basé sur l'avantage Elo (pas probabilité!)
+  // Ajustement SOS: Diviseur basé sur force des adversaires
+  // Ajustement FORME: Multiplicateur basé sur les 5 derniers matchs
+  
+  // Calcul du multiplicateur Elo: Si Elo favored 81%, le ratio est 0.811/0.189 = 4.3x
+  // Mais on le limite à un multiplicateur raisonnable (1.1x à 1.3x)
+  const eloMultiplier = Math.min(1.3, 1.0 + (eloWinProb - 0.5) * 0.6);  // Entre 0.7 et 1.3
+  
+  // Lambdas: (Offensive / Défensive adverse) * Multiplicateur Elo * Ajustement SOS * Forme récente
+  let lambdaHome = (homeOffense / (awayDefense + 0.1)) * eloMultiplier * sosHome.sos / sosAway.sos * homeFormMult;
+  let lambdaAway = (awayOffense / (homeDefense + 0.1)) * (1 / eloMultiplier) * sosAway.sos / sosHome.sos * awayFormMult;
   
   lambdaHome *= homeAdvantage;
   
@@ -1333,8 +1331,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const awayGoalsExpected = bookmakerData.awayOffensiveVsHomeDefense;
   const totalGoalsExpected = homeGoalsExpected + awayGoalsExpected;
   
-  // 2️⃣ OVER/UNDER - ANALYSE FINE: 60% Historique + 40% Offensive/Défense
-  const ouFine = calculateOverUnderFine(bookmakerData, homeGoalsExpected, awayGoalsExpected);
+  // 2️⃣ OVER/UNDER - FORMULE POISSON: Basée sur les lambdas réels (Attaque/Défense × Elo × SOS × Forme)
+  const ouFine = calculateOverUnderPoisson(lambdaHome, lambdaAway);
   const ou15Home = { pOver: ouFine.ou15, pUnder: 1 - ouFine.ou15 };
   const ou15Away = { pOver: ouFine.ou15, pUnder: 1 - ouFine.ou15 };
   const ou25Home = { pOver: ouFine.ou25, pUnder: 1 - ouFine.ou25 };
@@ -1345,16 +1343,19 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const ou25Total = { pOver: ouFine.ou25, pUnder: 1 - ouFine.ou25 };
   const ou35Total = { pOver: ouFine.ou35, pUnder: 1 - ouFine.ou35 };
   
-  // 3️⃣ BTTS - ANALYSE FINE: 60% Historique + 40% Scoring probability
-  const pBTTS = calculateBTTSFine(bookmakerData);
+  // 3️⃣ BTTS - FORMULE POISSON: P(Home ≥ 1) × P(Away ≥ 1)
+  const bttsResult = calculateBTTSPoisson(lambdaHome, lambdaAway);
+  const pBTTS = bttsResult.pBTTS;
+  const pHomeScoresPoisson = bttsResult.pHomeScores;
+  const pAwayScoresPoisson = bttsResult.pAwayScores;
   
-  // 4️⃣ CLEAN SHEET - ANALYSE FINE: 60% Historique + 40% Défense théorique
-  const csHome = calculateCleanSheetFine(bookmakerData, awayGoalsExpected, true);
-  const csAway = calculateCleanSheetFine(bookmakerData, homeGoalsExpected, false);
+  // 4️⃣ CLEAN SHEET - FORMULE POISSON: P(0 buts encaissés) = e^(-lambda_opponent)
+  const csHome = calculateCleanSheetPoisson(lambdaAway);  // Home encaisse lambdaAway (attaque adversaire)
+  const csAway = calculateCleanSheetPoisson(lambdaHome);  // Away encaisse lambdaHome (attaque adversaire)
   
-  // 5️⃣ PROBABILITÉS DE MARQUAGE - ANALYSE FINE: 60% Historique + 40% Théorique
-  const pHomeScores = calculateScoringProbabilityFine(bookmakerData, homeGoalsExpected, true);
-  const pAwayScores = calculateScoringProbabilityFine(bookmakerData, awayGoalsExpected, false);
+  // 5️⃣ PROBABILITÉS DE MARQUAGE - FORMULE POISSON: P(équipe marque ≥ 1) = 1 - e^(-lambda)
+  const pHomeScores = pHomeScoresPoisson;
+  const pAwayScores = pAwayScoresPoisson;
   
   // 6️⃣ FORM RÉCENTE - Plus de poids aux résultats récents
   const homeFormMultiplier = bookmakerData.homeFormScore;  // Entre 0 et 1
@@ -1470,7 +1471,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     homeLastMatches, awayLastMatches,
     homeOffense, homeDefense, awayOffense, awayDefense,
     homeGF, homeGA, awayGF, awayGA,
-    eloRawProb, sosImpact, poissonImpact, finalProb,
+    eloRawProb, eloMultiplier, sosImpact, poissonImpact, finalProb,
     competitionType, compProps,
     // 📊 DONNÉES MARCHÉ BTTS
     pHomeScores, pAwayScores, pBTTS,
@@ -4368,10 +4369,14 @@ function generateMarketAnalysis(b) {
       <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
         <strong>📈 Résumé du calcul:</strong>
         <div style="margin-left: 12px; margin-top: 6px; color: var(--txt2);">
-          Elo brut: <strong>${m.eloRawProb ? m.eloRawProb.toFixed(1) : '—'}%</strong><br>
-          Impact SOS: <strong>${m.sosImpact ? (m.sosImpact > 0 ? '+' : '') + m.sosImpact.toFixed(1) : '—'}%</strong><br>
-          Impact Poisson: <strong>${m.poissonImpact ? (m.poissonImpact > 0 ? '+' : '') + m.poissonImpact.toFixed(1) : '—'}%</strong><br>
-          <strong style="color: var(--accent); font-size: 13px;">Probabilité finale: ${m.pH ? (m.pH * 100).toFixed(1) : '—'}%</strong>
+          <strong>1️⃣ Elo brut (référence):</strong> ${m.eloRawProb ? m.eloRawProb.toFixed(1) : '—'}%<br>
+          <strong>2️⃣ Multiplicateur Elo:</strong> ${m.eloMultiplier ? m.eloMultiplier.toFixed(2) : '—'}x<br>
+          <strong>3️⃣ Ajustement Attaque/Défense + SOS:</strong> ${m.sosHome ? (m.sosHome * 100 - 100).toFixed(1) : '—'}%<br>
+          <strong>4️⃣ Forme récente (5 derniers matchs):</strong> ${m.homeFormMult ? ((m.homeFormMult - 1) * 100).toFixed(0) : '—'}% ${m.homeFormMult > 1.2 ? '💪' : m.homeFormMult < 0.8 ? '💔' : '➡️'}<br>
+          <br><strong style="color: var(--accent); font-size: 13px;">📊 Probabilité finale: ${m.pH ? (m.pH * 100).toFixed(1) : '—'}%</strong>
+          <div style="font-size: 11px; color: var(--txt3); margin-top: 6px;">
+            30% historique + 70% Elo (Coupe du Monde) + Forme récente
+          </div>
         </div>
       </div>
     </div>
