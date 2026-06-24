@@ -2433,6 +2433,30 @@ function buildMarkets(m,model){
   const mk=(l,e,o)=>mkSel(l,e,rng,o);
   const list=[];
 
+  // 📊 AUDIT GLOBAL: Vérifier que tous les marchés ont des vraies cotes
+  console.log(`\n📊 AUDIT COMPLET - Vérifier les vraies cotes par marché:\n`);
+  
+  const allMarkets = ['Match Winner', 'Double Chance', 'Both Teams Score', 'Goals Over/Under', 
+    'First Half Winner', 'HT/FT Double', 'Exact Score', 'Clean Sheet - Home', 'Clean Sheet - Away',
+    'Total - Home', 'Total - Away'];
+  
+  allMarkets.forEach(market => {
+    const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+    let found = false;
+    for(let bm of bookmarkers) {
+      if(realOdds && realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[market]) {
+        const cotes = realOdds[bm].markets[market];
+        console.log(`✅ ${market.padEnd(25)} → ${bm.padEnd(12)} (${cotes.length} cotes)`);
+        found = true;
+        break;
+      }
+    }
+    if(!found) {
+      console.log(`❌ ${market.padEnd(25)} → PAS TROUVÉ!`);
+    }
+  });
+  console.log(`\n`);
+
   // ✅ MARCHÉ 1N2: Utiliser les vraies cotes Unibet
   list.push({id:'1n2',name:'Résultat (1N2)',cols:3,sels:[
     mkSmart(m.home.name, model.pH, 0, rng, '1n2'),
