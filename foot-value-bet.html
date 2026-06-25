@@ -1064,63 +1064,64 @@ function calculateBookmakerAnalysis(homeLastMatches, awayLastMatches, homeId, aw
 // Combine win rates observés (60%) + Elo qualité adversaires (40%)
 // Ça c'est une analyse FINE comme demandé!
 function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, awayLastMatches, competitionType = 'CHAMPIONSHIP') {
+  // ⚠️ CETTE FONCTION EST OBSOLÈTE - Utiliser calculateAdvancedProbabilities() à la place!
+  // Mais on la garde pour compatibilité
   
-  // 1️⃣ EXTRAIRE WIN RATES HISTORIQUES (DATA BRUTE - 60%)
-  const homeWinRate = bookmakerData.homeStats.winRate;      // % réel de victoires
-  const homeDrawRate = bookmakerData.homeStats.drawRate;    // % réel de nuls
-  const awayWinRate = bookmakerData.awayStats.winRate;      // % réel de victoires away
+  // 1️⃣ EXTRAIRE LES DONNÉES BRUTES
+  const homeWinRate = bookmakerData.homeStats.winRate;
+  const homeDrawRate = bookmakerData.homeStats.drawRate;
+  const awayWinRate = bookmakerData.awayStats.winRate;
   
-  // 2️⃣ ANALYSER LA QUALITÉ DES VICTOIRES/DÉFAITES (40%)
-  // Elo de chaque équipe en fonction des adversaires affrontés
+  // 2️⃣ CALCULER PROBABILITÉ ELO
   const homeElo = getElo(homeId, 'Home', '', 0, 0, 1);
   const awayElo = getElo(awayId, 'Away', '', 0, 0, 1);
-  
-  // 3️⃣ CALCULER PROBABILITÉ ELO (qualité du matchup)
   const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
   
-  // 4️⃣ ANALYSER SOS (Force des adversaires affrontés)
+  // 3️⃣ CALCULER SOS
   const sosHome = calculateSOS(homeId, 'Home', homeLastMatches, 'CHAMPIONSHIP');
   const sosAway = calculateSOS(awayId, 'Away', awayLastMatches, 'CHAMPIONSHIP');
   
-  // 5️⃣ COMBINER HISTORIQUE + QUALITÉ POUR PROBABILITÉS FINALES
-  // Pour Coupe du Monde: 30% historique, 70% Elo (car peu de matchs et données fiables)
-  // Pour autres: 60% historique, 40% Elo (plus de données)
+  // 4️⃣ CALCULER FORME (ajout 2024)
+  const homeForm = calculateForm(homeLastMatches, homeId);
+  const awayForm = calculateForm(awayLastMatches, awayId);
+  const homeFormMult = calcAdvancedFormMult(homeForm);
+  const awayFormMult = calcAdvancedFormMult(awayForm);
+  
+  // 5️⃣ COMBINER: 30% historique + 70% Elo (Coupe du Monde)
   const isWorldCup = competitionType === 'WORLD_CUP';
   const historicalWeight = isWorldCup ? 0.3 : 0.6;
   const eloWeight = isWorldCup ? 0.7 : 0.4;
   
-  const pH_historical = homeWinRate;
+  // 6️⃣ APPLIQUER FORME AUX PROBABILITÉS
+  // La forme affecte la probabilité: forme excellente = +, forme mauvaise = -
+  const formImpact = (homeFormMult - 1) - (awayFormMult - 1);  // Différentiel de forme
+  const pH_historical = homeWinRate * homeFormMult;  // Historique ajusté par forme
   const pH_elo = eloWinProb;
   const pH_mixed = (pH_historical * historicalWeight) + (pH_elo * eloWeight);
   
-  // ⚠️ NULS: Réduire le poids de l'historique pour les matchs mal appairés
-  // Si les équipes sont très déséquilibrées (Elo > 2x différence), pD doit être très bas
+  // 7️⃣ NULS: Réduire selon déséquilibre Elo
   const eloDiff = Math.abs(homeElo - awayElo);
-  const drawWeight = eloDiff > 500 ? 0.3 : (eloDiff > 300 ? 0.5 : 0.7);  // Moins de nuls si déséquilibré
-  const pD_final = homeDrawRate * drawWeight;  // ← Réduire basé sur déséquilibre
+  const drawWeight = eloDiff > 500 ? 0.3 : (eloDiff > 300 ? 0.5 : 0.7);
+  const pD_final = homeDrawRate * drawWeight;
   
-  // Away: même logique
-  const pA_historical = awayWinRate;
+  // 8️⃣ Away avec même logique
+  const pA_historical = awayWinRate * awayFormMult;
   const pA_elo = 1 - eloWinProb;
   const pA_mixed = (pA_historical * historicalWeight) + (pA_elo * eloWeight);
   
-  // 6️⃣ NORMALISER (s'assurer que total = 100%)
-  // ⚠️ IMPORTANT: Ne pas diviser par total! Renormaliser correctement!
-  // Calculer pH et pA, puis pD = 1 - pH - pA pour garantir total = 1.0
+  // 9️⃣ NORMALISER
   const total = pH_mixed + pA_mixed;
-  
-  // Renormaliser pH et pA pour qu'ils somment à (1 - pD_final)
   const pH = (pH_mixed / total) * (1 - pD_final);
   const pA = (pA_mixed / total) * (1 - pD_final);
-  const pD = pD_final;  // Les nuls restent comme calculés
+  const pD = pD_final;
   
   return { 
     pH, pD, pA,
-    // DEBUG INFO
     homeElo, awayElo, eloWinProb,
     sosHome, sosAway,
-    homeWinRate, homeDrawRate, awayWinRate,  // Historique brut
-    pH_historical, pH_elo, pH_mixed           // Calculs intermédiaires
+    homeFormMult, awayFormMult,  // Ajouté pour debug
+    homeWinRate, homeDrawRate, awayWinRate,
+    pH_historical, pH_elo, pH_mixed
   };
 }
 
@@ -3306,8 +3307,8 @@ const state={
   loadedMatches:MATCHES.map(m=>m.id),
   collapsed:{},
   pendingBet:null,
-  bets:[],
-  history:[],
+  bets: JSON.parse(localStorage.getItem('foot-value-bet-bets') || '[]'),
+  history: JSON.parse(localStorage.getItem('foot-value-bet-history') || '[]'),
   settings:{
     apiKey: localStorage.getItem('foot-value-bet-apiKey') || 'fa96c57b27321cef9fc4cae58aa3fe13',
     currency:'EUR',
@@ -4643,6 +4644,8 @@ function confirmBet(){
     matchId:b.matchId,matchName:b.matchName,league:b.league,market:b.market,sel:b.sel,
     cote:b.cote,stake:stake,est:b.est,value:b.est*b.cote-1,conf:b.conf,note:b.note,status:'attente'
   }));
+  // ✅ SAUVEGARDER EN LOCALSTORAGE
+  localStorage.setItem('foot-value-bet-bets', JSON.stringify(state.bets));
   showModal(false);go('bets');toast('Pari ajouté ✓');
 }
 function showModal(v){const el=document.getElementById('modalBack');el.classList.toggle('show',v);if(!v)state.pendingBet=null}
@@ -4704,10 +4707,16 @@ function statusSelect(b){
 function changeStatus(id,val){
   const idx=state.bets.findIndex(b=>b.id===id);if(idx<0)return;
   const bet=state.bets[idx];bet.status=val;
-  if(val==='attente'){render();return}
+  if(val==='attente'){
+    localStorage.setItem('foot-value-bet-bets', JSON.stringify(state.bets));
+    render();return
+  }
   // move to history
   state.bets.splice(idx,1);
   state.history.unshift(bet);
+  // ✅ SAUVEGARDER EN LOCALSTORAGE
+  localStorage.setItem('foot-value-bet-bets', JSON.stringify(state.bets));
+  localStorage.setItem('foot-value-bet-history', JSON.stringify(state.history));
   render();
   toast(val==='gagne'?'Pari gagné → historique ✓':val==='perdu'?'Pari perdu → historique':'Pari annulé → historique');
 }
