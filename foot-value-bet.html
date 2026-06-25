@@ -2626,25 +2626,25 @@ function buildMarkets(m,model){
   ]});
 
   list.push({id:'dc',name:'Double chance',cols:3,sels:[
-    mkSmart('1X — '+H+' ou nul',model.dcX1 || (model.pH+model.pD),0,rng,'dc'),
-    mkSmart('12 — pas de nul',model.dc12 || (model.pH+model.pA),1,rng,'dc'),
-    mkSmart('X2 — nul ou '+A,model.dcX2 || (model.pD+model.pA),2,rng,'dc')]});
+    mkSmart('1X — '+H+' ou nul',model.dcX1 || (model.pH+model.pD),0,rng,'dc',m.id),
+    mkSmart('12 — pas de nul',model.dc12 || (model.pH+model.pA),1,rng,'dc',m.id),
+    mkSmart('X2 — nul ou '+A,model.dcX2 || (model.pD+model.pA),2,rng,'dc',m.id)]});
 
 
   list.push({id:'btts',name:'Les deux équipes marquent (BTTS)',cols:2,sels:[
-    mkSmart('Oui',model.pBTTS || model.btts || 0.5,0,rng,'btts'),
-    mkSmart('Non',1-(model.pBTTS || model.btts || 0.5),1,rng,'btts')]});
+    mkSmart('Oui',model.pBTTS || model.btts || 0.5,0,rng,'btts',m.id),
+    mkSmart('Non',1-(model.pBTTS || model.btts || 0.5),1,rng,'btts',m.id)]});
 
   const tg=[];let totIdx=0;
   // 1.5 buts
   tg.push(mkSmart('Plus de 1.5 buts', model.ou15Total?.pOver || model.over[1.5] || 0.5, totIdx++, rng, 'tot', m.id));
-  tg.push(mkSmart('Moins de 1.5 buts', model.ou15Total?.pUnder || (1-model.over[1.5]) || 0.5, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Moins de 1.5 buts', model.ou15Total?.pUnder || (1-model.over[1.5]) || 0.5, totIdx++, rng, 'tot', m.id));
   // 2.5 buts
   tg.push(mkSmart('Plus de 2.5 buts', model.ou25Total?.pOver || model.over[2.5] || 0.5, totIdx++, rng, 'tot', m.id));
-  tg.push(mkSmart('Moins de 2.5 buts', model.ou25Total?.pUnder || (1-model.over[2.5]) || 0.5, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Moins de 2.5 buts', model.ou25Total?.pUnder || (1-model.over[2.5]) || 0.5, totIdx++, rng, 'tot', m.id));
   // 3.5 buts
   tg.push(mkSmart('Plus de 3.5 buts', model.ou35Total?.pOver || model.over[3.5] || 0.5, totIdx++, rng, 'tot', m.id));
-  tg.push(mkSmart('Moins de 3.5 buts', model.ou35Total?.pUnder || (1-model.over[3.5]) || 0.5, totIdx++, rng, 'tot'));
+  tg.push(mkSmart('Moins de 3.5 buts', model.ou35Total?.pUnder || (1-model.over[3.5]) || 0.5, totIdx++, rng, 'tot', m.id));
   list.push({id:'tot',name:'Total de buts (Over / Under)',cols:2,sels:tg});
 
   // CLEAN SHEET - Chercher les vraies cotes (directement dans realOdds)
@@ -2694,9 +2694,9 @@ function buildMarkets(m,model){
 
   // First Half (résultat HT)
   list.push({id:'htr',name:'Résultat à la mi-temps (1N2)',cols:3,sels:[
-    mkSmart(H+' à la pause',model.pHT_1 || model.HT[1] || 0.5,0,rng,'htr'),
-    mkSmart('Nul à la pause',model.pHT_D || model.HT.N || 0.5,1,rng,'htr'),
-    mkSmart(A+' à la pause',model.pHT_2 || model.HT[2] || 0.5,2,rng,'htr')]});
+    mkSmart(H+' à la pause',model.pHT_1 || model.HT[1] || 0.5,0,rng,'htr',m.id),
+    mkSmart('Nul à la pause',model.pHT_D || model.HT.N || 0.5,1,rng,'htr',m.id),
+    mkSmart(A+' à la pause',model.pHT_2 || model.HT[2] || 0.5,2,rng,'htr',m.id)]});
 
   const htftLabels={'1/1':H+' / '+H,'1/N':H+' / Nul','1/2':H+' / '+A,'N/1':'Nul / '+H,'N/N':'Nul / Nul','N/2':'Nul / '+A,'2/1':A+' / '+H,'2/N':A+' / Nul','2/2':A+' / '+A};
   
@@ -2717,7 +2717,7 @@ function buildMarkets(m,model){
   
   // Chercher les cotes HT/FT (essaie Unibet → 10Bet → autres bookmakers)
   list.push({id:'htft',name:'HT/FT',cols:3,sels:htftApiOrder.map((k, apiIndex)=>{
-    const result = getRealCotes('HT/FT Double');
+    const result = getRealCotes('HT/FT Double', ['Unibet', 'Bet365', '1xBet', 'William Hill'], m.id);
     
     // 🔍 DEBUG: Afficher le détail complet de HT/FT Double avec les noms des paris
     if(result && result.cotes && apiIndex === 0) {
@@ -2750,12 +2750,12 @@ function buildMarkets(m,model){
   }
 
   list.push({id:'hou',name:H+' Over/Under',cols:3,sels:[
-    mkSmart(H+' > 1.5',(model.ou15Home?.pOver || 0.5),0,rng,'hou'),
-    mkSmart(H+' ≤ 1.5',(model.ou15Home?.pUnder || 0.5),1,rng,'hou'),
-    mkSmart(H+' > 2.5',(model.ou25Home?.pOver || 0.5),2,rng,'hou'),
-    mkSmart(H+' ≤ 2.5',(model.ou25Home?.pUnder || 0.5),3,rng,'hou'),
-    mkSmart(H+' > 3.5',(model.ou35Home?.pOver || 0.5),4,rng,'hou'),
-    mkSmart(H+' ≤ 3.5',(model.ou35Home?.pUnder || 0.5),5,rng,'hou')]});
+    mkSmart(H+' > 1.5',(model.ou15Home?.pOver || 0.5),0,rng,'hou',m.id),
+    mkSmart(H+' ≤ 1.5',(model.ou15Home?.pUnder || 0.5),1,rng,'hou',m.id),
+    mkSmart(H+' > 2.5',(model.ou25Home?.pOver || 0.5),2,rng,'hou',m.id),
+    mkSmart(H+' ≤ 2.5',(model.ou25Home?.pUnder || 0.5),3,rng,'hou',m.id),
+    mkSmart(H+' > 3.5',(model.ou35Home?.pOver || 0.5),4,rng,'hou',m.id),
+    mkSmart(H+' ≤ 3.5',(model.ou35Home?.pUnder || 0.5),5,rng,'hou',m.id)]});
 
   // 🔍 DEBUG: Afficher l'ordre complet de Total - Away
   if(realOdds && realOdds['Unibet'] && realOdds['Unibet'].markets && realOdds['Unibet'].markets['Total - Away']) {
@@ -2766,12 +2766,12 @@ function buildMarkets(m,model){
 
   // AWAY OVER/UNDER - Corriger les indices: [0]=Over 1.5, [2]=Over 2.5, [4]=Over 0.5
   list.push({id:'aou',name:A+' Over/Under',cols:3,sels:[
-    mkSmart(A+' > 1.5',(model.ou15Away?.pOver || 0.5),0,rng,'aou'),
-    mkSmart(A+' ≤ 1.5',(model.ou15Away?.pUnder || 0.5),1,rng,'aou'),
-    mkSmart(A+' > 2.5',(model.ou25Away?.pOver || 0.5),2,rng,'aou'),
-    mkSmart(A+' ≤ 2.5',(model.ou25Away?.pUnder || 0.5),3,rng,'aou'),
-    mkSmart(A+' > 0.5',(model.ou05Away?.pOver || 0.5),4,rng,'aou'),
-    mkSmart(A+' ≤ 0.5',(model.ou05Away?.pUnder || 0.5),5,rng,'aou')]});
+    mkSmart(A+' > 1.5',(model.ou15Away?.pOver || 0.5),0,rng,'aou',m.id),
+    mkSmart(A+' ≤ 1.5',(model.ou15Away?.pUnder || 0.5),1,rng,'aou',m.id),
+    mkSmart(A+' > 2.5',(model.ou25Away?.pOver || 0.5),2,rng,'aou',m.id),
+    mkSmart(A+' ≤ 2.5',(model.ou25Away?.pUnder || 0.5),3,rng,'aou',m.id),
+    mkSmart(A+' > 0.5',(model.ou05Away?.pOver || 0.5),4,rng,'aou',m.id),
+    mkSmart(A+' ≤ 0.5',(model.ou05Away?.pUnder || 0.5),5,rng,'aou',m.id)]});
 
   // CORRECT SCORE - Top 10 scores probables avec vraies cotes
   let correctScores=[];
