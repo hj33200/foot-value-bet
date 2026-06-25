@@ -1090,10 +1090,8 @@ function calcAdvancedFormMult(form) {
 // Combine win rates observés (60%) + Elo qualité adversaires (40%)
 // Ça c'est une analyse FINE comme demandé!
 function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, awayLastMatches, competitionType = 'CHAMPIONSHIP') {
-  // ⚠️ CETTE FONCTION EST OBSOLÈTE - Utiliser calculateAdvancedProbabilities() à la place!
-  // Mais on la garde pour compatibilité
   
-  // 1️⃣ EXTRAIRE LES DONNÉES BRUTES
+  // 1️⃣ EXTRAIRE WIN RATES HISTORIQUES
   const homeWinRate = bookmakerData.homeStats.winRate;
   const homeDrawRate = bookmakerData.homeStats.drawRate;
   const awayWinRate = bookmakerData.awayStats.winRate;
@@ -1107,35 +1105,26 @@ function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, aw
   const sosHome = calculateSOS(homeId, 'Home', homeLastMatches, 'CHAMPIONSHIP');
   const sosAway = calculateSOS(awayId, 'Away', awayLastMatches, 'CHAMPIONSHIP');
   
-  // 4️⃣ CALCULER FORME (ajout 2024)
-  const homeForm = calculateForm(homeLastMatches, homeId);
-  const awayForm = calculateForm(awayLastMatches, awayId);
-  const homeFormMult = calcAdvancedFormMult(homeForm);
-  const awayFormMult = calcAdvancedFormMult(awayForm);
-  
-  // 5️⃣ COMBINER: 30% historique + 70% Elo (Coupe du Monde)
+  // 4️⃣ COMBINER: 30% historique + 70% Elo pour Coupe du Monde
   const isWorldCup = competitionType === 'WORLD_CUP';
   const historicalWeight = isWorldCup ? 0.3 : 0.6;
   const eloWeight = isWorldCup ? 0.7 : 0.4;
   
-  // 6️⃣ APPLIQUER FORME AUX PROBABILITÉS
-  // La forme affecte la probabilité: forme excellente = +, forme mauvaise = -
-  const formImpact = (homeFormMult - 1) - (awayFormMult - 1);  // Différentiel de forme
-  const pH_historical = homeWinRate * homeFormMult;  // Historique ajusté par forme
+  const pH_historical = homeWinRate;
   const pH_elo = eloWinProb;
   const pH_mixed = (pH_historical * historicalWeight) + (pH_elo * eloWeight);
   
-  // 7️⃣ NULS: Réduire selon déséquilibre Elo
+  // 5️⃣ NULS: Réduire selon déséquilibre
   const eloDiff = Math.abs(homeElo - awayElo);
   const drawWeight = eloDiff > 500 ? 0.3 : (eloDiff > 300 ? 0.5 : 0.7);
   const pD_final = homeDrawRate * drawWeight;
   
-  // 8️⃣ Away avec même logique
-  const pA_historical = awayWinRate * awayFormMult;
+  // 6️⃣ AWAY
+  const pA_historical = awayWinRate;
   const pA_elo = 1 - eloWinProb;
   const pA_mixed = (pA_historical * historicalWeight) + (pA_elo * eloWeight);
   
-  // 9️⃣ NORMALISER
+  // 7️⃣ NORMALISER
   const total = pH_mixed + pA_mixed;
   const pH = (pH_mixed / total) * (1 - pD_final);
   const pA = (pA_mixed / total) * (1 - pD_final);
@@ -1145,7 +1134,6 @@ function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, aw
     pH, pD, pA,
     homeElo, awayElo, eloWinProb,
     sosHome, sosAway,
-    homeFormMult, awayFormMult,  // Ajouté pour debug
     homeWinRate, homeDrawRate, awayWinRate,
     pH_historical, pH_elo, pH_mixed
   };
@@ -1691,9 +1679,20 @@ function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
   
   // 🎯 UTILISER LES VALEURS FINES DE calculateAdvancedProbabilities AU LIEU DE RECALCULER
   // (plutôt que de recalculer naïvement à partir de FM)
-  const pH = advanced.pH;
-  const pD = advanced.pD;
-  const pA = advanced.pA;
+  const pH_base = advanced.pH;
+  const pD_base = advanced.pD;
+  const pA_base = advanced.pA;
+  
+  // 🎯 APPLIQUER LA FORME (VVVDV vs DLLLL)
+  // Home excellent form (1.41x) vs Away terrible form (0.61x)
+  // La probabilité Home augmente, la probabilité Away diminue
+  const formRatio = formMultH / formMultA;  // Si Home+41% et Away-39%: 1.41/0.61 = 2.31x
+  
+  // Renormaliser les probabilités avec la Forme
+  const total_adjusted = (pH_base * formRatio) + pA_base;
+  const pH = (pH_base * formRatio) / total_adjusted;
+  const pA = pA_base / total_adjusted;
+  const pD = pD_base;  // Les nuls ne sont pas affectés par la Forme
   const btts = advanced.pBTTS;
   const cs_h = advanced.csHome;
   const cs_a = advanced.csAway;
@@ -2317,23 +2316,25 @@ function buildMarkets(m,model){
   
   // 🎯 FONCTION: Chercher les vraies cotes avec fallback INTELLIGENT
   const getRealCotes = (marketName, preferredBMs = ['Bet365', '1xBet', 'William Hill'], matchId = null) => {
-    // 🔍 CHERCHER DANS LE BON CACHE (par matchId si disponible)
+    // 🔍 CHERCHER DANS LE BON CACHE (par matchId UNIQUEMENT)
     let realOdds = null;
     if(matchId && window.REAL_ODDS_CACHE && window.REAL_ODDS_CACHE[matchId]) {
       realOdds = window.REAL_ODDS_CACHE[matchId].data || window.REAL_ODDS_CACHE[matchId];
-      console.log(`✅ getRealCotes: Trouvé cache pour matchId=${matchId}`);  // DEBUG
-    } else if(window.REAL_ODDS_CACHE) {
-      // Fallback: chercher le premier disponible
-      const firstKey = Object.keys(window.REAL_ODDS_CACHE)[0];
-      if(firstKey) {
+      console.log(`✅ getRealCotes: Trouvé cache pour matchId=${matchId}`);
+    } else {
+      // ⚠️ PAS DE CACHE POUR CE MATCH
+      console.warn(`⚠️ getRealCotes: Pas de cache pour matchId=${matchId}`);
+      
+      // FALLBACK: Utiliser le PREMIER disponible (cotes génériques)
+      // ⚠️ ATTENTION: Cela peut mélanger les cotes de différents matchs!
+      if(window.REAL_ODDS_CACHE && Object.keys(window.REAL_ODDS_CACHE).length > 0) {
+        const firstKey = Object.keys(window.REAL_ODDS_CACHE)[0];
         realOdds = window.REAL_ODDS_CACHE[firstKey].data || window.REAL_ODDS_CACHE[firstKey];
-        console.log(`⚠️ getRealCodes: Pas de cache pour matchId=${matchId}, utilisant ${firstKey}`);  // DEBUG
+        console.warn(`⚠️ FALLBACK DANGEREUX: Utilisant cotes de ${firstKey} au lieu de ${matchId}! Cotes PEUVENT ÊTRE MÉLANGÉES!`);
+      } else {
+        console.warn(`❌ getRealCotes: AUCUN CACHE DU TOUT! Impossible de récupérer les cotes!`);
+        return null;
       }
-    }
-    
-    if(!realOdds) {
-      console.warn(`❌ getRealCotes: Pas de cache du tout! REAL_ODDS_CACHE=`, window.REAL_ODDS_CACHE);  // DEBUG
-      return null;
     }
     
     // ⚠️ VÉRIFIER SI UNIBET EXISTE RÉELLEMENT
