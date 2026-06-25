@@ -1060,6 +1060,32 @@ function calculateBookmakerAnalysis(homeLastMatches, awayLastMatches, homeId, aw
   };
 }
 
+// 📊 FONCTION UTILITAIRE - Calcul de la Forme (5 derniers matchs)
+function calculateForm(matches, teamId) {
+  let recentPoints = 0, recentWeight = 0;
+  if (!matches || matches.length === 0) return 0.5;
+  
+  matches.slice(-5).forEach((m, idx) => {
+    const isHome = m.teams.home.id == teamId;
+    const myGoals = isHome ? m.goals.home : m.goals.away;
+    const oppGoals = isHome ? m.goals.away : m.goals.home;
+    const weight = idx + 1; // Récents = plus lourd
+    
+    if (myGoals > oppGoals) recentPoints += 3 * weight;
+    else if (myGoals === oppGoals) recentPoints += 1 * weight;
+    
+    recentWeight += 3 * weight;
+  });
+  return recentWeight > 0 ? recentPoints / recentWeight : 0.5;
+}
+
+// 📊 FONCTION UTILITAIRE - Convertir Forme en Multiplicateur (0.5x à 1.5x)
+function calcAdvancedFormMult(form) {
+  // form = 0 (très mauvais) à 1 (excellent)
+  // Multiplicateur = 0.5 (terrible) à 1.5 (excellent)
+  return 0.5 + form;
+}
+
 // 🎯 CALCUL 1N2 AVANCÉ - HYBRIDE DATA + ANALYSE SPORTIVE
 // Combine win rates observés (60%) + Elo qualité adversaires (40%)
 // Ça c'est une analyse FINE comme demandé!
