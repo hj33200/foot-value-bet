@@ -1692,27 +1692,14 @@ function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
   
   // 🎯 UTILISER LES VALEURS FINES DE calculateAdvancedProbabilities AU LIEU DE RECALCULER
   // (plutôt que de recalculer naïvement à partir de FM)
-  const pH_base = advanced.pH;
-  const pD_base = advanced.pD;
-  const pA_base = advanced.pA;
+  const pH = advanced.pH;
+  const pA = advanced.pA;
+  const pD = advanced.pD;
   
-  // 🎯 APPLIQUER LA FORME (VVVDV vs DLLLL)
-  // Home excellent form (1.41x) vs Away terrible form (0.61x)
-  // La probabilité Home augmente, la probabilité Away diminue
-  const formRatio = formMultH / formMultA;  // Si Home+41% et Away-39%: 1.41/0.61 = 2.31x
-  
-  // Renormaliser les probabilités avec la Forme
-  const total_adjusted = (pH_base * formRatio) + pA_base;
-  const pH = (pH_base * formRatio) / total_adjusted;
-  const pA = pA_base / total_adjusted;
-  const pD = pD_base;  // Les nuls ne sont pas affectés par la Forme
-  
-  // 🔍 DEBUG
-  console.log(`🔍 DEBUG buildModel - Forme appliquée:`);
-  console.log(`   pH_base=${r2(pH_base)}, pD_base=${r2(pD_base)}, pA_base=${r2(pA_base)}`);
+  // 🔍 DEBUG - VÉRIFIE LES VALEURS REÇUES DE calculateAdvancedProbabilities
+  console.log(`🔍 DEBUG buildModel reçoit:`);
+  console.log(`   pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)} (total=${r2(pH+pD+pA)})`);
   console.log(`   formMultH=${r2(formMultH)}, formMultA=${r2(formMultA)}`);
-  console.log(`   formRatio=${r2(formRatio)}`);
-  console.log(`   APRÈS forme: pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)}`);
   console.log(`   lambdaHome=${r2(lH)}, lambdaAway=${r2(lA)}`);
   const btts = advanced.pBTTS;
   const cs_h = advanced.csHome;
@@ -4422,7 +4409,11 @@ function generateMarketAnalysis(b) {
           <strong>2️⃣ Multiplicateur Elo:</strong> ${m.eloMultiplier ? m.eloMultiplier.toFixed(2) : '—'}x<br>
           <strong>3️⃣ Ajustement Attaque/Défense + SOS:</strong> ${m.sosHome ? (m.sosHome * 100 - 100).toFixed(1) : '—'}%<br>
           <strong>4️⃣ Forme récente (5 derniers matchs):</strong> ${m.homeFormMult ? ((m.homeFormMult - 1) * 100).toFixed(0) : '—'}% ${m.homeFormMult > 1.2 ? '💪' : m.homeFormMult < 0.8 ? '💔' : '➡️'}<br>
-          <br><strong style="color: var(--accent); font-size: 13px;">📊 Probabilité finale: ${m.pH ? (m.pH * 100).toFixed(1) : '—'}%</strong>
+          <br><strong style="color: var(--accent); font-size: 13px;">📊 Probabilité finale: ${
+            b.marketId === '1n2' 
+              ? (b.selIdx === 0 ? m.pH : b.selIdx === 2 ? m.pA : m.pD) * 100
+              : (b.selIdx % 2 === 0 ? m.pH : m.pA) * 100
+          }%</strong>
           <div style="font-size: 11px; color: var(--txt3); margin-top: 6px;">
             30% historique + 70% Elo (Coupe du Monde) + Forme récente
           </div>
