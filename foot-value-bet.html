@@ -1489,13 +1489,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   console.log(`   homeFormMult=${r2(homeFormMult)}, awayFormMult=${r2(awayFormMult)}`);
   console.log(`   pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)}`);
   console.log(`   lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
-  console.log(`\n📊 TOUS LES MARCHÉS (AVANT buildModel Forme):`);
-  console.log(`   1N2: pH=${r2(pH)}`);
-  console.log(`   BTTS: ${r2(btts)}`);
-  console.log(`   Over 2.5: ${r2(over[2.5])}`);
-  console.log(`   Clean Sheet Home: ${r2(cs_h)}`);
-  console.log(`   HT/FT Probs: 1/1=${r2(HTFT['1/1'])} 1/N=${r2(HTFT['1/N'])} 1/2=${r2(HTFT['1/2'])}`);
-  console.log(``);
   
   return { 
     lambdaHome, lambdaAway, homeFormMult, awayFormMult,
@@ -1719,12 +1712,8 @@ function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
   console.log(`   pH_base=${r2(pH_base)}, pD_base=${r2(pD_base)}, pA_base=${r2(pA_base)}`);
   console.log(`   formMultH=${r2(formMultH)}, formMultA=${r2(formMultA)}`);
   console.log(`   formRatio=${r2(formRatio)}`);
-  console.log(`   total_adjusted=${r2(total_adjusted)}`);
   console.log(`   APRÈS forme: pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)}`);
-  console.log(`\n✅ TOUS LES MARCHÉS FINAUX (AVEC FORME):`);
-  console.log(`   1N2: ${r2(pH)} | BTTS: ${r2(btts)} | Over2.5: ${r2(over[2.5])} | CS: ${r2(cs_h)}`);
-  console.log(`   lambdaHome=${r2(lH)} (×${r2(formMultH)}) | lambdaAway=${r2(lA)} (×${r2(formMultA)})`);
-  console.log(`\n`);
+  console.log(`   lambdaHome=${r2(lH)}, lambdaAway=${r2(lA)}`);
   const btts = advanced.pBTTS;
   const cs_h = advanced.csHome;
   const cs_a = advanced.csAway;
