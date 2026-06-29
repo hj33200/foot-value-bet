@@ -5322,7 +5322,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if(loadAppState()) {
     console.log('✅ État restauré avec succès');
     // Rerender la page avec l'état restauré
-    renderPage();
+    render();
   }
 });
 
@@ -5382,13 +5382,13 @@ function getRecommendation(d) {
   } else if(bestValue >= 0.05) {
     color = 'green';
     icon = '✅';
-    message = `BON PARI: ${bestBet.sel} @ ${bestBet.cote.toFixed(2)}`;
-    recommendation = `Value: +${(bestValue*100).toFixed(1)}% | Marché: ${bestMarket.name}`;
+    message = `BON PARI: ${bestBet.sel} @ ${(+(bestBet.cote) || 0).toFixed(2)}`;
+    recommendation = `Value: +${((+(bestValue) || 0)*100).toFixed(1)}% | Marché: ${bestMarket.name}`;
   } else if(bestValue >= 0) {
     color = 'yellow';
     icon = '⚠️';
-    message = `NEUTRE: ${bestBet.sel} @ ${bestBet.cote.toFixed(2)}`;
-    recommendation = `Value: +${(bestValue*100).toFixed(1)}% | Faible marge`;
+    message = `NEUTRE: ${bestBet.sel} @ ${(+(bestBet.cote) || 0).toFixed(2)}`;
+    recommendation = `Value: +${((+(bestValue) || 0)*100).toFixed(1)}% | Faible marge`;
   } else {
     color = 'red';
     icon = '❌';
@@ -5401,19 +5401,21 @@ function getRecommendation(d) {
 
 // ⚔️ TABLEAU COMPARATIF HOME VS AWAY
 function comparisonTableHomeAway(d) {
-  const H = d.statsH, A = d.statsA, m = d.meta;
-  const model = d.model;
+  const H = d.statsH || {}, A = d.statsA || {}, m = d.meta || {};
+  const model = d.model || {};
+  const formH = d.formH || { wins: 0, draws: 0, losses: 0, ratio: 1 };
+  const formA = d.formA || { wins: 0, draws: 0, losses: 0, ratio: 1 };
   
   const rows = [
     { label: 'Rang Général', home: ord(H.rankGen), away: ord(A.rankGen) },
     { label: 'Rang (côté)', home: ord(H.rankSide), away: ord(A.rankSide) },
-    { label: 'Elo', home: ((+m.homeElo) || 0).toFixed(0), away: ((+m.awayElo) || 0).toFixed(0), badge: '🏆' },
-    { label: 'Attaque (buts/match)', home: ((+H.gf) || 0).toFixed(2), away: ((+A.gf) || 0).toFixed(2), badge: '⚽' },
-    { label: 'Défense (encaissés/match)', home: ((+H.ga) || 0).toFixed(2), away: ((+A.ga) || 0).toFixed(2), badge: '🛡️' },
-    { label: 'Forme (5 derniers)', home: (d.formH?.wins || 0) + 'V-' + (d.formH?.draws || 0) + 'N-' + (d.formH?.losses || 0) + 'D', away: (d.formA?.wins || 0) + 'V-' + (d.formA?.draws || 0) + 'N-' + (d.formA?.losses || 0) + 'D', badge: '📅' },
-    { label: 'Multiplicateur forme', home: ((+(d.formH?.ratio || 1)) || 1).toFixed(2) + 'x', away: ((+(d.formA?.ratio || 1)) || 1).toFixed(2) + 'x', badge: '📈' },
-    { label: 'Buts attendus', home: ((+(model?.lambdaHome) || 0)).toFixed(2), away: ((+(model?.lambdaAway) || 0)).toFixed(2), badge: '🎯' },
-    { label: 'Prob. victoire', home: ((+(model?.pH) || 0) * 100).toFixed(1) + '%', away: ((+(model?.pA) || 0) * 100).toFixed(1) + '%', badge: '📊' },
+    { label: 'Elo', home: ((+(m.homeElo) || 0)).toFixed(0), away: ((+(m.awayElo) || 0)).toFixed(0), badge: '🏆' },
+    { label: 'Attaque (buts/match)', home: ((+(H.gf) || 0)).toFixed(2), away: ((+(A.gf) || 0)).toFixed(2), badge: '⚽' },
+    { label: 'Défense (encaissés/match)', home: ((+(H.ga) || 0)).toFixed(2), away: ((+(A.ga) || 0)).toFixed(2), badge: '🛡️' },
+    { label: 'Forme (5 derniers)', home: (formH.wins || 0) + 'V-' + (formH.draws || 0) + 'N-' + (formH.losses || 0) + 'D', away: (formA.wins || 0) + 'V-' + (formA.draws || 0) + 'N-' + (formA.losses || 0) + 'D', badge: '📅' },
+    { label: 'Multiplicateur forme', home: ((+(formH.ratio) || 1)).toFixed(2) + 'x', away: ((+(formA.ratio) || 1)).toFixed(2) + 'x', badge: '📈' },
+    { label: 'Buts attendus', home: ((+(model.lambdaHome) || 0)).toFixed(2), away: ((+(model.lambdaAway) || 0)).toFixed(2), badge: '🎯' },
+    { label: 'Prob. victoire', home: ((+(model.pH) || 0) * 100).toFixed(1) + '%', away: ((+(model.pA) || 0) * 100).toFixed(1) + '%', badge: '📊' },
   ];
   
   return `
