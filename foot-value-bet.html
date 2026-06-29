@@ -5443,6 +5443,12 @@ function initRadarChart(d) {
   setTimeout(() => {
     const ctx = document.getElementById(canvasId);
     if(ctx && window.Chart) {
+      // 🔄 Détruire le chart existant s'il y en a un
+      const chartInstance = Chart.helpers?.getChart?.(ctx) || ctx.chart;
+      if(chartInstance) {
+        chartInstance.destroy();
+      }
+      
       const H_stats = d.statsH;
       const A_stats = d.statsA;
       const maxGF = Math.max(H_stats.gf || 0, A_stats.gf || 0, 4);
