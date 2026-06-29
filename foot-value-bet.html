@@ -478,6 +478,8 @@ document.addEventListener('click', function(e) {
   if (c && !e.target.closest('#datePickerContainer') && !e.target.closest('#dateInput')) c.classList.remove('active');
 });
 </script>
+<!-- 📊 Chart.js pour les graphiques -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -3307,12 +3309,22 @@ function getMatchData(id){
   const homeForm = calcForm(m.home);
   const awayForm = calcForm(m.away);
   
+  // 📊 Calculer Elo pour chaque équipe
+  const homeElo = getElo(m.home.id, m.home.name, homeForm, m.home.gf || 0, m.home.ga || 0, m.home.matches || 34);
+  const awayElo = getElo(m.away.id, m.away.name, awayForm, m.away.gf || 0, m.away.ga || 0, m.away.matches || 34);
+  
+  // 📈 Parser les stats de forme
+  const formH = { wins: (homeForm.match(/V/g) || []).length, draws: (homeForm.match(/D/g) || []).length, losses: (homeForm.match(/L/g) || []).length, ratio: calcAdvancedFormMult(homeForm) };
+  const formA = { wins: (awayForm.match(/V/g) || []).length, draws: (awayForm.match(/D/g) || []).length, losses: (awayForm.match(/L/g) || []).length, ratio: calcAdvancedFormMult(awayForm) };
+  
   const model = buildModel(m.home, m.away, homeForm, awayForm, rng, m.lg);
   const data = {
-    meta: m,
+    meta: { ...m, homeElo, awayElo },  // Ajouter Elo à meta
     model,
     homeForm,
     awayForm,
+    formH,  // Ajouter données form parsées
+    formA,  // Ajouter données form parsées
     statsH: buildStats(m.home, homeForm, 'home'),
     statsA: buildStats(m.away, awayForm, 'away'),
     h2h: buildH2H(m),
@@ -3837,8 +3849,25 @@ function viewDetail(){
   const dateStr=new Date(m.date+'T00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   // count value bets
   let nGreen=0;d.markets.forEach(mk=>mk.sels.forEach(s=>{if(s.color==='green')nGreen++}));
+  
+  // 🎯 Récupérer la recommandation
+  const rec = getRecommendation(d);
+  const recColor = {green: '#22c55e', yellow: '#f59e0b', red: '#ef4444', gray: '#9ca3af'}[rec.color];
+  
   return `
   <a class="back-link" onclick="go('dashboard')">${iconSvg('M19 12H5M12 19l-7-7 7-7')} Retour au dashboard</a>
+  
+  <!-- 🎯 RECOMMANDATION EN COULEUR -->
+  <div class="card" style="background:linear-gradient(135deg, ${recColor}15 0%, ${recColor}05 100%);border-left:4px solid ${recColor};padding:16px;margin-bottom:15px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="font-size:32px">${rec.icon}</div>
+      <div>
+        <div style="font-weight:700;font-size:16px;color:${recColor}">${rec.message}</div>
+        <div style="font-size:13px;color:var(--txt3);margin-top:4px">${rec.recommendation}</div>
+      </div>
+    </div>
+  </div>
+  
   <div class="card detail-head fade">
     <div class="glow"></div>
     <div class="dh-meta">
@@ -3852,6 +3881,17 @@ function viewDetail(){
         <div class="dh-datetime">${dateStr}<br>Coup d'envoi ${m.time}</div></div>
       <div class="dh-team">${crest(m.away,'lg')}<span class="nm">${m.away.name}</span><span class="rk">${ord(d.statsA.rankGen)} · ${ord(d.statsA.rankSide)} ext.</span></div>
     </div>
+  </div>
+
+  <div class="section-title"><span class="dot"></span>Comparaison
+    <span class="hint">${m.home.name} <span style="color:var(--blue)">●</span> vs ${m.away.name} <span style="color:var(--red)">●</span></span></div>
+  <div class="card">
+    ${comparisonTableHomeAway(d)}
+  </div>
+
+  <div class="section-title"><span class="dot"></span>Profil Tactique</div>
+  <div class="card">
+    ${createRadarChart(d)}
   </div>
 
   <div class="section-title"><span class="dot"></span>Statistiques
@@ -5306,6 +5346,173 @@ window.saveSettings = function(...args) {
 };
 
 console.log('✅ Auto-save/load configuré!');
+
+/* ============================================================
+   📊 AMÉLIORATIONS ANALYSE DES MATCHS
+   ============================================================ */
+
+// 🎯 RECOMMANDATION EN COULEUR
+function getRecommendation(d) {
+  const m = d.meta;
+  const markets = d.markets || [];
+  
+  // Trouver le meilleur pari (plus haute value)
+  let bestValue = -100;
+  let bestBet = null;
+  let bestMarket = null;
+  
+  markets.forEach(mk => {
+    mk.sels?.forEach(s => {
+      if(s.value > bestValue && s.est) {
+        bestValue = s.value;
+        bestBet = s;
+        bestMarket = mk;
+      }
+    });
+  });
+  
+  // Déterminer la couleur et le message
+  let color, icon, message, recommendation;
+  
+  if(!bestBet || !bestMarket) {
+    color = 'gray';
+    icon = '❓';
+    message = 'Données insuffisantes';
+    recommendation = 'Pas assez de données pour une recommandation';
+  } else if(bestValue >= 0.05) {
+    color = 'green';
+    icon = '✅';
+    message = `BON PARI: ${bestBet.sel} @ ${bestBet.cote.toFixed(2)}`;
+    recommendation = `Value: +${(bestValue*100).toFixed(1)}% | Marché: ${bestMarket.name}`;
+  } else if(bestValue >= 0) {
+    color = 'yellow';
+    icon = '⚠️';
+    message = `NEUTRE: ${bestBet.sel} @ ${bestBet.cote.toFixed(2)}`;
+    recommendation = `Value: +${(bestValue*100).toFixed(1)}% | Faible marge`;
+  } else {
+    color = 'red';
+    icon = '❌';
+    message = 'NO BET: Value négative partout';
+    recommendation = 'Attendre une meilleure opportunité';
+  }
+  
+  return { color, icon, message, recommendation, value: bestValue, bet: bestBet, market: bestMarket };
+}
+
+// ⚔️ TABLEAU COMPARATIF HOME VS AWAY
+function comparisonTableHomeAway(d) {
+  const H = d.statsH, A = d.statsA, m = d.meta;
+  const model = d.model;
+  
+  const rows = [
+    { label: 'Rang Général', home: ord(H.rankGen), away: ord(A.rankGen) },
+    { label: 'Rang (côté)', home: ord(H.rankSide), away: ord(A.rankSide) },
+    { label: 'Elo', home: (m.homeElo || 0).toFixed(0), away: (m.awayElo || 0).toFixed(0), badge: '🏆' },
+    { label: 'Attaque (buts/match)', home: (H.gf || 0).toFixed(2), away: (A.gf || 0).toFixed(2), badge: '⚽' },
+    { label: 'Défense (encaissés/match)', home: (H.ga || 0).toFixed(2), away: (A.ga || 0).toFixed(2), badge: '🛡️' },
+    { label: 'Forme (5 derniers)', home: (d.formH?.wins || 0) + 'V-' + (d.formH?.draws || 0) + 'N-' + (d.formH?.losses || 0) + 'D', away: (d.formA?.wins || 0) + 'V-' + (d.formA?.draws || 0) + 'N-' + (d.formA?.losses || 0) + 'D', badge: '📅' },
+    { label: 'Multiplicateur forme', home: (d.formH?.ratio || 1).toFixed(2) + 'x', away: (d.formA?.ratio || 1).toFixed(2) + 'x', badge: '📈' },
+    { label: 'Buts attendus', home: (model?.lambdaHome || 0).toFixed(2), away: (model?.lambdaAway || 0).toFixed(2), badge: '🎯' },
+    { label: 'Prob. victoire', home: (model?.pH * 100).toFixed(1) + '%', away: (model?.pA * 100).toFixed(1) + '%', badge: '📊' },
+  ];
+  
+  return `
+    <div class="comparison-table">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tr style="background:var(--bg2);border-bottom:2px solid var(--line)">
+          <th style="padding:10px;text-align:left;font-weight:600">Métrique</th>
+          <th style="padding:10px;text-align:center;color:var(--blue);font-weight:600">${m.home.name}</th>
+          <th style="padding:10px;text-align:center;color:var(--red);font-weight:600">${m.away.name}</th>
+        </tr>
+        ${rows.map(r => `
+          <tr style="border-bottom:1px solid var(--line);height:40px">
+            <td style="padding:10px;font-weight:500;white-space:nowrap">${r.badge ? r.badge + ' ' : ''}${r.label}</td>
+            <td style="padding:10px;text-align:center;color:var(--blue);font-weight:500">${r.home}</td>
+            <td style="padding:10px;text-align:center;color:var(--red);font-weight:500">${r.away}</td>
+          </tr>
+        `).join('')}
+      </table>
+    </div>`;
+}
+
+// 📊 Initialiser le graphique radar
+function initRadarChart(d) {
+  const canvasId = 'radarChart-' + d.meta.id;
+  setTimeout(() => {
+    const ctx = document.getElementById(canvasId);
+    if(ctx && window.Chart) {
+      const H_stats = d.statsH;
+      const A_stats = d.statsA;
+      const maxGF = Math.max(H_stats.gf || 0, A_stats.gf || 0, 4);
+      const maxGA = Math.max(H_stats.ga || 0, A_stats.ga || 0, 3);
+      
+      new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels: ['Attaque', 'Défense', 'Forme', 'Elo'],
+          datasets: [
+            {
+              label: d.meta.home.name,
+              data: [
+                Math.min(100, (H_stats.gf || 0) / maxGF * 100),
+                Math.min(100, ((maxGA * 2 - (H_stats.ga || 0)) / (maxGA * 2) * 100)),
+                (d.formH?.ratio || 1) * 20,
+                Math.min(100, (d.meta.homeElo || 1800) / 1800 * 100)
+              ],
+              borderColor: 'var(--blue)',
+              backgroundColor: 'rgba(100, 150, 255, 0.15)',
+              borderWidth: 2,
+              pointRadius: 4,
+              pointBackgroundColor: 'var(--blue)'
+            },
+            {
+              label: d.meta.away.name,
+              data: [
+                Math.min(100, (A_stats.gf || 0) / maxGF * 100),
+                Math.min(100, ((maxGA * 2 - (A_stats.ga || 0)) / (maxGA * 2) * 100)),
+                (d.formA?.ratio || 1) * 20,
+                Math.min(100, (d.meta.awayElo || 1800) / 1800 * 100)
+              ],
+              borderColor: 'var(--red)',
+              backgroundColor: 'rgba(255, 100, 100, 0.15)',
+              borderWidth: 2,
+              pointRadius: 4,
+              pointBackgroundColor: 'var(--red)'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          scales: {
+            r: {
+              beginAtZero: true,
+              max: 100,
+              ticks: { stepSize: 20 },
+              grid: { color: 'var(--line)' }
+            }
+          },
+          plugins: {
+            legend: { labels: { color: 'var(--txt2)' } }
+          }
+        }
+      });
+    }
+  }, 100);
+}
+
+function createRadarChart(d) {
+  const canvasId = 'radarChart-' + d.meta.id;
+  
+  // Retourner juste le HTML, initialiser après
+  setTimeout(() => initRadarChart(d), 150);
+  
+  return `
+    <div class="radar-container" style="background:var(--bg2);padding:20px;border-radius:8px;margin:15px 0">
+      <h4 style="margin:0 0 15px 0">📊 Profil Offensif/Défensif</h4>
+      <canvas id="${canvasId}" style="max-width:100%;height:300px"></canvas>
+    </div>`;
+}
 
 </script>
 </body>
