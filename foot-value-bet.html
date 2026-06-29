@@ -5407,13 +5407,13 @@ function comparisonTableHomeAway(d) {
   const rows = [
     { label: 'Rang Général', home: ord(H.rankGen), away: ord(A.rankGen) },
     { label: 'Rang (côté)', home: ord(H.rankSide), away: ord(A.rankSide) },
-    { label: 'Elo', home: (m.homeElo || 0).toFixed(0), away: (m.awayElo || 0).toFixed(0), badge: '🏆' },
-    { label: 'Attaque (buts/match)', home: (H.gf || 0).toFixed(2), away: (A.gf || 0).toFixed(2), badge: '⚽' },
-    { label: 'Défense (encaissés/match)', home: (H.ga || 0).toFixed(2), away: (A.ga || 0).toFixed(2), badge: '🛡️' },
+    { label: 'Elo', home: ((+m.homeElo) || 0).toFixed(0), away: ((+m.awayElo) || 0).toFixed(0), badge: '🏆' },
+    { label: 'Attaque (buts/match)', home: ((+H.gf) || 0).toFixed(2), away: ((+A.gf) || 0).toFixed(2), badge: '⚽' },
+    { label: 'Défense (encaissés/match)', home: ((+H.ga) || 0).toFixed(2), away: ((+A.ga) || 0).toFixed(2), badge: '🛡️' },
     { label: 'Forme (5 derniers)', home: (d.formH?.wins || 0) + 'V-' + (d.formH?.draws || 0) + 'N-' + (d.formH?.losses || 0) + 'D', away: (d.formA?.wins || 0) + 'V-' + (d.formA?.draws || 0) + 'N-' + (d.formA?.losses || 0) + 'D', badge: '📅' },
-    { label: 'Multiplicateur forme', home: (d.formH?.ratio || 1).toFixed(2) + 'x', away: (d.formA?.ratio || 1).toFixed(2) + 'x', badge: '📈' },
-    { label: 'Buts attendus', home: (model?.lambdaHome || 0).toFixed(2), away: (model?.lambdaAway || 0).toFixed(2), badge: '🎯' },
-    { label: 'Prob. victoire', home: (model?.pH * 100).toFixed(1) + '%', away: (model?.pA * 100).toFixed(1) + '%', badge: '📊' },
+    { label: 'Multiplicateur forme', home: ((+(d.formH?.ratio || 1)) || 1).toFixed(2) + 'x', away: ((+(d.formA?.ratio || 1)) || 1).toFixed(2) + 'x', badge: '📈' },
+    { label: 'Buts attendus', home: ((+(model?.lambdaHome) || 0)).toFixed(2), away: ((+(model?.lambdaAway) || 0)).toFixed(2), badge: '🎯' },
+    { label: 'Prob. victoire', home: ((+(model?.pH) || 0) * 100).toFixed(1) + '%', away: ((+(model?.pA) || 0) * 100).toFixed(1) + '%', badge: '📊' },
   ];
   
   return `
