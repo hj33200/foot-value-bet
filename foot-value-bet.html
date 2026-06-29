@@ -1130,14 +1130,6 @@ function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, aw
   const pA = (pA_mixed / total) * (1 - pD_final);
   const pD = pD_final;
   
-  // 🔍 DEBUG
-  console.log(`🔍 DEBUG calculate1N2Advanced (${homeId} vs ${awayId}):`);
-  console.log(`   homeWinRate=${r2(homeWinRate)}, homeElo=${homeElo}, eloWinProb=${r2(eloWinProb)}`);
-  console.log(`   pH_historical=${r2(pH_historical)}, pH_elo=${r2(pH_elo)}`);
-  console.log(`   historicalWeight=${historicalWeight}, eloWeight=${eloWeight}`);
-  console.log(`   pH_mixed=${r2(pH_mixed)}, pA_mixed=${r2(pA_mixed)}`);
-  console.log(`   AVANT normalisation: pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)}`);
-  
   return { 
     pH, pD, pA,
     homeElo, awayElo, eloWinProb,
@@ -1484,11 +1476,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     }
   }
   
-  // 🔍 DEBUG
-  console.log(`🔍 DEBUG calculateAdvancedProbabilities:`);
-  console.log(`   homeFormMult=${r2(homeFormMult)}, awayFormMult=${r2(awayFormMult)}`);
-  console.log(`   pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)}`);
-  console.log(`   lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
   
   return { 
     lambdaHome, lambdaAway, homeFormMult, awayFormMult,
@@ -1706,14 +1693,6 @@ function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
   const pH = (pH_base * formRatio) / total_adjusted;
   const pA = pA_base / total_adjusted;
   const pD = pD_base;  // Les nuls ne sont pas affectés par la Forme
-  
-  // 🔍 DEBUG
-  console.log(`🔍 DEBUG buildModel - Forme appliquée:`);
-  console.log(`   pH_base=${r2(pH_base)}, pD_base=${r2(pD_base)}, pA_base=${r2(pA_base)}`);
-  console.log(`   formMultH=${r2(formMultH)}, formMultA=${r2(formMultA)}`);
-  console.log(`   formRatio=${r2(formRatio)}`);
-  console.log(`   APRÈS forme: pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)}`);
-  console.log(`   lambdaHome=${r2(lH)}, lambdaAway=${r2(lA)}`);
   const btts = advanced.pBTTS;
   const cs_h = advanced.csHome;
   const cs_a = advanced.csAway;
