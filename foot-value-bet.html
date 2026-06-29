@@ -3359,6 +3359,80 @@ function curSym(){return CUR[state.settings.currency]||'€'}
 function kellyFrac(){return {full:1,half:.5,quarter:.25}[state.settings.kellyMode]}
 
 /* ============================================================
+   💾 LOCALSTORAGE: Sauvegarder et charger l'état de l'app
+   ============================================================ */
+function saveAppState() {
+  try {
+    const dataToSave = {
+      page: state.page,
+      selectedMatchId: state.selectedMatchId,
+      filterLeague: state.filterLeague,
+      filterDate: state.filterDate,
+      settings: state.settings,
+      bets: state.bets,
+      history: state.history,
+      oddsCache: window.REAL_ODDS_CACHE || {},
+      lastSaved: new Date().toISOString()
+    };
+    
+    localStorage.setItem('foot-value-bet-app-state', JSON.stringify(dataToSave));
+    console.log('💾 État sauvegardé avec succès');
+  } catch(e) {
+    console.error('❌ Erreur sauvegarde:', e);
+  }
+}
+
+function loadAppState() {
+  try {
+    const saved = localStorage.getItem('foot-value-bet-app-state');
+    if(!saved) {
+      console.log('📂 Pas de sauvegarde trouvée - démarrage frais');
+      return false;
+    }
+    
+    const data = JSON.parse(saved);
+    
+    // Restaurer l'état
+    state.page = data.page || 'dashboard';
+    state.selectedMatchId = data.selectedMatchId || 'm1';
+    state.filterLeague = data.filterLeague || 'l1';
+    state.filterDate = data.filterDate || new Date().toISOString().slice(0,10);
+    
+    // Restaurer settings
+    if(data.settings) {
+      state.settings = { ...state.settings, ...data.settings };
+    }
+    
+    // Restaurer bets et history
+    state.bets = data.bets || [];
+    state.history = data.history || [];
+    
+    // Restaurer cache des cotes
+    if(data.oddsCache) {
+      window.REAL_ODDS_CACHE = data.oddsCache;
+    }
+    
+    console.log(`✅ État restauré (dernière sauvegarde: ${data.lastSaved})`);
+    return true;
+  } catch(e) {
+    console.error('❌ Erreur chargement:', e);
+    return false;
+  }
+}
+
+function clearAllData() {
+  if(confirm('⚠️ Supprimer TOUTES les données sauvegardées? Cette action est irréversible!')) {
+    localStorage.removeItem('foot-value-bet-app-state');
+    localStorage.removeItem('foot-value-bet-bets');
+    localStorage.removeItem('foot-value-bet-history');
+    localStorage.removeItem('foot-value-bet-apiKey');
+    
+    // Recharger la page
+    location.reload();
+  }
+}
+
+/* ============================================================
    NAV
    ============================================================ */
 const PAGES=[
@@ -4955,6 +5029,19 @@ function viewSettings(){
         Kelly = ((cote−1) × p − (1−p)) / (cote−1)
       </div>
     </div>
+    
+    <div class="card set-block" style="border-left: 3px solid var(--red);">
+      <h3 style="color: var(--red);">⚠️ Données</h3>
+      <div class="desc">Gérer vos données sauvegardées.</div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn" style="background: var(--green); color: white; flex: 1; min-width: 120px;" onclick="saveAppState()">💾 Sauvegarder maintenant</button>
+        <button class="btn" style="background: var(--red); color: white; flex: 1; min-width: 120px;" onclick="clearAllData()">🗑️ Effacer tout</button>
+      </div>
+      <div style="font-size: 11px; color: var(--txt3); margin-top: 8px; line-height: 1.6;">
+        • <b>Sauvegarder:</b> Sauvegarde manuelle de tout (page, paris, cotes)<br>
+        • <b>Effacer:</b> Supprime TOUT et réinitialise l'app ⚠️
+      </div>
+    </div>
   </div>`;
 }
 function toggleBookmaker(bm){const a=state.settings.bookmakers;const i=a.indexOf(bm);i<0?a.push(bm):a.splice(i,1);render()}
@@ -5185,6 +5272,40 @@ async function loadAndApplyRealData() {
   go('dashboard');
 }
 
+/* ============================================================
+   🔄 AUTO-SAVE ET AUTO-LOAD
+   ============================================================ */
+
+// 📂 Charger l'état au démarrage
+window.addEventListener('DOMContentLoaded', () => {
+  console.log('🔄 Chargement de l\'état sauvegardé...');
+  if(loadAppState()) {
+    console.log('✅ État restauré avec succès');
+    // Rerender la page avec l'état restauré
+    renderPage();
+  }
+});
+
+// 💾 Sauvegarder au unload (fermeture page)
+window.addEventListener('beforeunload', () => {
+  saveAppState();
+});
+
+// 💾 Sauvegarder aussi quand on ajoute un pari
+const originalAddBet = window.addBet || function() {};
+window.addBet = function(...args) {
+  originalAddBet.apply(this, args);
+  saveAppState();
+};
+
+// 💾 Sauvegarder aussi quand on modifie les settings
+const originalSaveSettings = window.saveSettings || function() {};
+window.saveSettings = function(...args) {
+  originalSaveSettings.apply(this, args);
+  saveAppState();
+};
+
+console.log('✅ Auto-save/load configuré!');
 
 </script>
 </body>
