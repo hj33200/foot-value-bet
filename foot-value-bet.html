@@ -2283,11 +2283,11 @@ function buildMarkets(m,model){
   let realOdds = null;
   if(window.REAL_ODDS_CACHE && window.REAL_ODDS_CACHE[m.id]) {
     const cached = window.REAL_ODDS_CACHE[m.id];
-    // Vérifier si le cache est valide (moins de 5 minutes)
+    // Vérifier si le cache est valide (moins de 1 minute)
     const cacheAge = Date.now() - (cached.timestamp || 0);
-    const fiveMinutes = 5 * 60 * 1000;
+    const oneMinute = 1 * 60 * 1000;
     
-    if(cacheAge < fiveMinutes) {
+    if(cacheAge < oneMinute) {
       realOdds = cached.data || cached;  // Compatibilité avec anciens caches
     } else {
       delete window.REAL_ODDS_CACHE[m.id];
@@ -4029,6 +4029,12 @@ function editOddCote(marketId, selIdx) {
    MODAL: Ajouter un pari
    ============================================================ */
 function openBetModal(marketId,selIdx){
+  // 🔄 FORCER REFRESH DES COTES: supprimer le cache pour ce match
+  if(window.REAL_ODDS_CACHE && window.REAL_ODDS_CACHE[state.selectedMatchId]) {
+    delete window.REAL_ODDS_CACHE[state.selectedMatchId];
+    console.log(`🔄 REFRESH FORCÉ: Cache supprimé pour matchId=${state.selectedMatchId}`);
+  }
+  
   const d=getMatchData(state.selectedMatchId);const m=d.meta;
   const mk=d.markets.find(x=>x.id===marketId);const s=mk.sels[selIdx];
   if(!s||s.cote==null)return;
@@ -4415,10 +4421,6 @@ function generateMarketAnalysis(b) {
               : (b.selIdx % 2 === 0 ? m.pH : m.pA)
             ) * 100).toFixed(1)
           }%</strong>
-          <div style="font-size: 11px; color: #FF0000; background: #FFF0F0; padding: 4px; margin-top: 4px; border-radius: 3px;">⚠️ DEBUG: marketId=${b.marketId}, selIdx=${b.selIdx}, prixDisplay=${((b.marketId === '1n2' 
-              ? (b.selIdx === 0 ? m.pH : b.selIdx === 2 ? m.pA : m.pD)
-              : (b.selIdx % 2 === 0 ? m.pH : m.pA)
-            ) * 100).toFixed(1)}</div>
           <div style="font-size: 11px; color: var(--txt3); margin-top: 6px;">
             30% historique + 70% Elo (Coupe du Monde) + Forme récente
           </div>
@@ -4460,6 +4462,7 @@ function renderModal(){
         <div class="mh-t">Ajouter un pari</div>
         <div class="mh-s">${b.matchName}</div>
       </div>
+      <button class="x" style="margin-left:8px;width:auto;padding:4px 8px;font-size:12px;background:var(--accent);color:white;border:none;cursor:pointer" onclick="refreshOdds()">🔄 Cotes</button>
       <button class="x" onclick="showModal(false)">×</button>
     </div>
     <div class="modal-body">
@@ -4693,6 +4696,30 @@ function confirmBet(){
   showModal(false);go('bets');toast('Pari ajouté ✓');
 }
 function showModal(v){const el=document.getElementById('modalBack');el.classList.toggle('show',v);if(!v)state.pendingBet=null}
+
+// 🔄 FONCTION: Rafraîchir les cotes du match
+function refreshOdds() {
+  const matchId = state.selectedMatchId;
+  if(!matchId) return;
+  
+  // Supprimer le cache du match
+  if(window.REAL_ODDS_CACHE && window.REAL_ODDS_CACHE[matchId]) {
+    delete window.REAL_ODDS_CACHE[matchId];
+  }
+  
+  console.log(`🔄 Refresh manuel des cotes pour matchId=${matchId}`);
+  
+  // Recharger la modal (force le recalcul des cotes)
+  if(state.pendingBet) {
+    const {market, sel} = state.pendingBet;
+    const markets = state.allMatches.find(x => x.id === matchId)?.markets || [];
+    const mk = markets.find(x => x.name === market);
+    if(mk) {
+      const selIdx = mk.sels.findIndex(x => x.sel === sel);
+      openBetModal(mk.id, selIdx);
+    }
+  }
+}
 document.getElementById('modalBack').addEventListener('click',e=>{if(e.target.id==='modalBack')showModal(false)});
 
 /* ============================================================
