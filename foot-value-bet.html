@@ -3008,8 +3008,7 @@ const FOOTBALL_API = {
     }
     
     const year = dateStr ? parseInt(dateStr.substring(0, 4)) : new Date().getFullYear();
-    // API free plan: limité à 2022-2024
-    const season = (leagueKey === 'wc') ? '2024' : Math.min(year - 1, 2024);
+    const season = (leagueKey === 'wc') ? '2026' : (year - 1);
     const url = this.BASE + '?endpoint=fixtures&league=' + leagueId + '&season=' + season + (dateStr ? '&date=' + dateStr : '');
     
     const res = await fetch(url, {
