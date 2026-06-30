@@ -3008,7 +3008,8 @@ const FOOTBALL_API = {
     }
     
     const year = dateStr ? parseInt(dateStr.substring(0, 4)) : new Date().getFullYear();
-    const season = (leagueKey === 'wc') ? '2026' : (year - 1);
+    // API free plan: limité à 2022-2024
+    const season = (leagueKey === 'wc') ? '2024' : Math.min(year - 1, 2024);
     const url = this.BASE + '?endpoint=fixtures&league=' + leagueId + '&season=' + season + (dateStr ? '&date=' + dateStr : '');
     
     const res = await fetch(url, {
@@ -3277,6 +3278,12 @@ let matchCache={};
 function getMatchData(id){
   if(matchCache[id])return matchCache[id];
   const m=MATCHES.find(x=>x.id===id);
+  
+  // ⚠️ Vérifier que le match existe
+  if(!m) {
+    console.error(`❌ Match ${id} not found!`);
+    return null;
+  }
   
   // Create deterministic RNG based on match ID
   const seed = hashStr(m.id + m.home.id + m.away.id);
@@ -3845,7 +3852,19 @@ async function openDetail(id){
    PAGE: DETAIL MATCH
    ============================================================ */
 function viewDetail(){
-  const d=getMatchData(state.selectedMatchId);const m=d.meta;
+  const d=getMatchData(state.selectedMatchId);
+  
+  // ⚠️ Vérifier que les données du match existent
+  if(!d) {
+    return `<div class="card" style="padding:20px;text-align:center;color:var(--txt3)">
+      <div style="font-size:24px;margin-bottom:10px">❌</div>
+      <div style="font-weight:600;margin-bottom:8px">Match non trouvé</div>
+      <div style="font-size:13px;margin-bottom:15px">Le match sélectionné n'existe pas ou les données ne sont pas chargées.</div>
+      <button class="btn" onclick="go('dashboard')" style="background:var(--accent);color:white;border:none">Retour au dashboard</button>
+    </div>`;
+  }
+  
+  const m=d.meta;
   const dateStr=new Date(m.date+'T00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   // count value bets
   let nGreen=0;d.markets.forEach(mk=>mk.sels.forEach(s=>{if(s.color==='green')nGreen++}));
