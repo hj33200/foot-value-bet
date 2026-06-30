@@ -3857,17 +3857,6 @@ function viewDetail(){
   return `
   <a class="back-link" onclick="go('dashboard')">${iconSvg('M19 12H5M12 19l-7-7 7-7')} Retour au dashboard</a>
   
-  <!-- 🎯 RECOMMANDATION EN COULEUR -->
-  <div class="card" style="background:linear-gradient(135deg, ${recColor}15 0%, ${recColor}05 100%);border-left:4px solid ${recColor};padding:16px;margin-bottom:15px">
-    <div style="display:flex;align-items:center;gap:12px">
-      <div style="font-size:32px">${rec.icon}</div>
-      <div>
-        <div style="font-weight:700;font-size:16px;color:${recColor}">${rec.message}</div>
-        <div style="font-size:13px;color:var(--txt3);margin-top:4px">${rec.recommendation}</div>
-      </div>
-    </div>
-  </div>
-  
   <div class="card detail-head fade">
     <div class="glow"></div>
     <div class="dh-meta">
@@ -5410,8 +5399,8 @@ function comparisonTableHomeAway(d) {
     { label: 'Rang Général', home: ord(H.rankGen), away: ord(A.rankGen) },
     { label: 'Rang (côté)', home: ord(H.rankSide), away: ord(A.rankSide) },
     { label: 'Elo', home: ((+(m.homeElo) || 0)).toFixed(0), away: ((+(m.awayElo) || 0)).toFixed(0), badge: '🏆' },
-    { label: 'Attaque (buts/match)', home: ((+(H.gf) || 0)).toFixed(2), away: ((+(A.gf) || 0)).toFixed(2), badge: '⚽' },
-    { label: 'Défense (encaissés/match)', home: ((+(H.ga) || 0)).toFixed(2), away: ((+(A.ga) || 0)).toFixed(2), badge: '🛡️' },
+    { label: 'Attaque (buts/match)', home: (((+(H.gf) || 0) / (d.meta.home.matches || 34)) || 0).toFixed(2), away: (((+(A.gf) || 0) / (d.meta.away.matches || 34)) || 0).toFixed(2), badge: '⚽' },
+    { label: 'Défense (encaissés/match)', home: (((+(H.ga) || 0) / (d.meta.home.matches || 34)) || 0).toFixed(2), away: (((+(A.ga) || 0) / (d.meta.away.matches || 34)) || 0).toFixed(2), badge: '🛡️' },
     { label: 'Forme (5 derniers)', home: (formH.wins || 0) + 'V-' + (formH.draws || 0) + 'N-' + (formH.losses || 0) + 'D', away: (formA.wins || 0) + 'V-' + (formA.draws || 0) + 'N-' + (formA.losses || 0) + 'D', badge: '📅' },
     { label: 'Multiplicateur forme', home: ((+(formH.ratio) || 1)).toFixed(2) + 'x', away: ((+(formA.ratio) || 1)).toFixed(2) + 'x', badge: '📈' },
     { label: 'Buts attendus', home: ((+(model.lambdaHome) || 0)).toFixed(2), away: ((+(model.lambdaAway) || 0)).toFixed(2), badge: '🎯' },
@@ -5449,10 +5438,23 @@ function initRadarChart(d) {
         chartInstance.destroy();
       }
       
-      const H_stats = d.statsH;
-      const A_stats = d.statsA;
-      const maxGF = Math.max(H_stats.gf || 0, A_stats.gf || 0, 4);
-      const maxGA = Math.max(H_stats.ga || 0, A_stats.ga || 0, 3);
+      const H = d.statsH || {};
+      const A = d.statsA || {};
+      const formH = d.formH || {};
+      const formA = d.formA || {};
+      
+      // Normalisation: tout entre 0-100
+      const hAttack = Math.min(100, (+(H.gf) || 0) * 20);  // Attaque: ~2-3 buts = 40-60
+      const aAttack = Math.min(100, (+(A.gf) || 0) * 20);
+      
+      const hDefense = Math.max(0, 100 - ((+(H.ga) || 0) * 20));  // Défense inversée
+      const aDefense = Math.max(0, 100 - ((+(A.ga) || 0) * 20));
+      
+      const hForm = Math.min(100, ((formH.wins || 0) * 15 + (formH.draws || 0) * 5));  // Forme
+      const aForm = Math.min(100, ((formA.wins || 0) * 15 + (formA.draws || 0) * 5));
+      
+      const hElo = Math.min(100, ((+(d.meta.homeElo) || 1800) / 1800) * 100);
+      const aElo = Math.min(100, ((+(d.meta.awayElo) || 1800) / 1800) * 100);
       
       new Chart(ctx, {
         type: 'radar',
@@ -5461,47 +5463,56 @@ function initRadarChart(d) {
           datasets: [
             {
               label: d.meta.home.name,
-              data: [
-                Math.min(100, (H_stats.gf || 0) / maxGF * 100),
-                Math.min(100, ((maxGA * 2 - (H_stats.ga || 0)) / (maxGA * 2) * 100)),
-                (d.formH?.ratio || 1) * 20,
-                Math.min(100, (d.meta.homeElo || 1800) / 1800 * 100)
-              ],
-              borderColor: 'var(--blue)',
-              backgroundColor: 'rgba(100, 150, 255, 0.15)',
-              borderWidth: 2,
-              pointRadius: 4,
-              pointBackgroundColor: 'var(--blue)'
+              data: [hAttack, hDefense, hForm, hElo],
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.25)',
+              borderWidth: 2.5,
+              pointRadius: 5,
+              pointBackgroundColor: '#3b82f6',
+              pointBorderColor: '#fff',
+              pointBorderWidth: 2,
+              tension: 0.2
             },
             {
               label: d.meta.away.name,
-              data: [
-                Math.min(100, (A_stats.gf || 0) / maxGF * 100),
-                Math.min(100, ((maxGA * 2 - (A_stats.ga || 0)) / (maxGA * 2) * 100)),
-                (d.formA?.ratio || 1) * 20,
-                Math.min(100, (d.meta.awayElo || 1800) / 1800 * 100)
-              ],
-              borderColor: 'var(--red)',
-              backgroundColor: 'rgba(255, 100, 100, 0.15)',
-              borderWidth: 2,
-              pointRadius: 4,
-              pointBackgroundColor: 'var(--red)'
+              data: [aAttack, aDefense, aForm, aElo],
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.25)',
+              borderWidth: 2.5,
+              pointRadius: 5,
+              pointBackgroundColor: '#ef4444',
+              pointBorderColor: '#fff',
+              pointBorderWidth: 2,
+              tension: 0.2
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: true,
+          plugins: {
+            legend: { 
+              labels: { color: 'var(--txt2)', font: { size: 13, weight: '500' }, padding: 15 }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0,0,0,0.8)',
+              titleColor: '#fff',
+              bodyColor: '#fff',
+              borderColor: 'var(--line)',
+              borderWidth: 1,
+              padding: 12,
+              titleFont: { size: 13, weight: 'bold' },
+              bodyFont: { size: 12 }
+            }
+          },
           scales: {
             r: {
               beginAtZero: true,
               max: 100,
-              ticks: { stepSize: 20 },
-              grid: { color: 'var(--line)' }
+              ticks: { stepSize: 25, color: 'var(--txt3)', font: { size: 11 } },
+              grid: { color: 'rgba(255,255,255,0.1)' },
+              pointLabels: { color: 'var(--txt2)', font: { size: 12, weight: '600' } }
             }
-          },
-          plugins: {
-            legend: { labels: { color: 'var(--txt2)' } }
           }
         }
       });
@@ -5516,9 +5527,25 @@ function createRadarChart(d) {
   setTimeout(() => initRadarChart(d), 150);
   
   return `
-    <div class="radar-container" style="background:var(--bg2);padding:20px;border-radius:8px;margin:15px 0">
-      <h4 style="margin:0 0 15px 0">📊 Profil Offensif/Défensif</h4>
-      <canvas id="${canvasId}" style="max-width:100%;height:300px"></canvas>
+    <div class="radar-container" style="background:linear-gradient(135deg, var(--bg2) 0%, var(--bg1) 100%);padding:24px;border-radius:12px;margin:15px 0;border:1px solid var(--line)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h4 style="margin:0;font-size:16px;font-weight:700">⚔️ Profil Offensif/Défensif</h4>
+        <div style="display:flex;gap:16px;font-size:12px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="width:12px;height:12px;background:#3b82f6;border-radius:2px"></div>
+            <span style="color:var(--txt3)">${d.meta.home.name}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="width:12px;height:12px;background:#ef4444;border-radius:2px"></div>
+            <span style="color:var(--txt3)">${d.meta.away.name}</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="${canvasId}" style="max-width:100%;height:350px"></canvas>
+      <div style="margin-top:16px;padding:12px;background:var(--bg1);border-radius:8px;border-left:3px solid var(--accent);font-size:12px;color:var(--txt3);line-height:1.6">
+        <strong style="color:var(--txt2)">📖 Comment lire:</strong><br>
+        Plus la zone est grande = Plus forte sur cet axe. Attaque & Défense: buts. Forme: résultats récents. Elo: classement.
+      </div>
     </div>`;
 }
 
