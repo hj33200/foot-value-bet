@@ -3404,8 +3404,8 @@ function loadAppState() {
     
     const data = JSON.parse(saved);
     
-    // Restaurer l'état
-    state.page = data.page || 'dashboard';
+    // Restaurer l'état (SAUF la page - toujours commencer au dashboard)
+    state.page = 'dashboard';  // ← Toujours dashboard au chargement!
     state.selectedMatchId = data.selectedMatchId || 'm1';
     state.filterLeague = data.filterLeague || 'l1';
     state.filterDate = data.filterDate || new Date().toISOString().slice(0,10);
@@ -5443,18 +5443,22 @@ function initRadarChart(d) {
       const formH = d.formH || {};
       const formA = d.formA || {};
       
-      // Normalisation: tout entre 0-100
-      const hAttack = Math.min(100, (+(H.gf) || 0) * 20);  // Attaque: ~2-3 buts = 40-60
-      const aAttack = Math.min(100, (+(A.gf) || 0) * 20);
+      // Normalisation: tout entre 0-100 avec des échelles réalistes
+      // Attaque: 0-5 buts/match → 0-100
+      const hAttack = Math.min(100, Math.max(0, ((+(H.avgFor) || 0) / 5) * 100));
+      const aAttack = Math.min(100, Math.max(0, ((+(A.avgFor) || 0) / 5) * 100));
       
-      const hDefense = Math.max(0, 100 - ((+(H.ga) || 0) * 20));  // Défense inversée
-      const aDefense = Math.max(0, 100 - ((+(A.ga) || 0) * 20));
+      // Défense: 0-3 encaissés/match → 100-0 (inversée)
+      const hDefense = Math.max(0, Math.min(100, 100 - (((+(H.avgAga) || 0) / 3) * 100)));
+      const aDefense = Math.max(0, Math.min(100, 100 - (((+(A.avgAga) || 0) / 3) * 100)));
       
-      const hForm = Math.min(100, ((formH.wins || 0) * 15 + (formH.draws || 0) * 5));  // Forme
-      const aForm = Math.min(100, ((formA.wins || 0) * 15 + (formA.draws || 0) * 5));
+      // Forme: wins=15pts, draws=5pts, max ~10 matchs = max 150pts → 0-100
+      const hForm = Math.min(100, ((formH.wins || 0) * 15 + (formH.draws || 0) * 5) / 150 * 100);
+      const aForm = Math.min(100, ((formA.wins || 0) * 15 + (formA.draws || 0) * 5) / 150 * 100);
       
-      const hElo = Math.min(100, ((+(d.meta.homeElo) || 1800) / 1800) * 100);
-      const aElo = Math.min(100, ((+(d.meta.awayElo) || 1800) / 1800) * 100);
+      // Elo: 1400-2000 → 0-100
+      const hElo = Math.max(0, Math.min(100, (((+(d.meta.homeElo) || 1600) - 1400) / 600) * 100));
+      const aElo = Math.max(0, Math.min(100, (((+(d.meta.awayElo) || 1600) - 1400) / 600) * 100));
       
       new Chart(ctx, {
         type: 'radar',
