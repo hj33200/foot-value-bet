@@ -3052,17 +3052,15 @@ const FOOTBALL_API = {
       await this.fetchStatsForTeams(uniqueTeamIds).catch(e => console.warn('Stats non chargées:', e));
       
       // Charger les H2H en arrière-plan pour chaque match
-      // ⚠️ TEMPORAIREMENT DÉSACTIVÉ: Le proxy Vercel retourne 400 pour H2H
-      // TODO: Corriger le format du paramètre h2h ou trouver un autre endpoint
-      /* 
+      // ✅ RÉACTIVÉ: Charger les vrais H2H des matches
       allMatches.forEach(match => {
         fetchH2H(match.homeTeamId, match.awayTeamId).then(h2hData => {
           if(matchCache[match.id]) {
             matchCache[match.id].h2h = h2hData.length > 0 ? h2hData : buildH2H({home: {gf: 0, matches: 1}, away: {gf: 0, matches: 1}});
+            console.log(`✅ H2H chargés pour ${match.home.name} vs ${match.away.name}:`, h2hData.length);
           }
         }).catch(e => console.warn('H2H non chargés:', e));
       });
-      */
     }
     
     return allMatches;
