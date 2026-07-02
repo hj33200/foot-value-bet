@@ -2621,6 +2621,7 @@ function buildMarkets(m,model){
       console.log(`🔍 mkSmart cherche ${marketName} (marketId=${marketId}, idx=${idx}, label=${label}, matchId=${matchId})`);  // DEBUG
       const result = getRealCotes(marketName, ['Unibet', 'Bet365', '1xBet', 'William Hill'], matchId);  // ← Passer matchId!
       console.log(`📊 getRealCotes retourne:`, result);  // DEBUG
+      console.log(`🔍 COTES ORDRE: idx=${idx}, label=${label}, cotes=`, result?.cotes);  // DEBUG L'ORDRE!
       
       if(result && result.cotes && result.cotes[idx]) {
         const oddValue = parseFloat(result.cotes[idx].odd);
