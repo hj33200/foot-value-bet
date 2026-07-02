@@ -1307,6 +1307,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   // Convertir Elo difference en multiplicateur (basé sur la formule d'Elo)
   const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
+  const eloMultiplier = Math.min(1.3, 1.0 + (eloWinProb - 0.5) * 0.6);  // Entre 0.7 et 1.3
   const homeEloMult = eloWinProb; // Entre 0 et 1
   const awayEloMult = 1 - eloWinProb;
   
@@ -1330,10 +1331,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   // Ajustement Elo: Multiplicateur basé sur l'avantage Elo (pas probabilité!)
   // Ajustement SOS: Diviseur basé sur force des adversaires
   // Ajustement FORME: Multiplicateur basé sur les 5 derniers matchs
-  
-  // Calcul du multiplicateur Elo: Si Elo favored 81%, le ratio est 0.811/0.189 = 4.3x
-  // Mais on le limite à un multiplicateur raisonnable (1.1x à 1.3x)
-  const eloMultiplier = Math.min(1.3, 1.0 + (eloWinProb - 0.5) * 0.6);  // Entre 0.7 et 1.3
   
   // Lambdas: (Offensive / Défensive adverse) * Multiplicateur Elo * Ajustement SOS * Forme récente
   let lambdaHome = (homeOffense / (awayDefense + 0.1)) * eloMultiplier * sosHome.sos / sosAway.sos * homeFormMult;
