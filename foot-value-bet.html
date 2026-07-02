@@ -771,23 +771,14 @@ function detectCompetitionType(leagueName, competitionName) {
 
 // 🌍 OBTENIR LES PROPRIÉTÉS DE LA COMPÉTITION
 function getCompetitionProperties(competitionType) {
-  if (competitionType === 'WORLD_CUP') {
-    return {
-      name: 'Coupe du Monde',
-      isNeutralGround: true,
-      homeAdvantage: 1.0,
-      sosUsesHomeAway: false,
-      description: '⚽ Terrain neutre (tous les matchs)'
-    };
-  } else {
-    return {
-      name: 'Championnat',
-      isNeutralGround: false,
-      homeAdvantage: 1.03, // 3% d'avantage domicile
-      sosUsesHomeAway: true,
-      description: '🏟️ Avec avantage domicile'
-    };
-  }
+  // ⚽ PAS D'AVANTAGE DOMICILE NULLE PART (terrain neutre partout)
+  return {
+    name: competitionType === 'WORLD_CUP' ? 'Coupe du Monde' : 'Championnat',
+    isNeutralGround: true,  // ✅ TOUJOURS terrain neutre
+    homeAdvantage: 1.0,      // ✅ PAS d'avantage domicile
+    sosUsesHomeAway: competitionType !== 'WORLD_CUP',
+    description: '⚽ Terrain neutre (pas d\'avantage domicile)'
+  };
 }
 
 // 🌍 TABLE FIFA RANKINGS (mise à jour octobre 2024)
@@ -1324,9 +1315,15 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const sosHome = calculateSOS(home.id, home.name, homeLastMatches, competitionType);
   const sosAway = calculateSOS(away.id, away.name, awayLastMatches, competitionType);
   
+  console.log(`📊 FACTEURS CORRECTIFS:`);
+  console.log(`   Elo HOME: ${r2(homeElo)}, Elo AWAY: ${r2(awayElo)}`);
+  console.log(`   eloWinProb=${r2(eloWinProb)}, eloMultiplier=${r2(eloMultiplier)}`);
+  console.log(`   sosHome=${r2(sosHome.sos)}, sosAway=${r2(sosAway.sos)}`);
+  console.log(`   sosRatio (sosHome/sosAway)=${r2(sosHome.sos / sosAway.sos)}`);
+  console.log(`   homeFormMult=${r2(homeFormMult)}, awayFormMult=${r2(awayFormMult)}`);
   
   // 5️⃣ LAMBDAS POISSON FINALES avec ELO + SOS
-  const homeAdvantage = compProps.homeAdvantage; // ✅ Utilise le type de compétition
+  const homeAdvantage = compProps.homeAdvantage; // = 1.0 toujours (pas d'avantage)
   
   // ✅ CALCUL CORRECT DES LAMBDAS:
   // Base: homeOffense / awayDefense (ratio de force offensive/défensive)
@@ -1342,11 +1339,20 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   let lambdaHome = (homeOffense / (awayDefense + 0.1)) * eloMultiplier * sosHome.sos / sosAway.sos * homeFormMult;
   let lambdaAway = (awayOffense / (homeDefense + 0.1)) * (1 / eloMultiplier) * sosAway.sos / sosHome.sos * awayFormMult;
   
+  console.log(`📊 COMPOSANTS LAMBDAS:`);
+  console.log(`   HOME: (${r2(homeOffense)}/${r2(awayDefense + 0.1)}) * ${r2(eloMultiplier)} * ${r2(sosHome.sos / sosAway.sos)} * ${r2(homeFormMult)} * ${r2(homeAdvantage)}`);
+  console.log(`   AWAY: (${r2(awayOffense)}/${r2(homeDefense + 0.1)}) * ${r2(1 / eloMultiplier)} * ${r2(sosAway.sos / sosHome.sos)} * ${r2(awayFormMult)}`);
+  
+  console.log(`📊 AVANT homeAdvantage: lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
+  
   lambdaHome *= homeAdvantage;
+  
+  console.log(`📊 APRÈS homeAdvantage (${r2(homeAdvantage)}): lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
   
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
   
+  console.log(`📊 APRÈS CLAMP: lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
   console.log(`🔴 LAMBDAS FINAUX: ${r2(lambdaHome)} vs ${r2(lambdaAway)}`);
   console.log(`   Si lambdaHome > lambdaAway → Home plus fort ✅`);
   console.log(`   Si lambdaHome < lambdaAway → Away plus fort ❌`);
