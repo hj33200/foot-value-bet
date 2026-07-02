@@ -2357,19 +2357,9 @@ function buildMarkets(m,model){
       realOdds = window.REAL_ODDS_CACHE[matchId].data || window.REAL_ODDS_CACHE[matchId];
       console.log(`✅ getRealCotes: Trouvé cache pour matchId=${matchId}`);
     } else {
-      // ⚠️ PAS DE CACHE POUR CE MATCH
-      console.warn(`⚠️ getRealCotes: Pas de cache pour matchId=${matchId}`);
-      
-      // FALLBACK: Utiliser le PREMIER disponible (cotes génériques)
-      // ⚠️ ATTENTION: Cela peut mélanger les cotes de différents matchs!
-      if(window.REAL_ODDS_CACHE && Object.keys(window.REAL_ODDS_CACHE).length > 0) {
-        const firstKey = Object.keys(window.REAL_ODDS_CACHE)[0];
-        realOdds = window.REAL_ODDS_CACHE[firstKey].data || window.REAL_ODDS_CACHE[firstKey];
-        console.warn(`⚠️ FALLBACK DANGEREUX: Utilisant cotes de ${firstKey} au lieu de ${matchId}! Cotes PEUVENT ÊTRE MÉLANGÉES!`);
-      } else {
-        console.warn(`❌ getRealCotes: AUCUN CACHE DU TOUT! Impossible de récupérer les cotes!`);
-        return null;
-      }
+      // ⚠️ PAS DE CACHE POUR CE MATCH - NE PAS UTILISER FALLBACK!
+      console.warn(`⚠️ getRealCotes: Pas de cache pour matchId=${matchId} - Utiliser des cotes fictives`);
+      return null;  // ← Retourner null au lieu de fallback!
     }
     
     // ⚠️ VÉRIFIER SI UNIBET EXISTE RÉELLEMENT
@@ -5199,19 +5189,30 @@ function computeStatsFromMatches(matches) {
 
 // 🎯 Charger les vraies cotes 1X2 pour tous les matchs du dashboard
 async function loadRealOddsForDashboard() {
-  if(!MATCHES || MATCHES.length === 0) return;
+  if(!MATCHES || MATCHES.length === 0) {
+    console.warn('⚠️ Pas de matchs à charger');
+    return;
+  }
   
+  console.log(`📊 Chargement des cotes pour ${MATCHES.length} matchs...`);
   
   // Charger les cotes en parallèle (max 5 à la fois pour ne pas surcharger)
   const batchSize = 5;
   for(let i = 0; i < MATCHES.length; i += batchSize) {
     const batch = MATCHES.slice(i, i + batchSize);
+    console.log(`🔄 Batch ${Math.floor(i/batchSize) + 1}: ${batch.map(m => m.id).join(', ')}`);
+    
     const promises = batch.map(m => {
+      console.log(`  🔄 Chargement cotes pour match ${m.id}...`);
+      
       // Vérifier si le cache est valide (moins de 5 minutes)
       let needsFetch = !window.REAL_ODDS_CACHE?.[m.id];
       if(window.REAL_ODDS_CACHE?.[m.id]) {
         const cacheAge = Date.now() - (window.REAL_ODDS_CACHE[m.id].timestamp || 0);
         needsFetch = cacheAge > 5 * 60 * 1000;  // Plus de 5 minutes = rechargement
+        if(!needsFetch) {
+          console.log(`  ✅ Cache valide pour ${m.id}`);
+        }
       }
       
       if(needsFetch) {
@@ -5223,14 +5224,24 @@ async function loadRealOddsForDashboard() {
                 data: odds,
                 timestamp: Date.now()  // ⏰ Ajouter le timestamp
               };
+              console.log(`  ✅ Cotes chargées pour ${m.id}`);
+            } else {
+              console.error(`  ❌ API retourné null pour ${m.id}`);
             }
           })
-          .catch(err => console.warn(`⚠️ Erreur cotes ${m.id}:`, err));
+          .catch(err => {
+            console.error(`  ❌ Erreur cotes ${m.id}:`, err.message);
+          });
+      } else {
+        return Promise.resolve();
       }
     });
     
     await Promise.all(promises);
   }
+  
+  console.log(`✅ Toutes les cotes chargées!`);
+  console.log(`📊 Cache final:`, Object.keys(window.REAL_ODDS_CACHE || {}).length, 'matchs');
   
   // Re-rendre le dashboard avec les vraies cotes
   render();
