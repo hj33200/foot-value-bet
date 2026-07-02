@@ -1255,18 +1255,38 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const awayGA = awayStats.ga || away.ga || 1;
   const awayMatches = (awayStats.matches || 0) > 0 ? awayStats.matches : (awayForm.length > 0 ? awayForm.length : (away.matches || 1));
   
-  console.log(`📊 STATS ${home.name} vs ${away.name}:`);
+  console.log(`📊 STATS BRUTES ${home.name} vs ${away.name}:`);
   console.log(`   HOME: ${homeGF} buts pour / ${homeGA} encaissés en ${homeMatches} matchs`);
   console.log(`   AWAY: ${awayGF} buts pour / ${awayGA} encaissés en ${awayMatches} matchs`);
   
-  // 1️⃣ FORCES OFFENSIVES/DÉFENSIVES
-  const homeOffense = homeGF / homeMatches;
-  const homeDefense = homeGA / homeMatches;
-  const awayOffense = awayGF / awayMatches;
-  const awayDefense = awayGA / awayMatches;
+  // 🔴 CALCUL SOS EN PREMIER (avant de normaliser les stats)
+  const sosHome = calculateSOS(home.id, home.name, homeLastMatches, competitionType);
+  const sosAway = calculateSOS(away.id, away.name, awayLastMatches, competitionType);
   
-  console.log(`   OFFENSE: ${r2(homeOffense)} home vs ${r2(awayOffense)} away`);
-  console.log(`   DEFENSE: ${r2(homeDefense)} home vs ${r2(awayDefense)} away`);
+  console.log(`📊 SOS (Calendrier):`);
+  console.log(`   sosHome=${r2(sosHome.sos)} (adversaires forts = nombre > 1)`);
+  console.log(`   sosAway=${r2(sosAway.sos)} (adversaires faibles = nombre < 1)`);
+  
+  // 1️⃣ FORCES OFFENSIVES/DÉFENSIVES NORMALISÉES PAR SOS
+  // Si sos > 1 = adversaires forts = réduire les stats (moins impressionnant)
+  // Si sos < 1 = adversaires faibles = réduire les stats (gonflé)
+  const homeOffense_raw = homeGF / homeMatches;
+  const homeDefense_raw = homeGA / homeMatches;
+  const awayOffense_raw = awayGF / awayMatches;
+  const awayDefense_raw = awayGA / awayMatches;
+  
+  // Normaliser par SOS
+  const homeOffense = homeOffense_raw / sosHome.sos;  // ÷ par sos: si sos élevé, réduit
+  const homeDefense = homeDefense_raw / sosHome.sos;
+  const awayOffense = awayOffense_raw / sosAway.sos;
+  const awayDefense = awayDefense_raw / sosAway.sos;
+  
+  console.log(`📊 STATS NORMALISÉES par SOS:`);
+  console.log(`   HOME offense: ${r2(homeOffense_raw)} → ${r2(homeOffense)} (÷ ${r2(sosHome.sos)})`);
+  console.log(`   HOME defense: ${r2(homeDefense_raw)} → ${r2(homeDefense)}`);
+  console.log(`   AWAY offense: ${r2(awayOffense_raw)} → ${r2(awayOffense)} (÷ ${r2(sosAway.sos)})`);
+  console.log(`   AWAY defense: ${r2(awayDefense_raw)} → ${r2(awayDefense)}`);
+  
   
   
   // 2️⃣ RATIO DE VICTOIRES
@@ -1302,48 +1322,34 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   // 4️⃣ ELO RATING - Pondération scientifiquement validée
   ELO_CACHE = {}; // ← VIDER LE CACHE pour recalculer!
+  
+  // 4️⃣ ELO
   const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches);
   const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches);
   
-  // Convertir Elo difference en multiplicateur (basé sur la formule d'Elo)
+  // Convertir Elo difference en multiplicateur
   const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
   const eloMultiplier = Math.min(1.3, 1.0 + (eloWinProb - 0.5) * 0.6);  // Entre 0.7 et 1.3
-  const homeEloMult = eloWinProb; // Entre 0 et 1
-  const awayEloMult = 1 - eloWinProb;
   
+  console.log(`📊 ELO:`);
+  console.log(`   homeElo=${homeElo}, awayElo=${awayElo}`);
+  console.log(`   eloWinProb=${r2(eloWinProb)}, eloMultiplier=${r2(eloMultiplier)}`);
   
-  // 4️⃣.5️⃣ CALCUL SOS (Strength of Schedule) - Force des adversaires
-  const sosHome = calculateSOS(home.id, home.name, homeLastMatches, competitionType);
-  const sosAway = calculateSOS(away.id, away.name, awayLastMatches, competitionType);
-  
-  console.log(`📊 FACTEURS CORRECTIFS:`);
-  console.log(`   Elo HOME: ${homeElo}, Elo AWAY: ${awayElo}`);
-  console.log(`   eloWinProb=${r2(eloWinProb)}`);
-  console.log(`   sosHome=${r2(sosHome.sos)}, sosAway=${r2(sosAway.sos)}`);
-  console.log(`   sosRatio=${r2(sosHome.sos / sosAway.sos)}`);
-  
-  // 5️⃣ LAMBDAS POISSON FINALES avec ELO + SOS
+  // 5️⃣ LAMBDAS POISSON FINALES - NOUVELLE FORMULE
   const homeAdvantage = compProps.homeAdvantage; // = 1.0 toujours (pas d'avantage)
   
-  // ✅ CALCUL CORRECT DES LAMBDAS:
-  // Base: homeOffense / awayDefense (ratio de force offensive/défensive)
-  // Ajustement Elo: Multiplicateur basé sur l'avantage Elo (pas probabilité!)
-  // Ajustement SOS: Diviseur basé sur force des adversaires
-  // Ajustement FORME: Multiplicateur basé sur les 5 derniers matchs
+  // ✅ NOUVELLE FORMULE CORRECTE:
+  // lambdaHome = homeOffense (normalisé) × awayDefense (normalisé) × eloMultiplier × homeFormMult × homeAdvantage
+  // Les stats sont déjà normalisées par SOS, donc pas besoin de ratio SOS dans la formule!
   
-  // Lambdas: (Offensive / Défensive adverse) * Multiplicateur Elo * Ajustement SOS * Forme récente
-  let lambdaHome = (homeOffense / (awayDefense + 0.1)) * eloMultiplier * sosHome.sos / sosAway.sos * homeFormMult;
-  let lambdaAway = (awayOffense / (homeDefense + 0.1)) * (1 / eloMultiplier) * sosAway.sos / sosHome.sos * awayFormMult;
+  let lambdaHome = homeOffense * awayDefense * eloMultiplier * homeFormMult * homeAdvantage;
+  let lambdaAway = awayOffense * homeDefense * (1 / eloMultiplier) * awayFormMult;
   
-  console.log(`📊 COMPOSANTS LAMBDAS:`);
-  console.log(`   HOME: (${r2(homeOffense)}/${r2(awayDefense + 0.1)}) * ${r2(eloMultiplier)} * ${r2(sosHome.sos / sosAway.sos)} * ${r2(homeFormMult)} * ${r2(homeAdvantage)}`);
-  console.log(`   AWAY: (${r2(awayOffense)}/${r2(homeDefense + 0.1)}) * ${r2(1 / eloMultiplier)} * ${r2(sosAway.sos / sosHome.sos)} * ${r2(awayFormMult)}`);
+  console.log(`📊 COMPOSANTS LAMBDAS (stats déjà normalisées par SOS):`);
+  console.log(`   HOME: ${r2(homeOffense)} * ${r2(awayDefense)} * ${r2(eloMultiplier)} * ${r2(homeFormMult)} * ${r2(homeAdvantage)}`);
+  console.log(`   AWAY: ${r2(awayOffense)} * ${r2(homeDefense)} * ${r2(1 / eloMultiplier)} * ${r2(awayFormMult)}`);
   
-  console.log(`📊 AVANT homeAdvantage: lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
-  
-  lambdaHome *= homeAdvantage;
-  
-  console.log(`📊 APRÈS homeAdvantage (${r2(homeAdvantage)}): lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
+  console.log(`📊 AVANT clamp: lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
   
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
