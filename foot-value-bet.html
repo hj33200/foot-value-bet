@@ -1122,14 +1122,7 @@ function calculate1N2Advanced(bookmakerData, homeId, awayId, homeLastMatches, aw
   const pH = (pH_mixed / total) * (1 - pD_final);
   const pA = (pA_mixed / total) * (1 - pD_final);
   const pD = pD_final;
-  
-  // 🔍 DEBUG
-  console.log(`🔍 DEBUG calculate1N2Advanced (${homeId} vs ${awayId}):`);
-  console.log(`   homeWinRate=${r2(homeWinRate)}, homeElo=${homeElo}, eloWinProb=${r2(eloWinProb)}`);
-  console.log(`   pH_historical=${r2(pH_historical)}, pH_elo=${r2(pH_elo)}`);
-  console.log(`   historicalWeight=${historicalWeight}, eloWeight=${eloWeight}`);
-  console.log(`   pH_mixed=${r2(pH_mixed)}, pA_mixed=${r2(pA_mixed)}`);
-  console.log(`   AVANT normalisation: pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)}`);
+
   
   return { 
     pH, pD, pA,
@@ -1255,17 +1248,10 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const awayGA = awayStats.ga || away.ga || 1;
   const awayMatches = (awayStats.matches || 0) > 0 ? awayStats.matches : (awayForm.length > 0 ? awayForm.length : (away.matches || 1));
   
-  console.log(`📊 STATS BRUTES ${home.name} vs ${away.name}:`);
-  console.log(`   HOME: ${homeGF} buts pour / ${homeGA} encaissés en ${homeMatches} matchs`);
-  console.log(`   AWAY: ${awayGF} buts pour / ${awayGA} encaissés en ${awayMatches} matchs`);
   
   // 🔴 CALCUL SOS EN PREMIER (avant de normaliser les stats)
   const sosHome = calculateSOS(home.id, home.name, homeLastMatches, competitionType);
   const sosAway = calculateSOS(away.id, away.name, awayLastMatches, competitionType);
-  
-  console.log(`📊 SOS (Calendrier):`);
-  console.log(`   sosHome=${r2(sosHome.sos)} (adversaires forts = nombre > 1)`);
-  console.log(`   sosAway=${r2(sosAway.sos)} (adversaires faibles = nombre < 1)`);
   
   // 1️⃣ FORCES OFFENSIVES/DÉFENSIVES NORMALISÉES PAR SOS
   // Si sos > 1 = adversaires forts = réduire les stats (moins impressionnant)
@@ -1280,12 +1266,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const homeDefense = homeDefense_raw / sosHome.sos;
   const awayOffense = awayOffense_raw / sosAway.sos;
   const awayDefense = awayDefense_raw / sosAway.sos;
-  
-  console.log(`📊 STATS NORMALISÉES par SOS:`);
-  console.log(`   HOME offense: ${r2(homeOffense_raw)} → ${r2(homeOffense)} (÷ ${r2(sosHome.sos)})`);
-  console.log(`   HOME defense: ${r2(homeDefense_raw)} → ${r2(homeDefense)}`);
-  console.log(`   AWAY offense: ${r2(awayOffense_raw)} → ${r2(awayOffense)} (÷ ${r2(sosAway.sos)})`);
-  console.log(`   AWAY defense: ${r2(awayDefense_raw)} → ${r2(awayDefense)}`);
   
   
   
@@ -1331,44 +1311,24 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
   const eloMultiplier = Math.min(1.3, 1.0 + (eloWinProb - 0.5) * 0.6);  // Entre 0.7 et 1.3
   
-  console.log(`📊 ELO:`);
-  console.log(`   homeElo=${homeElo}, awayElo=${awayElo}`);
-  console.log(`   eloWinProb=${r2(eloWinProb)}, eloMultiplier=${r2(eloMultiplier)}`);
-  
   // 5️⃣ LAMBDAS POISSON FINALES - NOUVELLE FORMULE
   const homeAdvantage = compProps.homeAdvantage; // = 1.0 toujours (pas d'avantage)
   
   // ✅ NOUVELLE FORMULE CORRECTE:
   // lambdaHome = homeOffense (normalisé) × awayDefense (normalisé) × eloMultiplier × homeFormMult × homeAdvantage
   // Les stats sont déjà normalisées par SOS, donc pas besoin de ratio SOS dans la formule!
-  
   let lambdaHome = homeOffense * awayDefense * eloMultiplier * homeFormMult * homeAdvantage;
   let lambdaAway = awayOffense * homeDefense * (1 / eloMultiplier) * awayFormMult;
   
-  console.log(`📊 COMPOSANTS LAMBDAS (stats déjà normalisées par SOS):`);
-  console.log(`   HOME: ${r2(homeOffense)} * ${r2(awayDefense)} * ${r2(eloMultiplier)} * ${r2(homeFormMult)} * ${r2(homeAdvantage)}`);
-  console.log(`   AWAY: ${r2(awayOffense)} * ${r2(homeDefense)} * ${r2(1 / eloMultiplier)} * ${r2(awayFormMult)}`);
-  
-  console.log(`📊 AVANT clamp: lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
-  
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
-  
-  console.log(`📊 APRÈS CLAMP: lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
-  console.log(`🔴 LAMBDAS FINAUX: ${r2(lambdaHome)} vs ${r2(lambdaAway)}`);
-  console.log(`   Si lambdaHome > lambdaAway → Home plus fort ✅`);
-  console.log(`   Si lambdaHome < lambdaAway → Away plus fort ❌`);
+
   
   // 🎯 CALCULS BASÉS SUR L'ANALYSE RÉELLE (0% IMAGINATION, 100% DATA)
   
   // 1️⃣ RÉSULTAT 1N2 - UTILISER POISSON COHÉRENT avec les lambdas calculés!
   // ✅ COHÉRENCE: pH, pD, pA viennent du même modèle que les lambdas
-  console.log(`🎯 DEBUG 1N2 pour ${home.name} vs ${away.name}:`);
-  console.log(`   lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
-  
   const result1N2 = calculateMatch1N2Poisson(lambdaHome, lambdaAway);
-  
-  console.log(`   RÉSULTAT: pH=${r2(result1N2.pH)}, pD=${r2(result1N2.pD)}, pA=${r2(result1N2.pA)}`);
   
   const pH = result1N2.pH;
   const pD = result1N2.pD;
@@ -1509,12 +1469,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
       else pHT_2 += p;
     }
   }
-  
-  // 🔍 DEBUG
-  console.log(`🔍 DEBUG calculateAdvancedProbabilities:`);
-  console.log(`   homeFormMult=${r2(homeFormMult)}, awayFormMult=${r2(awayFormMult)}`);
-  console.log(`   pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)}`);
-  console.log(`   lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
+
   
   return { 
     lambdaHome, lambdaAway, homeFormMult, awayFormMult,
@@ -1747,11 +1702,7 @@ function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
   const pA = advanced.pA;
   const pD = advanced.pD;
   
-  // 🔍 DEBUG - VÉRIFIE LES VALEURS REÇUES DE calculateAdvancedProbabilities
-  console.log(`🔍 DEBUG buildModel reçoit:`);
-  console.log(`   pH=${r2(pH)}, pD=${r2(pD)}, pA=${r2(pA)} (total=${r2(pH+pD+pA)})`);
-  console.log(`   formMultH=${r2(formMultH)}, formMultA=${r2(formMultA)}`);
-  console.log(`   lambdaHome=${r2(lH)}, lambdaAway=${r2(lA)}`);
+
   const btts = advanced.pBTTS;
   const cs_h = advanced.csHome;
   const cs_a = advanced.csAway;
@@ -2019,14 +1970,12 @@ async function fetchH2H(teamId1, teamId2) {
   try {
     // Endpoint H2H via proxy Vercel
     const url = FOOTBALL_API.BASE + '?endpoint=fixtures&h2h=' + teamId1 + '-' + teamId2;
-    console.log('🔍 H2H: Tentative fetch:', url);  // DEBUG
     
     const res = await fetch(url, {
       headers: { 'x-apisports-key': apiKey }
     });
     
     if (!res.ok) {
-      console.warn(`⚠️ H2H API retour ${res.status} - Ignoré silencieusement`);  // DEBUG
       return [];  // ← Retourner vide au lieu de throw
     }
     
@@ -2379,10 +2328,7 @@ function buildMarkets(m,model){
     let realOdds = null;
     if(matchId && window.REAL_ODDS_CACHE && window.REAL_ODDS_CACHE[matchId]) {
       realOdds = window.REAL_ODDS_CACHE[matchId].data || window.REAL_ODDS_CACHE[matchId];
-      console.log(`✅ getRealCotes: Trouvé cache pour matchId=${matchId}`);
     } else {
-      // ⚠️ PAS DE CACHE POUR CE MATCH - NE PAS UTILISER FALLBACK!
-      console.warn(`⚠️ getRealCotes: Pas de cache pour matchId=${matchId} - Utiliser des cotes fictives`);
       return null;  // ← Retourner null au lieu de fallback!
     }
     
@@ -2632,14 +2578,10 @@ function buildMarkets(m,model){
     // Chercher les vraies cotes
     if(marketId) {
       const marketName = marketMapping[marketId];
-      console.log(`🔍 mkSmart cherche ${marketName} (marketId=${marketId}, idx=${idx}, label=${label}, matchId=${matchId})`);  // DEBUG
       const result = getRealCotes(marketName, ['Unibet', 'Bet365', '1xBet', 'William Hill'], matchId);  // ← Passer matchId!
-      console.log(`📊 getRealCotes retourne:`, result);  // DEBUG
-      console.log(`🔍 COTES ORDRE: idx=${idx}, label=${label}, cotes=`, result?.cotes);  // DEBUG L'ORDRE!
       
       if(result && result.cotes && result.cotes[idx]) {
         const oddValue = parseFloat(result.cotes[idx].odd);
-        console.log(`✅ Cote trouvée: idx=${idx}, odd=${oddValue}, label=${label}`);  // DEBUG
         if(!isNaN(oddValue) && oddValue > 1) {
           opt.realCote = oddValue;
           opt.bookmaker = result.bookmaker;  // ✅ Ajouter le bookmaker
@@ -2647,9 +2589,6 @@ function buildMarkets(m,model){
         }
       }
     }
-    
-    // ❌ PAS DE COTE TROUVÉE → GRISER LE PARI
-    console.warn(`⚠️ mkSmart: Pas de cote trouvée pour ${label} (marketId=${marketId}, matchId=${matchId})`);  // DEBUG
     return {
       sel: label, 
       cote: null, 
@@ -5218,25 +5157,17 @@ async function loadRealOddsForDashboard() {
     return;
   }
   
-  console.log(`📊 Chargement des cotes pour ${MATCHES.length} matchs...`);
-  
   // Charger les cotes en parallèle (max 5 à la fois pour ne pas surcharger)
   const batchSize = 5;
   for(let i = 0; i < MATCHES.length; i += batchSize) {
     const batch = MATCHES.slice(i, i + batchSize);
-    console.log(`🔄 Batch ${Math.floor(i/batchSize) + 1}: ${batch.map(m => m.id).join(', ')}`);
     
     const promises = batch.map(m => {
-      console.log(`  🔄 Chargement cotes pour match ${m.id}...`);
-      
-      // Vérifier si le cache est valide (moins de 5 minutes)
+      // Vérifier si le cache est valide (moins de 24 heures)
       let needsFetch = !window.REAL_ODDS_CACHE?.[m.id];
       if(window.REAL_ODDS_CACHE?.[m.id]) {
         const cacheAge = Date.now() - (window.REAL_ODDS_CACHE[m.id].timestamp || 0);
         needsFetch = cacheAge > 24 * 60 * 60 * 1000;  // Plus de 24 heures = rechargement
-        if(!needsFetch) {
-          console.log(`  ✅ Cache valide pour ${m.id}`);
-        }
       }
       
       if(needsFetch) {
@@ -5246,15 +5177,9 @@ async function loadRealOddsForDashboard() {
               if(!window.REAL_ODDS_CACHE) window.REAL_ODDS_CACHE = {};
               window.REAL_ODDS_CACHE[m.id] = {
                 data: odds,
-                timestamp: Date.now()  // ⏰ Ajouter le timestamp
+                timestamp: Date.now()
               };
-              console.log(`  ✅ Cotes chargées pour ${m.id}`);
-            } else {
-              console.error(`  ❌ API retourné null pour ${m.id}`);
             }
-          })
-          .catch(err => {
-            console.error(`  ❌ Erreur cotes ${m.id}:`, err.message);
           });
       } else {
         return Promise.resolve();
@@ -5263,9 +5188,6 @@ async function loadRealOddsForDashboard() {
     
     await Promise.all(promises);
   }
-  
-  console.log(`✅ Toutes les cotes chargées!`);
-  console.log(`📊 Cache final:`, Object.keys(window.REAL_ODDS_CACHE || {}).length, 'matchs');
   
   // Re-rendre le dashboard avec les vraies cotes
   render();
