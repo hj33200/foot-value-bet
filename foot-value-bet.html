@@ -1345,7 +1345,13 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   // 1️⃣ RÉSULTAT 1N2 - UTILISER POISSON COHÉRENT avec les lambdas calculés!
   // ✅ COHÉRENCE: pH, pD, pA viennent du même modèle que les lambdas
+  console.log(`🎯 DEBUG 1N2 pour ${home.name} vs ${away.name}:`);
+  console.log(`   lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
+  
   const result1N2 = calculateMatch1N2Poisson(lambdaHome, lambdaAway);
+  
+  console.log(`   RÉSULTAT: pH=${r2(result1N2.pH)}, pD=${r2(result1N2.pD)}, pA=${r2(result1N2.pA)}`);
+  
   const pH = result1N2.pH;
   const pD = result1N2.pD;
   const pA = result1N2.pA;
