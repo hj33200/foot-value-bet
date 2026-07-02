@@ -5209,7 +5209,7 @@ async function loadRealOddsForDashboard() {
       let needsFetch = !window.REAL_ODDS_CACHE?.[m.id];
       if(window.REAL_ODDS_CACHE?.[m.id]) {
         const cacheAge = Date.now() - (window.REAL_ODDS_CACHE[m.id].timestamp || 0);
-        needsFetch = cacheAge > 5 * 60 * 1000;  // Plus de 5 minutes = rechargement
+        needsFetch = cacheAge > 24 * 60 * 60 * 1000;  // Plus de 24 heures = rechargement
         if(!needsFetch) {
           console.log(`  ✅ Cache valide pour ${m.id}`);
         }
