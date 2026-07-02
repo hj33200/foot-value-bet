@@ -1317,11 +1317,10 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const sosAway = calculateSOS(away.id, away.name, awayLastMatches, competitionType);
   
   console.log(`📊 FACTEURS CORRECTIFS:`);
-  console.log(`   Elo HOME: ${r2(homeElo)}, Elo AWAY: ${r2(awayElo)}`);
-  console.log(`   eloWinProb=${r2(eloWinProb)}, eloMultiplier=${r2(eloMultiplier)}`);
+  console.log(`   Elo HOME: ${homeElo}, Elo AWAY: ${awayElo}`);
+  console.log(`   eloWinProb=${r2(eloWinProb)}`);
   console.log(`   sosHome=${r2(sosHome.sos)}, sosAway=${r2(sosAway.sos)}`);
-  console.log(`   sosRatio (sosHome/sosAway)=${r2(sosHome.sos / sosAway.sos)}`);
-  console.log(`   homeFormMult=${r2(homeFormMult)}, awayFormMult=${r2(awayFormMult)}`);
+  console.log(`   sosRatio=${r2(sosHome.sos / sosAway.sos)}`);
   
   // 5️⃣ LAMBDAS POISSON FINALES avec ELO + SOS
   const homeAdvantage = compProps.homeAdvantage; // = 1.0 toujours (pas d'avantage)
