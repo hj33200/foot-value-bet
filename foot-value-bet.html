@@ -1264,11 +1264,18 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const awayGA = awayStats.ga || away.ga || 1;
   const awayMatches = (awayStats.matches || 0) > 0 ? awayStats.matches : (awayForm.length > 0 ? awayForm.length : (away.matches || 1));
   
+  console.log(`📊 STATS ${home.name} vs ${away.name}:`);
+  console.log(`   HOME: ${homeGF} buts pour / ${homeGA} encaissés en ${homeMatches} matchs`);
+  console.log(`   AWAY: ${awayGF} buts pour / ${awayGA} encaissés en ${awayMatches} matchs`);
+  
   // 1️⃣ FORCES OFFENSIVES/DÉFENSIVES
   const homeOffense = homeGF / homeMatches;
   const homeDefense = homeGA / homeMatches;
   const awayOffense = awayGF / awayMatches;
   const awayDefense = awayGA / awayMatches;
+  
+  console.log(`   OFFENSE: ${r2(homeOffense)} home vs ${r2(awayOffense)} away`);
+  console.log(`   DEFENSE: ${r2(homeDefense)} home vs ${r2(awayDefense)} away`);
   
   
   // 2️⃣ RATIO DE VICTOIRES
@@ -1340,6 +1347,9 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
   
+  console.log(`🔴 LAMBDAS FINAUX: ${r2(lambdaHome)} vs ${r2(lambdaAway)}`);
+  console.log(`   Si lambdaHome > lambdaAway → Home plus fort ✅`);
+  console.log(`   Si lambdaHome < lambdaAway → Away plus fort ❌`);
   
   // 🎯 CALCULS BASÉS SUR L'ANALYSE RÉELLE (0% IMAGINATION, 100% DATA)
   
