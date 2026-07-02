@@ -3862,6 +3862,9 @@ function viewDetail(){
   }
   
   const m=d.meta;
+  
+  // 📊 Sauvegarder les données du match globalement pour accès depuis oddButton
+  window.currentMatchData = d;
   const dateStr=new Date(m.date+'T00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   // count value bets
   let nGreen=0;d.markets.forEach(mk=>mk.sels.forEach(s=>{if(s.color==='green')nGreen++}));
@@ -3913,7 +3916,7 @@ function viewDetail(){
     <span><i class="voyant v-red"></i> No bet</span>
     <span><i class="voyant v-gray"></i> Données insuffisantes</span>
   </div>
-  <div class="stagger">${d.markets.map((mk,i)=>marketBlock(mk,i)).join('')}</div>`;
+  <div class="stagger">${d.markets.map((mk,i)=>marketBlock(mk,i,d)).join('')}</div>`;
 }
 function ord(n){return n+(n===1?'er':'e')}
 
@@ -4027,7 +4030,7 @@ function combinedScore(sel) {
   return (valueScore * 0.4) + (statsScore * 0.6);
 }
 
-function marketBlock(mk,idx){
+function marketBlock(mk,idx,d){
   const collapsed=state.collapsed[mk.id]?'collapsed':'';
   const valid=mk.sels.filter(s=>s.value!=null);
   const best=valid.length?valid.reduce((a,b)=>combinedScore(b)>combinedScore(a)?b:a):null;
@@ -4042,12 +4045,12 @@ function marketBlock(mk,idx){
     </div>
     <div class="market-body">
       <div class="odds-grid c${mk.cols}">
-        ${mk.sels.map((s,i)=>oddButton(mk,s,i)).join('')}
+        ${mk.sels.map((s,i)=>oddButton(mk,s,i,d)).join('')}
       </div>
     </div>
   </div>`;
 }
-function oddButton(mk,s,i){
+function oddButton(mk,s,i,d){
   // Calculer les couleurs et valeurs
   const vTxt = s.value ? ((s.value>=0?'+':'')+(s.value*100).toFixed(1)+'%') : 'N/A';
   const statColor = s.est >= 0.75 ? 'green' : s.est >= 0.50 ? 'orange' : s.est ? 'red' : 'gray';
@@ -4080,7 +4083,8 @@ function oddButton(mk,s,i){
   }
   
   // Cas normal: avec cote
-  return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i}); event.stopPropagation();'>
+  return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i}); event.stopPropagation();' style="position:relative">
+    <div style="position:absolute;top:6px;right:6px;cursor:pointer;font-size:14px;opacity:0.6;transition:opacity 0.2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" onclick="event.stopPropagation(); showMarketExplanation(window.currentMatchData, '${mk.id}', ${i})" title="Voir les explications">📊</div>
     <div class="ob-top">
       <span class="ob-sel">${s.sel}</span>
       <div class="ob-top-badges">
@@ -5353,6 +5357,170 @@ window.saveSettings = function(...args) {
 console.log('✅ Auto-save/load configuré!');
 
 /* ============================================================
+   📊 EXPLICATIONS DES MARCHÉS - Poisson & Distribution
+   ============================================================ */
+
+// 🎲 Calculer probabilité Poisson (P(X=k) = e^-λ * λ^k / k!)
+function poissonProb(lambda, k) {
+  const e = Math.exp(-lambda);
+  let factorial = 1;
+  for(let i = 1; i <= k; i++) factorial *= i;
+  return (e * Math.pow(lambda, k)) / factorial;
+}
+
+// 📊 Générer distribution Poisson pour un match
+function generatePoissonDistribution(lambdaHome, lambdaAway, maxGoals = 8) {
+  const distribution = {};
+  
+  // Calculer toutes les combinaisons de scores
+  for(let h = 0; h <= maxGoals; h++) {
+    for(let a = 0; a <= maxGoals; a++) {
+      const prob = poissonProb(lambdaHome, h) * poissonProb(lambdaAway, a);
+      const score = `${h}-${a}`;
+      distribution[score] = prob;
+    }
+  }
+  
+  return distribution;
+}
+
+// 🎯 Calculer probabilités Over/Under
+function calculateOverUnderProb(lambdaHome, lambdaAway, threshold = 2.5) {
+  const dist = generatePoissonDistribution(lambdaHome, lambdaAway, 10);
+  let overProb = 0;
+  let underProb = 0;
+  
+  Object.entries(dist).forEach(([score, prob]) => {
+    const [h, a] = score.split('-').map(Number);
+    const total = h + a;
+    if(total > threshold) overProb += prob;
+    else underProb += prob;
+  });
+  
+  return { overProb, underProb };
+}
+
+// 📈 Créer la modale d'explications de marché
+function showMarketExplanation(d, marketId, selIdx) {
+  if(!d || !d.model) {
+    console.error('Match data not available');
+    return;
+  }
+  
+  // Récupérer le marché et la sélection
+  const mk = d.markets.find(m => m.id === marketId);
+  const sel = mk?.sels[selIdx];
+  
+  if(!mk || !sel) {
+    console.error('Market or selection not found');
+    return;
+  }
+  
+  const model = d.model;
+  const lambdaH = model.lambdaHome || 2.5;
+  const lambdaA = model.lambdaAway || 2.0;
+  
+  // Distribution Poisson
+  const dist = generatePoissonDistribution(lambdaH, lambdaA, 8);
+  const scores = Object.entries(dist)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);  // Top 10 scores
+  
+  // Over/Under pour différents seuils
+  const over25 = calculateOverUnderProb(lambdaH, lambdaA, 2.5);
+  const over15 = calculateOverUnderProb(lambdaH, lambdaA, 1.5);
+  const over35 = calculateOverUnderProb(lambdaH, lambdaA, 3.5);
+  
+  // Afficher la modale
+  const content = `
+    <div class="market-explanation" style="max-height:80vh;overflow-y:auto">
+      <div style="padding:20px;border-bottom:1px solid var(--line)">
+        <h3 style="margin:0 0 8px 0">${mk.name} - ${sel.sel}</h3>
+        <div style="font-size:12px;color:var(--txt3)">${d.meta.home.name} vs ${d.meta.away.name}</div>
+      </div>
+      
+      <div style="padding:20px;border-bottom:1px solid var(--line)">
+        <h4 style="margin:0 0 12px 0">🎯 BUTS ATTENDUS (Poisson)</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+          <div style="background:var(--bg2);padding:10px;border-radius:6px;border-left:3px solid var(--blue)">
+            <div style="color:var(--txt3);font-size:11px">Home (${d.meta.home.name})</div>
+            <div style="font-weight:700;font-size:18px;color:var(--blue)">${lambdaH.toFixed(2)}</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:4px">buts attendus</div>
+          </div>
+          <div style="background:var(--bg2);padding:10px;border-radius:6px;border-left:3px solid var(--red)">
+            <div style="color:var(--txt3);font-size:11px">Away (${d.meta.away.name})</div>
+            <div style="font-weight:700;font-size:18px;color:var(--red)">${lambdaA.toFixed(2)}</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:4px">buts attendus</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="padding:20px;border-bottom:1px solid var(--line)">
+        <h4 style="margin:0 0 12px 0">📊 TOP 10 SCORES LES PLUS PROBABLES</h4>
+        <div style="font-size:12px">
+          ${scores.map(([score, prob], idx) => {
+            const pct = (prob * 100).toFixed(1);
+            return `<div style="display:grid;grid-template-columns:30px 1fr 60px;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)">
+              <div style="color:var(--txt3);text-align:center">${idx + 1}.</div>
+              <div>${score}</div>
+              <div style="text-align:right;font-weight:600">${pct}%</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      
+      <div style="padding:20px;border-bottom:1px solid var(--line)">
+        <h4 style="margin:0 0 12px 0">🎲 PROBABILITÉS OVER/UNDER</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">
+          <div style="background:var(--bg2);padding:10px;border-radius:6px">
+            <div style="color:var(--txt3);font-size:11px">Over 1.5</div>
+            <div style="font-weight:700;font-size:16px">${(over15.overProb * 100).toFixed(1)}%</div>
+          </div>
+          <div style="background:var(--bg2);padding:10px;border-radius:6px">
+            <div style="color:var(--txt3);font-size:11px">Under 1.5</div>
+            <div style="font-weight:700;font-size:16px">${(over15.underProb * 100).toFixed(1)}%</div>
+          </div>
+          <div style="background:var(--bg2);padding:10px;border-radius:6px">
+            <div style="color:var(--txt3);font-size:11px">Over 2.5</div>
+            <div style="font-weight:700;font-size:16px">${(over25.overProb * 100).toFixed(1)}%</div>
+          </div>
+          <div style="background:var(--bg2);padding:10px;border-radius:6px">
+            <div style="color:var(--txt3);font-size:11px">Under 2.5</div>
+            <div style="font-weight:700;font-size:16px">${(over25.underProb * 100).toFixed(1)}%</div>
+          </div>
+          <div style="background:var(--bg2);padding:10px;border-radius:6px">
+            <div style="color:var(--txt3);font-size:11px">Over 3.5</div>
+            <div style="font-weight:700;font-size:16px">${(over35.overProb * 100).toFixed(1)}%</div>
+          </div>
+          <div style="background:var(--bg2);padding:10px;border-radius:6px">
+            <div style="color:var(--txt3);font-size:11px">Under 3.5</div>
+            <div style="font-weight:700;font-size:16px">${(over35.underProb * 100).toFixed(1)}%</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="padding:20px">
+        <h4 style="margin:0 0 12px 0">💡 RÉSUMÉ</h4>
+        <div style="background:var(--bg2);padding:12px;border-radius:6px;border-left:3px solid var(--accent);font-size:12px;line-height:1.6;color:var(--txt2)">
+          <strong>Buts totaux attendus: ${(lambdaH + lambdaA).toFixed(2)}</strong><br>
+          Le modèle prédit <strong>${(lambdaH + lambdaA).toFixed(1)} buts</strong> en moyenne.<br>
+          <strong>${(over25.overProb * 100).toFixed(0)}%</strong> de chances d'avoir plus de 2.5 buts.
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Injecter la modale
+  const backdrop = document.getElementById('modalBack');
+  if(backdrop) {
+    const modalContent = backdrop.querySelector('.modal-content');
+    if(modalContent) {
+      modalContent.innerHTML = content;
+      state.showModal = true;
+      backdrop.classList.add('show');
+    }
+  }
+}/* ============================================================
    📊 AMÉLIORATIONS ANALYSE DES MATCHS
    ============================================================ */
 
