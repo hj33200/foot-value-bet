@@ -1266,15 +1266,10 @@ function calculateLambdaByOpponentStrength(teamId, lastMatches, baseOffense, bas
     opponentCategory = 'medium';
   }
   
-  // 🔍 LOG DEBUG: Vérifier le SOS de l'adversaire actuel
-  console.log(`🎯 Adversaire: ${opponentTeam.name} (ID=${opponentTeam.id}), SOS=${r2(currentOpponentSOS)} → ${opponentCategory.toUpperCase()}`);
-  
   // 📊 COLLECTER LES BUTS CONTRE CHAQUE TYPE D'ADVERSAIRE
   let goalsFor_vs_strong = [];
   let goalsFor_vs_weak = [];
   let goalsFor_vs_medium = [];
-  
-  console.log(`📋 Analysant les ${lastMatches.length} derniers matchs...`);
   
   for (let match of lastMatches) {
     const isHome = match.homeTeam?.id === teamId;
@@ -1284,25 +1279,18 @@ function calculateLambdaByOpponentStrength(teamId, lastMatches, baseOffense, bas
     
     // 🎯 RÉCUPÉRER L'ADVERSAIRE HISTORIQUE ET SON SOS RÉEL
     const historicalOpponentId = isHome ? match.awayTeam?.id : match.homeTeam?.id;
-    const historicalOpponentName = isHome ? match.awayTeam?.name : match.homeTeam?.name;
     
     // Calculer le SOS réel de l'adversaire historique
     const historicalOpponentSOS = calculateSOS(historicalOpponentId).sos;
     
     // Classer le match historique par type d'adversaire RÉEL
-    let historicalCategory;
     if (historicalOpponentSOS > 1.10) {
       goalsFor_vs_strong.push(matchGoalsFor);
-      historicalCategory = 'STRONG';
     } else if (historicalOpponentSOS < 0.90) {
       goalsFor_vs_weak.push(matchGoalsFor);
-      historicalCategory = 'WEAK';
     } else {
       goalsFor_vs_medium.push(matchGoalsFor);
-      historicalCategory = 'MEDIUM';
     }
-    
-    console.log(`  • vs ${historicalOpponentName}: ${matchGoalsFor} buts, SOS=${r2(historicalOpponentSOS)} (${historicalCategory})`);
   }
   
   // 📈 UTILISER LES DONNÉES RÉELLES POUR L'ADVERSAIRE ACTUEL
@@ -1311,26 +1299,21 @@ function calculateLambdaByOpponentStrength(teamId, lastMatches, baseOffense, bas
   if (opponentCategory === 'strong' && goalsFor_vs_strong.length > 0) {
     const avgVsStrong = goalsFor_vs_strong.reduce((a, b) => a + b, 0) / goalsFor_vs_strong.length;
     adjustedOffense = clamp(avgVsStrong, 0.2, 3.5);
-    console.log(`📊 Ajustement attaque vs adversaire FORT: base=${r2(baseOffense)} → ajusté=${r2(adjustedOffense)} (${goalsFor_vs_strong.length} matchs)`);
   } 
   else if (opponentCategory === 'weak' && goalsFor_vs_weak.length > 0) {
     const avgVsWeak = goalsFor_vs_weak.reduce((a, b) => a + b, 0) / goalsFor_vs_weak.length;
     adjustedOffense = clamp(avgVsWeak, 0.2, 3.5);
-    console.log(`📊 Ajustement attaque vs adversaire FAIBLE: base=${r2(baseOffense)} → ajusté=${r2(adjustedOffense)} (${goalsFor_vs_weak.length} matchs)`);
   }
   else if (opponentCategory === 'medium' && goalsFor_vs_medium.length > 0) {
     const avgVsMedium = goalsFor_vs_medium.reduce((a, b) => a + b, 0) / goalsFor_vs_medium.length;
     adjustedOffense = clamp(avgVsMedium, 0.2, 3.5);
-    console.log(`📊 Ajustement attaque vs adversaire MOYEN: base=${r2(baseOffense)} → ajusté=${r2(adjustedOffense)} (${goalsFor_vs_medium.length} matchs)`);
   }
   else {
     // Pas assez de données pour ce type, utiliser ajustement simple
     if (opponentCategory === 'strong') {
       adjustedOffense = clamp(baseOffense * 0.85, 0.2, 3.5);
-      console.log(`📊 Pas assez de données, ajustement simple vs FORT: ${r2(baseOffense)} → ${r2(adjustedOffense)}`);
     } else if (opponentCategory === 'weak') {
       adjustedOffense = clamp(baseOffense * 1.15, 0.2, 3.5);
-      console.log(`📊 Pas assez de données, ajustement simple vs FAIBLE: ${r2(baseOffense)} → ${r2(adjustedOffense)}`);
     }
   }
   
@@ -1417,17 +1400,10 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const awayDefense_raw = awayGA / awayMatches;
   
   // Normaliser par SOS
-  let homeOffense = homeOffense_raw / sosHome.sos;  // ÷ par sos: si sos élevé, réduit
-  let homeDefense = homeDefense_raw / sosHome.sos;
-  let awayOffense = awayOffense_raw / sosAway.sos;
-  let awayDefense = awayDefense_raw / sosAway.sos;
-  
-  // 🎯 AJUSTER PAR FORCE D'ADVERSAIRE (data-driven, SOS réel)
-  // Calculer l'attaque de Home selon la défense réelle d'Away
-  homeOffense = calculateLambdaByOpponentStrength(home.id, homeLastMatches, homeOffense, homeDefense, away);
-  
-  // Calculer l'attaque d'Away selon la défense réelle de Home
-  awayOffense = calculateLambdaByOpponentStrength(away.id, awayLastMatches, awayOffense, awayDefense, home);
+  const homeOffense = homeOffense_raw / sosHome.sos;
+  const homeDefense = homeDefense_raw / sosHome.sos;
+  const awayOffense = awayOffense_raw / sosAway.sos;
+  const awayDefense = awayDefense_raw / sosAway.sos;
   
   
   
@@ -1630,14 +1606,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const lH_HT = clamp(homeHT_stats.offense_ht * awayHT_stats.defense_ht * eloMultiplier * homeFormMult, 0.1, 3.0);
   const lA_HT = clamp(awayHT_stats.offense_ht * homeHT_stats.defense_ht * (1 / eloMultiplier) * awayFormMult, 0.1, 3.0);
   
-  // 📊 LOGS DEBUG - Vérifier les lambdas HT
-  console.log(`\n⏰ HALF-TIME DEBUG (${home.name} vs ${away.name}):`);
-  console.log(`  Full-Time: lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
-  console.log(`  HT Stats Home: offense=${r2(homeHT_stats.offense_ht)}, defense=${r2(homeHT_stats.defense_ht)}`);
-  console.log(`  HT Stats Away: offense=${r2(awayHT_stats.offense_ht)}, defense=${r2(awayHT_stats.defense_ht)}`);
-  console.log(`  HT Lambdas: lH_HT=${r2(lH_HT)}, lA_HT=${r2(lA_HT)}`);
-  console.log(`  Elo Mult: ${r2(eloMultiplier)}, Form: ${r2(homeFormMult)} vs ${r2(awayFormMult)}`);
-  
   let pHT_1 = 0, pHT_D = 0, pHT_2 = 0;
   for (let i = 0; i <= 8; i++) {
     for (let j = 0; j <= 8; j++) {
@@ -1647,8 +1615,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
       else pHT_2 += p;
     }
   }
-  
-  console.log(`  HT Probs: ${home.name}=${r2(pHT_1*100)}%, Draw=${r2(pHT_D*100)}%, ${away.name}=${r2(pHT_2*100)}%\n`);
 
   
   return { 
