@@ -879,6 +879,61 @@ function calculateSOS(teamId, teamName, matches, competitionType = 'CHAMPIONSHIP
   return { sos, competitionType };
 }
 
+// 🎯 CALCUL SOS LOCAL - Basé UNIQUEMENT sur les 10 derniers matchs
+// Plus précis que le SOS global car reflète les adversaires RÉCENTS
+function calculateLocalSOS(teamId, lastMatches, competitionType = 'CHAMPIONSHIP') {
+  if (!lastMatches || lastMatches.length === 0) {
+    return 1.0;
+  }
+  
+  const compProps = getCompetitionProperties(competitionType);
+  let totalAdversaire = 0;
+  let totalPoids = 0;
+  let validMatches = 0;
+  
+  try {
+    lastMatches.forEach((match, idx) => {
+      // Vérifier les différentes structures possibles
+      const homeTeam = match.homeTeam || match.teams?.home;
+      const awayTeam = match.awayTeam || match.teams?.away;
+      
+      if (!homeTeam || !awayTeam) return;
+      
+      const isHome = homeTeam.id === teamId;
+      const opponent = isHome ? awayTeam : homeTeam;
+      const opponentId = opponent.id;
+      const opponentName = opponent.name;
+      
+      // Récupérer la force Elo de l'adversaire
+      const opponentElo = getOpponentStrength(opponentId, opponentName);
+      
+      // Poids augmente avec la récence (match le plus récent = poids max)
+      const weight = (idx + 1) / lastMatches.length;
+      const eloRatio = opponentElo / 1600;
+      
+      let adversaireForce = eloRatio;
+      if (!compProps.isNeutralGround && !isHome) {
+        adversaireForce *= 1.03;  // Bonus si adversaire en déplacement (plus difficile)
+      }
+      
+      totalAdversaire += adversaireForce * weight;
+      totalPoids += weight;
+      validMatches++;
+    });
+  } catch (e) {
+    console.warn(`⚠️ Erreur lors du calcul SOS local:`, e);
+    return 1.0;
+  }
+  
+  if (validMatches === 0 || totalPoids === 0) {
+    return 1.0;
+  }
+  
+  // SOS = force moyenne des adversaires normalisée
+  const localSOS = totalAdversaire / totalPoids;
+  return clamp(localSOS, 0.7, 1.3);  // Limiter entre 0.7 et 1.3
+}
+
 function calculateEloFromResults(teamName, form, gf, ga, matches) {
   const PRIOR_ELO = 1600;
   if (!form || form.length === 0) return PRIOR_ELO;
@@ -1399,11 +1454,16 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const awayOffense_raw = awayGF / awayMatches;
   const awayDefense_raw = awayGA / awayMatches;
   
-  // Normaliser par SOS
-  const homeOffense = homeOffense_raw / sosHome.sos;
-  const homeDefense = homeDefense_raw / sosHome.sos;
-  const awayOffense = awayOffense_raw / sosAway.sos;
-  const awayDefense = awayDefense_raw / sosAway.sos;
+  // 🎯 UTILISER LE SOS LOCAL (10 derniers matchs) AU LIEU DU SOS GLOBAL
+  // C'est plus précis car reflète les adversaires récents, pas toute la saison
+  const sosHome_local = calculateLocalSOS(home.id, homeLastMatches, leagueKey);
+  const sosAway_local = calculateLocalSOS(away.id, awayLastMatches, leagueKey);
+  
+  // Normaliser UNE SEULE FOIS par SOS local
+  const homeOffense = homeOffense_raw / sosHome_local;
+  const homeDefense = homeDefense_raw / sosHome_local;
+  const awayOffense = awayOffense_raw / sosAway_local;
+  const awayDefense = awayDefense_raw / sosAway_local;
   
   
   
@@ -1519,7 +1579,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   // 📊 IMPACTS EN POURCENTAGE
   const eloRawProb = eloWinProb * 100; // Prob Elo brut
-  const sosImpact = ((sosHome.sos - 1) * 100) - ((sosAway.sos - 1) * 100); // Impact SOS
+  const sosImpact = ((sosHome_local - 1) * 100) - ((sosAway_local - 1) * 100); // Impact SOS local
   const poissonImpact = (poissonWinProb * 100) - eloRawProb; // Impact Poisson
   const finalProb = poissonWinProb * 100;
   
@@ -1599,8 +1659,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   // FIRST HALF WINNER (1ère mi-temps) - VRAIE FORMULE
   // Calculer les stats mi-temps précises (basées sur les 10 derniers matchs)
-  const homeHT_stats = calculateHalfTimeStats(home.id, homeLastMatches, sosHome.sos);
-  const awayHT_stats = calculateHalfTimeStats(away.id, awayLastMatches, sosAway.sos);
+  const homeHT_stats = calculateHalfTimeStats(home.id, homeLastMatches, sosHome_local);
+  const awayHT_stats = calculateHalfTimeStats(away.id, awayLastMatches, sosAway_local);
   
   // Lambdas mi-temps = même formule que full-time mais avec stats HT
   const lH_HT = clamp(homeHT_stats.offense_ht * awayHT_stats.defense_ht * eloMultiplier * homeFormMult, 0.1, 3.0);
@@ -1623,6 +1683,7 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     pH, pD, pA,
     homeElo, awayElo, eloWinProb,
     sosHome: sosHome.sos, sosAway: sosAway.sos,
+    sosHome_local: sosHome_local, sosAway_local: sosAway_local,
     homeLastMatches, awayLastMatches,
     homeOffense, homeDefense, awayOffense, awayDefense,
     homeGF, homeGA, awayGF, awayGA,
