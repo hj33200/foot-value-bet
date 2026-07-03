@@ -1247,7 +1247,77 @@ function calculatePoissonThreshold(lambda, threshold) {
   return 1 - pUnder;
 }
 
-// 🎯 CALCULER LES STATS MI-TEMPS BASÉES SUR LES 10 DERNIERS MATCHS
+// 🎯 CALCULER LAMBDAS AJUSTÉS PAR FORCE D'ADVERSAIRE (fort/moyen/faible)
+function calculateLambdaByOpponentStrength(teamId, lastMatches, baseOffense, baseDefense, opponentSOS) {
+  if (!lastMatches || lastMatches.length === 0) {
+    // Pas de données, retourner les lambdas de base
+    return baseOffense;
+  }
+  
+  // Classer l'adversaire
+  let opponentCategory;
+  if (opponentSOS > 1.10) {
+    opponentCategory = 'strong';
+  } else if (opponentSOS < 0.90) {
+    opponentCategory = 'weak';
+  } else {
+    opponentCategory = 'medium';
+  }
+  
+  // Séparer les matchs par type d'adversaire
+  let goalsFor_byType = [];
+  let matchCount_byType = 0;
+  
+  for (let match of lastMatches) {
+    const opponentId = match.homeTeam?.id === teamId ? match.awayTeam?.id : match.homeTeam?.id;
+    const isHome = match.homeTeam?.id === teamId;
+    const matchGoalsFor = isHome ? match.goals?.home : match.goals?.away;
+    
+    if (matchGoalsFor === undefined || matchGoalsFor === null) continue;
+    
+    // Récupérer le SOS de cet adversaire spécifique
+    // ⚠️ LIMITATION: On n'a pas le SOS exact de chaque adversaire
+    // Donc on utilise une approximation basée sur le contexte
+    
+    // Pour maintenant, utiliser l'approximation:
+    // - Si c'était un match difficile (peu de buts) → adversaire fort
+    // - Si c'était un match facile (beaucoup de buts) → adversaire faible
+    const isLikelyStrongOpponent = matchGoalsFor <= 1;  // Approximation simple
+    
+    let matchType;
+    if (isLikelyStrongOpponent) {
+      matchType = 'strong';
+    } else if (matchGoalsFor >= 3) {
+      matchType = 'weak';
+    } else {
+      matchType = 'medium';
+    }
+    
+    // Si le match correspond au type cherché, l'inclure
+    if (matchType === opponentCategory) {
+      goalsFor_byType.push(matchGoalsFor);
+      matchCount_byType++;
+    }
+  }
+  
+  // Si on a des données pour ce type d'adversaire, les utiliser
+  if (matchCount_byType > 0) {
+    const avgGoals_byType = goalsFor_byType.reduce((a, b) => a + b, 0) / matchCount_byType;
+    
+    // Retourner la moyenne RÉELLE contre ce type d'adversaire
+    return clamp(avgGoals_byType, 0.2, 3.5);
+  }
+  
+  // Sinon, retourner la base avec ajustement simple
+  if (opponentCategory === 'strong') {
+    return clamp(baseOffense * 0.85, 0.2, 3.5);  // Moins de buts contre forts
+  } else if (opponentCategory === 'weak') {
+    return clamp(baseOffense * 1.15, 0.2, 3.5);  // Plus de buts contre faibles
+  }
+  
+  return baseOffense;
+}
+
 function calculateHalfTimeStats(teamId, lastMatches, sosValue = 1.0) {
   if (!lastMatches || lastMatches.length === 0) {
     return { offense_ht: 0.5, defense_ht: 0.8, matches: 0 };
@@ -1278,13 +1348,13 @@ function calculateHalfTimeStats(teamId, lastMatches, sosValue = 1.0) {
   const offense_ht_raw = matchesWithData > 0 ? totalGoalsFor_HT / matchesWithData : 0.5;
   const defense_ht_raw = matchesWithData > 0 ? totalGoalsAgainst_HT / matchesWithData : 0.8;
   
-  // Normaliser par SOS
-  const offense_ht = sosValue > 0 ? offense_ht_raw / sosValue : offense_ht_raw;
-  const defense_ht = sosValue > 0 ? defense_ht_raw / sosValue : defense_ht_raw;
+  // ⚠️ NE PAS normaliser par SOS pour HT!
+  // SOS est basé sur les 90 minutes, pas sur les 45 min
+  // Les stats HT sont déjà ajustées par les matchs réels
   
   return {
-    offense_ht: clamp(offense_ht, 0.1, 2.0),
-    defense_ht: clamp(defense_ht, 0.2, 2.0),
+    offense_ht: clamp(offense_ht_raw, 0.1, 2.0),
+    defense_ht: clamp(defense_ht_raw, 0.2, 2.0),
     matches: matchesWithData
   };
 }
@@ -1328,10 +1398,22 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const awayDefense_raw = awayGA / awayMatches;
   
   // Normaliser par SOS
-  const homeOffense = homeOffense_raw / sosHome.sos;  // ÷ par sos: si sos élevé, réduit
-  const homeDefense = homeDefense_raw / sosHome.sos;
-  const awayOffense = awayOffense_raw / sosAway.sos;
-  const awayDefense = awayDefense_raw / sosAway.sos;
+  let homeOffense = homeOffense_raw / sosHome.sos;  // ÷ par sos: si sos élevé, réduit
+  let homeDefense = homeDefense_raw / sosHome.sos;
+  let awayOffense = awayOffense_raw / sosAway.sos;
+  let awayDefense = awayDefense_raw / sosAway.sos;
+  
+  // 🎯 AJUSTER PAR FORCE D'ADVERSAIRE (data-driven)
+  // Si on joue contre une équipe forte, on marque moins
+  // Si on joue contre une équipe faible, on marque plus
+  
+  // Ajuster l'attaque de Home selon la défense d'Away
+  const awayStrength = sosAway.sos;  // > 1.1 = fort, < 0.9 = faible
+  homeOffense = calculateLambdaByOpponentStrength(home.id, homeLastMatches, homeOffense, homeDefense, awayStrength);
+  
+  // Ajuster l'attaque d'Away selon la défense de Home
+  const homeStrength = sosHome.sos;
+  awayOffense = calculateLambdaByOpponentStrength(away.id, awayLastMatches, awayOffense, awayDefense, homeStrength);
   
   
   
