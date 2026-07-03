@@ -1247,75 +1247,82 @@ function calculatePoissonThreshold(lambda, threshold) {
   return 1 - pUnder;
 }
 
-// 🎯 CALCULER LAMBDAS AJUSTÉS PAR FORCE D'ADVERSAIRE (fort/moyen/faible)
-function calculateLambdaByOpponentStrength(teamId, lastMatches, baseOffense, baseDefense, opponentSOS) {
+// 🎯 CALCULER LAMBDAS AJUSTÉS PAR FORCE D'ADVERSAIRE (fort/moyen/faible) - VERSION PRÉCISE
+function calculateLambdaByOpponentStrength(teamId, lastMatches, baseOffense, baseDefense, opponentTeam) {
   if (!lastMatches || lastMatches.length === 0) {
     // Pas de données, retourner les lambdas de base
     return baseOffense;
   }
   
-  // Classer l'adversaire
+  // 🎯 CLASSER L'ADVERSAIRE DU MATCH ACTUEL
+  const currentOpponentSOS = calculateSOS(opponentTeam.id).sos;
+  
   let opponentCategory;
-  if (opponentSOS > 1.10) {
+  if (currentOpponentSOS > 1.10) {
     opponentCategory = 'strong';
-  } else if (opponentSOS < 0.90) {
+  } else if (currentOpponentSOS < 0.90) {
     opponentCategory = 'weak';
   } else {
     opponentCategory = 'medium';
   }
   
-  // Séparer les matchs par type d'adversaire
-  let goalsFor_byType = [];
-  let matchCount_byType = 0;
+  // 📊 COLLECTER LES BUTS CONTRE CHAQUE TYPE D'ADVERSAIRE
+  let goalsFor_vs_strong = [];
+  let goalsFor_vs_weak = [];
+  let goalsFor_vs_medium = [];
   
   for (let match of lastMatches) {
-    const opponentId = match.homeTeam?.id === teamId ? match.awayTeam?.id : match.homeTeam?.id;
     const isHome = match.homeTeam?.id === teamId;
     const matchGoalsFor = isHome ? match.goals?.home : match.goals?.away;
     
     if (matchGoalsFor === undefined || matchGoalsFor === null) continue;
     
-    // Récupérer le SOS de cet adversaire spécifique
-    // ⚠️ LIMITATION: On n'a pas le SOS exact de chaque adversaire
-    // Donc on utilise une approximation basée sur le contexte
+    // 🎯 RÉCUPÉRER L'ADVERSAIRE HISTORIQUE ET SON SOS RÉEL
+    const historicalOpponentId = isHome ? match.awayTeam?.id : match.homeTeam?.id;
     
-    // Pour maintenant, utiliser l'approximation:
-    // - Si c'était un match difficile (peu de buts) → adversaire fort
-    // - Si c'était un match facile (beaucoup de buts) → adversaire faible
-    const isLikelyStrongOpponent = matchGoalsFor <= 1;  // Approximation simple
+    // Calculer le SOS réel de l'adversaire historique
+    const historicalOpponentSOS = calculateSOS(historicalOpponentId).sos;
     
-    let matchType;
-    if (isLikelyStrongOpponent) {
-      matchType = 'strong';
-    } else if (matchGoalsFor >= 3) {
-      matchType = 'weak';
+    // Classer le match historique par type d'adversaire RÉEL
+    if (historicalOpponentSOS > 1.10) {
+      goalsFor_vs_strong.push(matchGoalsFor);
+    } else if (historicalOpponentSOS < 0.90) {
+      goalsFor_vs_weak.push(matchGoalsFor);
     } else {
-      matchType = 'medium';
-    }
-    
-    // Si le match correspond au type cherché, l'inclure
-    if (matchType === opponentCategory) {
-      goalsFor_byType.push(matchGoalsFor);
-      matchCount_byType++;
+      goalsFor_vs_medium.push(matchGoalsFor);
     }
   }
   
-  // Si on a des données pour ce type d'adversaire, les utiliser
-  if (matchCount_byType > 0) {
-    const avgGoals_byType = goalsFor_byType.reduce((a, b) => a + b, 0) / matchCount_byType;
-    
-    // Retourner la moyenne RÉELLE contre ce type d'adversaire
-    return clamp(avgGoals_byType, 0.2, 3.5);
+  // 📈 UTILISER LES DONNÉES RÉELLES POUR L'ADVERSAIRE ACTUEL
+  let adjustedOffense = baseOffense;
+  
+  if (opponentCategory === 'strong' && goalsFor_vs_strong.length > 0) {
+    const avgVsStrong = goalsFor_vs_strong.reduce((a, b) => a + b, 0) / goalsFor_vs_strong.length;
+    adjustedOffense = clamp(avgVsStrong, 0.2, 3.5);
+    console.log(`📊 Ajustement attaque vs adversaire FORT: base=${r2(baseOffense)} → ajusté=${r2(adjustedOffense)} (${goalsFor_vs_strong.length} matchs)`);
+  } 
+  else if (opponentCategory === 'weak' && goalsFor_vs_weak.length > 0) {
+    const avgVsWeak = goalsFor_vs_weak.reduce((a, b) => a + b, 0) / goalsFor_vs_weak.length;
+    adjustedOffense = clamp(avgVsWeak, 0.2, 3.5);
+    console.log(`📊 Ajustement attaque vs adversaire FAIBLE: base=${r2(baseOffense)} → ajusté=${r2(adjustedOffense)} (${goalsFor_vs_weak.length} matchs)`);
+  }
+  else if (opponentCategory === 'medium' && goalsFor_vs_medium.length > 0) {
+    const avgVsMedium = goalsFor_vs_medium.reduce((a, b) => a + b, 0) / goalsFor_vs_medium.length;
+    adjustedOffense = clamp(avgVsMedium, 0.2, 3.5);
+    console.log(`📊 Ajustement attaque vs adversaire MOYEN: base=${r2(baseOffense)} → ajusté=${r2(adjustedOffense)} (${goalsFor_vs_medium.length} matchs)`);
+  }
+  else {
+    // Pas assez de données pour ce type, utiliser ajustement simple
+    if (opponentCategory === 'strong') {
+      adjustedOffense = clamp(baseOffense * 0.85, 0.2, 3.5);
+      console.log(`📊 Pas assez de données, ajustement simple vs FORT: ${r2(baseOffense)} → ${r2(adjustedOffense)}`);
+    } else if (opponentCategory === 'weak') {
+      adjustedOffense = clamp(baseOffense * 1.15, 0.2, 3.5);
+      console.log(`📊 Pas assez de données, ajustement simple vs FAIBLE: ${r2(baseOffense)} → ${r2(adjustedOffense)}`);
+    }
   }
   
-  // Sinon, retourner la base avec ajustement simple
-  if (opponentCategory === 'strong') {
-    return clamp(baseOffense * 0.85, 0.2, 3.5);  // Moins de buts contre forts
-  } else if (opponentCategory === 'weak') {
-    return clamp(baseOffense * 1.15, 0.2, 3.5);  // Plus de buts contre faibles
-  }
-  
-  return baseOffense;
+  return adjustedOffense;
 }
 
 function calculateHalfTimeStats(teamId, lastMatches, sosValue = 1.0) {
@@ -1403,17 +1410,12 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   let awayOffense = awayOffense_raw / sosAway.sos;
   let awayDefense = awayDefense_raw / sosAway.sos;
   
-  // 🎯 AJUSTER PAR FORCE D'ADVERSAIRE (data-driven)
-  // Si on joue contre une équipe forte, on marque moins
-  // Si on joue contre une équipe faible, on marque plus
+  // 🎯 AJUSTER PAR FORCE D'ADVERSAIRE (data-driven, SOS réel)
+  // Calculer l'attaque de Home selon la défense réelle d'Away
+  homeOffense = calculateLambdaByOpponentStrength(home.id, homeLastMatches, homeOffense, homeDefense, away);
   
-  // Ajuster l'attaque de Home selon la défense d'Away
-  const awayStrength = sosAway.sos;  // > 1.1 = fort, < 0.9 = faible
-  homeOffense = calculateLambdaByOpponentStrength(home.id, homeLastMatches, homeOffense, homeDefense, awayStrength);
-  
-  // Ajuster l'attaque d'Away selon la défense de Home
-  const homeStrength = sosHome.sos;
-  awayOffense = calculateLambdaByOpponentStrength(away.id, awayLastMatches, awayOffense, awayDefense, homeStrength);
+  // Calculer l'attaque d'Away selon la défense réelle de Home
+  awayOffense = calculateLambdaByOpponentStrength(away.id, awayLastMatches, awayOffense, awayDefense, home);
   
   
   
