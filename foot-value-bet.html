@@ -4396,8 +4396,8 @@ function editOddCote(marketId, selIdx) {
   
   toast(`✏️ Cote modifiée: ${newCote.toFixed(2)} • Value: ${(s.value*100).toFixed(1)}%`);
   
-  // Invalider le cache pour forcer le re-render
-  delete matchCache[state.selectedMatchId];
+  // ✅ NE PAS supprimer le cache! On vient de modifier l'objet s en place.
+  // Le cache est encore valide car c'est la même référence.
   render();
 }
 
