@@ -1482,16 +1482,27 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   // 3️⃣ FORM MULTIPLIER AMÉLIORÉ
   const calcAdvancedFormMult = (form) => {
     if(!form || form.length === 0) return 1.0;
+    
+    // 🚀 POIDS EXPONENTIELS - Dernier match = 30%, avant = 20%, etc.
+    // Cela donne PLUS d'importance au MOMENTUM récent!
+    const exponentialWeights = [0.30, 0.20, 0.15, 0.15, 0.20];
+    
     let weightedPoints = 0;
     let totalWeight = 0;
+    
     for(let i = 0; i < form.length; i++) {
-      const weight = (form.length - i);
+      // form[0] = match le plus récent, form[4] = le plus vieux
+      const weight = exponentialWeights[i] || 0.05;  // Fallback pour >5 matchs
       const points = form[i]==='V' ? 3 : form[i]==='D' ? 1 : 0;
       weightedPoints += points * weight;
-      totalWeight += 3 * weight;
+      totalWeight += 3 * weight;  // Max 3 points par match
     }
+    
     const avgPercentage = weightedPoints / totalWeight;
-    return 0.5 + avgPercentage;
+    
+    // ✅ Convertir en multiplicateur [0.5, 1.5]
+    // avgPercentage varie de 0 (perte) à 1 (victoire)
+    return 0.5 + (avgPercentage * 1.0);  // 0.5 = terrible, 1.5 = excellent
   };
   
   const homeFormMult = calcAdvancedFormMult(homeForm);
