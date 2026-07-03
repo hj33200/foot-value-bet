@@ -1159,6 +1159,30 @@ function calculateOverUnderPoisson(lambdaHome, lambdaAway) {
   return { ou15, ou25, ou35 };
 }
 
+// 🎯 OVER/UNDER PAR ÉQUIPE (Home seul ou Away seul)
+function calculateOverUnderByTeam(lambdaHome, lambdaAway) {
+  // Calcule Over/Under pour CHAQUE équipe séparément (pas le total!)
+  const calculateOverThresholdSingle = (lambda, threshold) => {
+    let pUnder = 0;
+    // Somme où buts <= threshold
+    for (let i = 0; i <= Math.ceil(threshold); i++) {
+      if (i <= threshold) {
+        pUnder += poissonProb(lambda, i);
+      }
+    }
+    return 1 - pUnder; // Over = 1 - Under
+  };
+  
+  return {
+    home15: calculateOverThresholdSingle(lambdaHome, 1.5),
+    home25: calculateOverThresholdSingle(lambdaHome, 2.5),
+    home35: calculateOverThresholdSingle(lambdaHome, 3.5),
+    away15: calculateOverThresholdSingle(lambdaAway, 1.5),
+    away25: calculateOverThresholdSingle(lambdaAway, 2.5),
+    away35: calculateOverThresholdSingle(lambdaAway, 3.5),
+  };
+}
+
 // 🎯 BTTS FINE
 function calculateBTTSPoisson(lambdaHome, lambdaAway) {
   // Probabilité Poisson que chaque équipe marque ≥ 1 but
@@ -1384,15 +1408,20 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   // 2️⃣ OVER/UNDER - FORMULE POISSON: Basée sur les lambdas réels (Attaque/Défense × Elo × SOS × Forme)
   const ouFine = calculateOverUnderPoisson(lambdaHome, lambdaAway);
-  const ou15Home = { pOver: ouFine.ou15, pUnder: 1 - ouFine.ou15 };
-  const ou15Away = { pOver: ouFine.ou15, pUnder: 1 - ouFine.ou15 };
-  const ou25Home = { pOver: ouFine.ou25, pUnder: 1 - ouFine.ou25 };
-  const ou25Away = { pOver: ouFine.ou25, pUnder: 1 - ouFine.ou25 };
-  const ou35Home = { pOver: ouFine.ou35, pUnder: 1 - ouFine.ou35 };
-  const ou35Away = { pOver: ouFine.ou35, pUnder: 1 - ouFine.ou35 };
+  const ouByTeam = calculateOverUnderByTeam(lambdaHome, lambdaAway);
+  
+  // Over/Under TOTAL
   const ou15Total = { pOver: ouFine.ou15, pUnder: 1 - ouFine.ou15 };
   const ou25Total = { pOver: ouFine.ou25, pUnder: 1 - ouFine.ou25 };
   const ou35Total = { pOver: ouFine.ou35, pUnder: 1 - ouFine.ou35 };
+  
+  // Over/Under PAR ÉQUIPE (utiliser les vraies stats)
+  const ou15Home = { pOver: ouByTeam.home15, pUnder: 1 - ouByTeam.home15 };
+  const ou15Away = { pOver: ouByTeam.away15, pUnder: 1 - ouByTeam.away15 };
+  const ou25Home = { pOver: ouByTeam.home25, pUnder: 1 - ouByTeam.home25 };
+  const ou25Away = { pOver: ouByTeam.away25, pUnder: 1 - ouByTeam.away25 };
+  const ou35Home = { pOver: ouByTeam.home35, pUnder: 1 - ouByTeam.home35 };
+  const ou35Away = { pOver: ouByTeam.away35, pUnder: 1 - ouByTeam.away35 };
   
   // 3️⃣ BTTS - FORMULE POISSON: P(Home ≥ 1) × P(Away ≥ 1)
   const bttsResult = calculateBTTSPoisson(lambdaHome, lambdaAway);
