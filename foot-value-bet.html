@@ -2802,11 +2802,6 @@ function buildMarkets(m,model){
       const marketName = marketMapping[marketId];
       const result = getRealCotes(marketName, ['Unibet', 'Bet365', '1xBet', 'William Hill'], matchId);
       
-      // DEBUG Over/Under
-      if((marketId === 'tot' || marketId === 'hou' || marketId === 'aou')) {
-        console.log(`🔍 mkSmart DEBUG (${marketId}):`, {label, marketName, result: result ? `${result.cotes?.length} cotes trouvées` : 'null'});
-      }
-      
       // 🎯 POUR OVER/UNDER: Chercher par LABEL au lieu d'INDEX (l'API peut avoir des cotes bonus)
       if((marketId === 'tot' || marketId === 'hou' || marketId === 'aou') && result && result.cotes) {
         // Chercher la cote qui correspond au label
@@ -2816,20 +2811,14 @@ function buildMarkets(m,model){
           
           // Chercher par keywords: Over/Under/Plus/Moins + nombre
           const keywords = labelLower.split(/[\s,><=]+/).filter(k => k.length > 0);
-          const match = keywords.every(kw => coteName.includes(kw));
-          
-          if(match) console.log(`  ✅ Match trouvé: "${c.name}" vs "${label}"`);
-          return match;
+          return keywords.every(kw => coteName.includes(kw));
         });
-        
-        console.log(`  Résultat: foundCote =`, foundCote ? `${foundCote.odd} (${foundCote.name})` : 'null');
         
         if(foundCote) {
           const oddValue = parseFloat(foundCote.odd);
           if(!isNaN(oddValue) && oddValue > 1) {
             opt.realCote = oddValue;
             opt.bookmaker = result.bookmaker;
-            console.log(`  ✅ AFFICHAGE: ${oddValue} (${result.bookmaker})`);
             return mkSel(label, est, rngLocal, opt, marketId);
           }
         }
