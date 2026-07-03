@@ -1223,6 +1223,48 @@ function calculatePoissonThreshold(lambda, threshold) {
   return 1 - pUnder;
 }
 
+// 🎯 CALCULER LES STATS MI-TEMPS BASÉES SUR LES 10 DERNIERS MATCHS
+function calculateHalfTimeStats(teamId, lastMatches, sosValue = 1.0) {
+  if (!lastMatches || lastMatches.length === 0) {
+    return { offense_ht: 0.5, defense_ht: 0.8, matches: 0 };
+  }
+  
+  let totalGoalsFor_HT = 0;
+  let totalGoalsAgainst_HT = 0;
+  let matchesWithData = 0;
+  
+  // Boucler sur les matchs
+  for (let match of lastMatches) {
+    const homeGoals = match.goals?.home;
+    const awayGoals = match.goals?.away;
+    const isHome = match.homeTeam?.id === teamId;
+    
+    if (homeGoals !== undefined && awayGoals !== undefined && homeGoals !== null && awayGoals !== null) {
+      // Approximation: 40% des buts avant 45 min (améliorable avec événements réels)
+      const goalsFor_HT = isHome ? homeGoals * 0.40 : awayGoals * 0.40;
+      const goalsAgainst_HT = isHome ? awayGoals * 0.40 : homeGoals * 0.40;
+      
+      totalGoalsFor_HT += goalsFor_HT;
+      totalGoalsAgainst_HT += goalsAgainst_HT;
+      matchesWithData++;
+    }
+  }
+  
+  // Calculer moyennes
+  const offense_ht_raw = matchesWithData > 0 ? totalGoalsFor_HT / matchesWithData : 0.5;
+  const defense_ht_raw = matchesWithData > 0 ? totalGoalsAgainst_HT / matchesWithData : 0.8;
+  
+  // Normaliser par SOS
+  const offense_ht = sosValue > 0 ? offense_ht_raw / sosValue : offense_ht_raw;
+  const defense_ht = sosValue > 0 ? defense_ht_raw / sosValue : defense_ht_raw;
+  
+  return {
+    offense_ht: clamp(offense_ht, 0.1, 2.0),
+    defense_ht: clamp(defense_ht, 0.2, 2.0),
+    matches: matchesWithData
+  };
+}
+
 function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey='l1') {
   
   // 🌍 DÉTECTER TYPE DE COMPÉTITION
@@ -1454,11 +1496,14 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const dnbAway = pA / (pH + pA);     // Away (remb. si nul)
   
   
-  // FIRST HALF WINNER (1ère mi-temps)
-  // Pattern réel: 40% des buts en 1ère mi-temps, 60% en 2e mi-temps
-  // (pas uniforme comme λ/2 supposerait)
-  const lH_HT = lambdaHome * 0.40;
-  const lA_HT = lambdaAway * 0.40;
+  // FIRST HALF WINNER (1ère mi-temps) - VRAIE FORMULE
+  // Calculer les stats mi-temps précises (basées sur les 10 derniers matchs)
+  const homeHT_stats = calculateHalfTimeStats(home.id, homeLastMatches, sosHome.sos);
+  const awayHT_stats = calculateHalfTimeStats(away.id, awayLastMatches, sosAway.sos);
+  
+  // Lambdas mi-temps = même formule que full-time mais avec stats HT
+  const lH_HT = clamp(homeHT_stats.offense_ht * awayHT_stats.defense_ht * eloMultiplier * homeFormMult, 0.1, 3.0);
+  const lA_HT = clamp(awayHT_stats.offense_ht * homeHT_stats.defense_ht * (1 / eloMultiplier) * awayFormMult, 0.1, 3.0);
   
   let pHT_1 = 0, pHT_D = 0, pHT_2 = 0;
   for (let i = 0; i <= 8; i++) {
