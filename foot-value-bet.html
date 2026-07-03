@@ -4308,8 +4308,9 @@ function oddButton(mk,s,i,d){
   const statColor = s.est >= 0.75 ? 'green' : s.est >= 0.50 ? 'orange' : s.est ? 'red' : 'gray';
   const statPct = s.est ? (s.est*100).toFixed(0)+'%' : 'N/A';
   
-  // Cas spécial: N/A (pas de cote)
-  if(s.color==='gray'||s.cote==null){
+  // Cas spécial: N/A (pas de cote ET pas de cote manuelle)
+  // ✅ IMPORTANT: S'il y a une cote manuelle (coteManuellementModifiee), afficher la cote même si color='gray'!
+  if((s.color==='gray'||s.cote==null) && !s.coteManuellementModifiee){
     return `<div class="odd-btn gray" onclick='editOddCote("${mk.id}",${i}); event.stopPropagation();' style="cursor:pointer; opacity:0.7; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
       <div class="ob-top">
         <span class="ob-sel">${s.sel}</span>
@@ -4334,7 +4335,7 @@ function oddButton(mk,s,i,d){
     </div>`;
   }
   
-  // Cas normal: avec cote
+  // Cas normal: avec cote (vraie ou manuelle)
   return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i}); event.stopPropagation();' style="position:relative">
     <div style="position:absolute;top:6px;right:6px;cursor:pointer;font-size:14px;opacity:0.6;transition:opacity 0.2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" onclick="event.stopPropagation(); showMarketExplanation(window.currentMatchData, '${mk.id}', ${i})" title="Voir les explications">📊</div>
     <div class="ob-top">
