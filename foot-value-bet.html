@@ -769,6 +769,10 @@ function detectCompetitionType(leagueName, competitionName) {
   return 'CHAMPIONSHIP';
 }
 
+// 🚀 COEFFICIENT DE MOMENTUM - Ajuste l'impact de la forme récente
+// 0.0 = pas de momentum, 0.5 = modéré, 1.0 = agressif
+const MOMENTUM_STRENGTH = 0.5;  // ⭐ Valeur recommandée: 0.5 ou 0.6
+
 // 🌍 OBTENIR LES PROPRIÉTÉS DE LA COMPÉTITION
 function getCompetitionProperties(competitionType) {
   // ⚽ PAS D'AVANTAGE DOMICILE NULLE PART (terrain neutre partout)
@@ -1129,9 +1133,31 @@ function calculateForm(matches, teamId) {
 
 // 📊 FONCTION UTILITAIRE - Convertir Forme en Multiplicateur (0.5x à 1.5x)
 function calcAdvancedFormMult(form) {
-  // form = 0 (très mauvais) à 1 (excellent)
-  // Multiplicateur = 0.5 (terrible) à 1.5 (excellent)
-  return 0.5 + form;
+  // form = string comme "VVVDL" (plus récent en premier)
+  // Retourne multiplicateur [0.5, 1.5] avec coefficient MOMENTUM_STRENGTH
+  
+  if(!form || form.length === 0) return 1.0;
+  
+  // 🚀 POIDS EXPONENTIELS - Dernier match = 30%, avant = 20%, etc.
+  const exponentialWeights = [0.30, 0.20, 0.15, 0.15, 0.20];
+  
+  let weightedPoints = 0;
+  let totalWeight = 0;
+  
+  for(let i = 0; i < form.length; i++) {
+    // form[0] = match le plus récent
+    const weight = exponentialWeights[i] || 0.05;  // Fallback pour >5 matchs
+    const points = form[i]==='V' ? 3 : form[i]==='D' ? 1 : 0;  // V=3 pts, D=1 pt, L=0 pts
+    weightedPoints += points * weight;
+    totalWeight += 3 * weight;  // Max 3 points par match
+  }
+  
+  const avgPercentage = weightedPoints / totalWeight;
+  
+  // ✅ Convertir en multiplicateur avec coefficient MOMENTUM_STRENGTH
+  // Sans coefficient: [0.5, 1.5]
+  // Avec coefficient 0.5: [0.5, 1.0]
+  return 0.5 + (avgPercentage * MOMENTUM_STRENGTH);
 }
 
 // 🎯 CALCUL 1N2 AVANCÉ - HYBRIDE DATA + ANALYSE SPORTIVE
@@ -1484,25 +1510,23 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     if(!form || form.length === 0) return 1.0;
     
     // 🚀 POIDS EXPONENTIELS - Dernier match = 30%, avant = 20%, etc.
-    // Cela donne PLUS d'importance au MOMENTUM récent!
+    // avec coefficient MOMENTUM_STRENGTH pour moduler l'impact
     const exponentialWeights = [0.30, 0.20, 0.15, 0.15, 0.20];
     
     let weightedPoints = 0;
     let totalWeight = 0;
     
     for(let i = 0; i < form.length; i++) {
-      // form[0] = match le plus récent, form[4] = le plus vieux
-      const weight = exponentialWeights[i] || 0.05;  // Fallback pour >5 matchs
+      const weight = exponentialWeights[i] || 0.05;
       const points = form[i]==='V' ? 3 : form[i]==='D' ? 1 : 0;
       weightedPoints += points * weight;
-      totalWeight += 3 * weight;  // Max 3 points par match
+      totalWeight += 3 * weight;
     }
     
     const avgPercentage = weightedPoints / totalWeight;
     
-    // ✅ Convertir en multiplicateur [0.5, 1.5]
-    // avgPercentage varie de 0 (perte) à 1 (victoire)
-    return 0.5 + (avgPercentage * 1.0);  // 0.5 = terrible, 1.5 = excellent
+    // ✅ Convertir en multiplicateur avec coefficient MOMENTUM_STRENGTH
+    return 0.5 + (avgPercentage * MOMENTUM_STRENGTH);
   };
   
   const homeFormMult = calcAdvancedFormMult(homeForm);
