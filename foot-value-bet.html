@@ -1266,10 +1266,15 @@ function calculateLambdaByOpponentStrength(teamId, lastMatches, baseOffense, bas
     opponentCategory = 'medium';
   }
   
+  // 🔍 LOG DEBUG: Vérifier le SOS de l'adversaire actuel
+  console.log(`🎯 Adversaire: ${opponentTeam.name} (ID=${opponentTeam.id}), SOS=${r2(currentOpponentSOS)} → ${opponentCategory.toUpperCase()}`);
+  
   // 📊 COLLECTER LES BUTS CONTRE CHAQUE TYPE D'ADVERSAIRE
   let goalsFor_vs_strong = [];
   let goalsFor_vs_weak = [];
   let goalsFor_vs_medium = [];
+  
+  console.log(`📋 Analysant les ${lastMatches.length} derniers matchs...`);
   
   for (let match of lastMatches) {
     const isHome = match.homeTeam?.id === teamId;
@@ -1279,18 +1284,25 @@ function calculateLambdaByOpponentStrength(teamId, lastMatches, baseOffense, bas
     
     // 🎯 RÉCUPÉRER L'ADVERSAIRE HISTORIQUE ET SON SOS RÉEL
     const historicalOpponentId = isHome ? match.awayTeam?.id : match.homeTeam?.id;
+    const historicalOpponentName = isHome ? match.awayTeam?.name : match.homeTeam?.name;
     
     // Calculer le SOS réel de l'adversaire historique
     const historicalOpponentSOS = calculateSOS(historicalOpponentId).sos;
     
     // Classer le match historique par type d'adversaire RÉEL
+    let historicalCategory;
     if (historicalOpponentSOS > 1.10) {
       goalsFor_vs_strong.push(matchGoalsFor);
+      historicalCategory = 'STRONG';
     } else if (historicalOpponentSOS < 0.90) {
       goalsFor_vs_weak.push(matchGoalsFor);
+      historicalCategory = 'WEAK';
     } else {
       goalsFor_vs_medium.push(matchGoalsFor);
+      historicalCategory = 'MEDIUM';
     }
+    
+    console.log(`  • vs ${historicalOpponentName}: ${matchGoalsFor} buts, SOS=${r2(historicalOpponentSOS)} (${historicalCategory})`);
   }
   
   // 📈 UTILISER LES DONNÉES RÉELLES POUR L'ADVERSAIRE ACTUEL
