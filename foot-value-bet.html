@@ -1580,6 +1580,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
     csHome, csAway,
     // 📊 DONNÉES MARCHÉ FIRST HALF
     pHT_1, pHT_D, pHT_2,
+    lH_HT, lA_HT,  // Lambdas mi-temps (pour debug)
+    homeHT_stats, awayHT_stats,  // Stats mi-temps (pour debug)
     // 📊 DONNÉES MARCHÉ HT/FT DOUBLE
     HTFT: htftProbs
   };
@@ -4463,7 +4465,15 @@ function generateMarketAnalysis(b) {
         <div style="background: var(--bg); border-radius: 8px; padding: 10px; margin: 10px 0; font-size: 12px;">
           <div style="margin-bottom: 8px;"><strong>Probabilités (45 minutes)</strong></div>
           <div style="margin-left: 12px; color: var(--txt2);">
-            Lambda ajusté: λ/2 pour chaque équipe<br><br>
+            <strong>Lambdas Poisson (mi-temps):</strong><br>
+            ${b.home.name}: λ = ${m.lH_HT ? m.lH_HT.toFixed(2) : '?'} buts attendus<br>
+            ${b.away.name}: λ = ${m.lA_HT ? m.lA_HT.toFixed(2) : '?'} buts attendus<br><br>
+            
+            <strong>Stats HT (attaque/défense):</strong><br>
+            ${b.home.name}: A=${m.homeHT_stats?.offense_ht.toFixed(2) || '?'}, D=${m.homeHT_stats?.defense_ht.toFixed(2) || '?'}<br>
+            ${b.away.name}: A=${m.awayHT_stats?.offense_ht.toFixed(2) || '?'}, D=${m.awayHT_stats?.defense_ht.toFixed(2) || '?'}<br><br>
+            
+            <strong>Résultats:</strong><br>
             ${b.home.name}: ${m.pHT_1 ? (m.pHT_1 * 100).toFixed(1) : '—'}%<br>
             Nul: ${m.pHT_D ? (m.pHT_D * 100).toFixed(1) : '—'}%<br>
             ${b.away.name}: ${m.pHT_2 ? (m.pHT_2 * 100).toFixed(1) : '—'}%
