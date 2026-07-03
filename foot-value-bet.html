@@ -2487,20 +2487,13 @@ function calculateCleanSheet(lambdaDefense) {
   return pClean;
 }
 
-// 🔍 FONCTION GLOBALE: Valider qu'une cote est cohérente avec sa probabilité
-// DOIT ÊTRE GLOBALE pour être accessible de partout!
+// 🔍 FONCTION GLOBALE: Valider qu'une cote existe
+// SIMPLE: Si on a une cote de l'API, l'afficher!
 function validateCote(oddValue, estimatedProb) {
   if(!oddValue || isNaN(oddValue) || oddValue <= 1) return null;
   
-  const impliedProb = 1 / oddValue;
-  const probDiff = Math.abs(impliedProb - estimatedProb);
-  
-  // ✅ Accepter si différence < 20%
-  if(probDiff < 0.20) {
-    return oddValue;
-  }
-  // ⚠️ Sinon: rejeter (probablement mal indexée)
-  return null;
+  // ✅ AFFICHER TOUTES LES COTES DE L'API (pas de validation)
+  return oddValue;
 }
 
 function buildMarkets(m,model){
@@ -2814,19 +2807,11 @@ function buildMarkets(m,model){
         
         // 🔍 VALIDATION: Vérifier que la cote est cohérente avec la probabilité estimée
         if(!isNaN(oddValue) && oddValue > 1) {
-          const impliedProb = 1 / oddValue;  // Probabilité implicite
-          const probDiff = Math.abs(impliedProb - est);  // Différence avec l'estimation
-          
-          // ✅ Accepter la cote si elle est raisonnablement proche
-          // (tolérance de 20% de différence max)
-          if(probDiff < 0.20) {
-            opt.realCote = oddValue;
-            opt.bookmaker = result.bookmaker;
-            return mkSel(label, est, rngLocal, opt, marketId);
-          } else {
-            // ⚠️ Cote trop éloignée → ignorer (probablement mal indexée)
-            // Afficher sans cote
-          }
+          // ✅ AFFICHER LA COTE (trouvée par l'API)
+          // Pas de validation - si l'API la trouve, c'est une vraie cote!
+          opt.realCote = oddValue;
+          opt.bookmaker = result.bookmaker;
+          return mkSel(label, est, rngLocal, opt, marketId);
         }
       }
     }
@@ -2975,19 +2960,12 @@ function buildMarkets(m,model){
     if(result && result.cotes && result.cotes[apiIndex]) {
       const realCote = parseFloat(result.cotes[apiIndex].odd);
       if(realCote && !isNaN(realCote)) {
-        // 🔍 VALIDATION: Vérifier que la cote est cohérente
-        const impliedProb = 1 / realCote;
-        const probDiff = Math.abs(impliedProb - model.HTFT[k]);
-        
-        // ✅ Accepter si différence < 20%
-        if(probDiff < 0.20) {
-          htftSel.cote = realCote;
-          htftSel.realCote = realCote;
-          htftSel.bookmaker = result.bookmaker;
-          htftSel.implied = impliedProb;
-          htftSel.value = model.HTFT[k] * realCote - 1;
-        }
-        // ⚠️ Sinon: ignorer la cote (probablement mal indexée)
+        // ✅ AFFICHER LA COTE (trouvée par l'API)
+        htftSel.cote = realCote;
+        htftSel.realCote = realCote;
+        htftSel.bookmaker = result.bookmaker;
+        htftSel.implied = 1 / realCote;
+        htftSel.value = model.HTFT[k] * realCote - 1;
       }
     }
     return htftSel;
@@ -4308,10 +4286,10 @@ function oddButton(mk,s,i,d){
   const statColor = s.est >= 0.75 ? 'green' : s.est >= 0.50 ? 'orange' : s.est ? 'red' : 'gray';
   const statPct = s.est ? (s.est*100).toFixed(0)+'%' : 'N/A';
   
-  // Cas spécial: N/A (pas de cote ET pas de cote manuelle)
-  // ✅ IMPORTANT: S'il y a une cote manuelle (coteManuellementModifiee), afficher la cote même si color='gray'!
-  if((s.color==='gray'||s.cote==null) && !s.coteManuellementModifiee){
-    return `<div class="odd-btn gray" onclick='editOddCote("${mk.id}",${i}); event.stopPropagation();' style="cursor:pointer; opacity:0.7; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+  // Cas spécial: N/A (pas de cote du tout - ni API ni manuelle)
+  // ✅ AFFICHER: Si on a une cote (qu'elle soit de l'API ou manuelle)
+  if(s.cote == null){
+    return `<div class="odd-btn gray" data-market="${mk.id}" data-sel-idx="${i}" onclick='editOddCote("${mk.id}",${i}); event.stopPropagation();' style="cursor:pointer; opacity:0.7; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
       <div class="ob-top">
         <span class="ob-sel">${s.sel}</span>
         <span class="voyant v-gray"></span>
@@ -4336,7 +4314,7 @@ function oddButton(mk,s,i,d){
   }
   
   // Cas normal: avec cote (vraie ou manuelle)
-  return `<button class="odd-btn ${s.color}" onclick='openBetModal("${mk.id}",${i}); event.stopPropagation();' style="position:relative">
+  return `<button class="odd-btn ${s.color}" data-market="${mk.id}" data-sel-idx="${i}" onclick='openBetModal("${mk.id}",${i}); event.stopPropagation();' style="position:relative">
     <div style="position:absolute;top:6px;right:6px;cursor:pointer;font-size:14px;opacity:0.6;transition:opacity 0.2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" onclick="event.stopPropagation(); showMarketExplanation(window.currentMatchData, '${mk.id}', ${i})" title="Voir les explications">📊</div>
     <div class="ob-top">
       <span class="ob-sel">${s.sel}</span>
@@ -4396,9 +4374,15 @@ function editOddCote(marketId, selIdx) {
   
   toast(`✏️ Cote modifiée: ${newCote.toFixed(2)} • Value: ${(s.value*100).toFixed(1)}%`);
   
-  // ✅ NE PAS supprimer le cache! On vient de modifier l'objet s en place.
-  // Le cache est encore valide car c'est la même référence.
-  render();
+  // ✅ Mettre à jour le DOM directement (pas render() qui régénère tout)
+  const buttonEl = document.querySelector(`[data-market="${mk.id}"][data-sel-idx="${selIdx}"]`);
+  if(buttonEl) {
+    // Régénérer le HTML du bouton avec les nouvelles valeurs
+    buttonEl.outerHTML = oddButton(mk, s, selIdx, d);
+  } else {
+    // Fallback: refait un render complet
+    render();
+  }
 }
 
 /* ============================================================
