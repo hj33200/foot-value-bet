@@ -1851,7 +1851,11 @@ function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
     // 📊 DONNÉES MARCHÉ FIRST HALF
     pHT_1: advanced.pHT_1,
     pHT_D: advanced.pHT_D,
-    pHT_2: advanced.pHT_2
+    pHT_2: advanced.pHT_2,
+    lH_HT: advanced.lH_HT,  // Lambda mi-temps Home
+    lA_HT: advanced.lA_HT,  // Lambda mi-temps Away
+    homeHT_stats: advanced.homeHT_stats,  // Stats HT Home
+    awayHT_stats: advanced.awayHT_stats   // Stats HT Away
   };
   } catch(err) {
     console.error('❌ ERREUR dans buildModel:', err);
