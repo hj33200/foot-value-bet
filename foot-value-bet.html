@@ -2487,26 +2487,26 @@ function calculateCleanSheet(lambdaDefense) {
   return pClean;
 }
 
+// 🔍 FONCTION GLOBALE: Valider qu'une cote est cohérente avec sa probabilité
+// DOIT ÊTRE GLOBALE pour être accessible de partout!
+function validateCote(oddValue, estimatedProb) {
+  if(!oddValue || isNaN(oddValue) || oddValue <= 1) return null;
+  
+  const impliedProb = 1 / oddValue;
+  const probDiff = Math.abs(impliedProb - estimatedProb);
+  
+  // ✅ Accepter si différence < 20%
+  if(probDiff < 0.20) {
+    return oddValue;
+  }
+  // ⚠️ Sinon: rejeter (probablement mal indexée)
+  return null;
+}
+
 function buildMarkets(m,model){
   const rng=model.rng;const H=m.home.short,A=m.away.short;
   const FM=model.FM;
   const exact=(i,j)=>FM[i]&&FM[i][j]?FM[i][j]:0;
-  
-  // 🔍 FONCTION HELPER: Valider qu'une cote est cohérente avec sa probabilité
-  // DOIT ÊTRE DÉFINIE AVANT TOUT APPEL!
-  const validateCote = (oddValue, estimatedProb) => {
-    if(!oddValue || isNaN(oddValue) || oddValue <= 1) return null;
-    
-    const impliedProb = 1 / oddValue;
-    const probDiff = Math.abs(impliedProb - estimatedProb);
-    
-    // ✅ Accepter si différence < 20%
-    if(probDiff < 0.20) {
-      return oddValue;
-    }
-    // ⚠️ Sinon: rejeter (probablement mal indexée)
-    return null;
-  };
   
   // Récupérer les vraies cotes si disponibles
   let realOdds = null;
