@@ -2492,6 +2492,22 @@ function buildMarkets(m,model){
   const FM=model.FM;
   const exact=(i,j)=>FM[i]&&FM[i][j]?FM[i][j]:0;
   
+  // 🔍 FONCTION HELPER: Valider qu'une cote est cohérente avec sa probabilité
+  // DOIT ÊTRE DÉFINIE AVANT TOUT APPEL!
+  const validateCote = (oddValue, estimatedProb) => {
+    if(!oddValue || isNaN(oddValue) || oddValue <= 1) return null;
+    
+    const impliedProb = 1 / oddValue;
+    const probDiff = Math.abs(impliedProb - estimatedProb);
+    
+    // ✅ Accepter si différence < 20%
+    if(probDiff < 0.20) {
+      return oddValue;
+    }
+    // ⚠️ Sinon: rejeter (probablement mal indexée)
+    return null;
+  };
+  
   // Récupérer les vraies cotes si disponibles
   let realOdds = null;
   if(window.REAL_ODDS_CACHE && window.REAL_ODDS_CACHE[m.id]) {
@@ -3079,21 +3095,6 @@ function buildMarkets(m,model){
   }
 
   // 🎯 Fonction pour chercher une cote par label/nom peu importe le bookmaker
-  // 🔍 FONCTION HELPER: Valider qu'une cote est cohérente avec sa probabilité
-  const validateCote = (oddValue, estimatedProb) => {
-    if(!oddValue || isNaN(oddValue) || oddValue <= 1) return null;
-    
-    const impliedProb = 1 / oddValue;
-    const probDiff = Math.abs(impliedProb - estimatedProb);
-    
-    // ✅ Accepter si différence < 20%
-    if(probDiff < 0.20) {
-      return oddValue;
-    }
-    // ⚠️ Sinon: rejeter (probablement mal indexée)
-    return null;
-  };
-  
   const findCoteByLabel = (marketName, searchLabel) => {
     const bookmarkers = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
     
