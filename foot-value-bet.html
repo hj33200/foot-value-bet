@@ -1534,6 +1534,14 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const lH_HT = clamp(homeHT_stats.offense_ht * awayHT_stats.defense_ht * eloMultiplier * homeFormMult, 0.1, 3.0);
   const lA_HT = clamp(awayHT_stats.offense_ht * homeHT_stats.defense_ht * (1 / eloMultiplier) * awayFormMult, 0.1, 3.0);
   
+  // 📊 LOGS DEBUG - Vérifier les lambdas HT
+  console.log(`\n⏰ HALF-TIME DEBUG (${home.name} vs ${away.name}):`);
+  console.log(`  Full-Time: lambdaHome=${r2(lambdaHome)}, lambdaAway=${r2(lambdaAway)}`);
+  console.log(`  HT Stats Home: offense=${r2(homeHT_stats.offense_ht)}, defense=${r2(homeHT_stats.defense_ht)}`);
+  console.log(`  HT Stats Away: offense=${r2(awayHT_stats.offense_ht)}, defense=${r2(awayHT_stats.defense_ht)}`);
+  console.log(`  HT Lambdas: lH_HT=${r2(lH_HT)}, lA_HT=${r2(lA_HT)}`);
+  console.log(`  Elo Mult: ${r2(eloMultiplier)}, Form: ${r2(homeFormMult)} vs ${r2(awayFormMult)}`);
+  
   let pHT_1 = 0, pHT_D = 0, pHT_2 = 0;
   for (let i = 0; i <= 8; i++) {
     for (let j = 0; j <= 8; j++) {
@@ -1543,6 +1551,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
       else pHT_2 += p;
     }
   }
+  
+  console.log(`  HT Probs: ${home.name}=${r2(pHT_1*100)}%, Draw=${r2(pHT_D*100)}%, ${away.name}=${r2(pHT_2*100)}%\n`);
 
   
   return { 
