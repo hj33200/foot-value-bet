@@ -2802,13 +2802,34 @@ function buildMarkets(m,model){
       const marketName = marketMapping[marketId];
       const result = getRealCotes(marketName, ['Unibet', 'Bet365', '1xBet', 'William Hill'], matchId);
       
+      // 🎯 POUR OVER/UNDER: Chercher par LABEL au lieu d'INDEX (l'API peut avoir des cotes bonus)
+      if((marketId === 'tot' || marketId === 'hou' || marketId === 'aou') && result && result.cotes) {
+        // Chercher la cote qui correspond au label
+        const foundCote = result.cotes.find(c => {
+          const coteName = (c.name || c.value || '').toLowerCase();
+          const labelLower = label.toLowerCase();
+          
+          // Chercher par keywords: Over/Under/Plus/Moins + nombre
+          const keywords = labelLower.split(/[\s,><=]+/).filter(k => k.length > 0);
+          return keywords.every(kw => coteName.includes(kw));
+        });
+        
+        if(foundCote) {
+          const oddValue = parseFloat(foundCote.odd);
+          if(!isNaN(oddValue) && oddValue > 1) {
+            opt.realCote = oddValue;
+            opt.bookmaker = result.bookmaker;
+            return mkSel(label, est, rngLocal, opt, marketId);
+          }
+        }
+      }
+      
+      // 🎯 POUR AUTRES MARCHÉS: Chercher par INDEX (1N2, DC, BTTS, etc.)
       if(result && result.cotes && result.cotes[idx]) {
         const oddValue = parseFloat(result.cotes[idx].odd);
         
-        // 🔍 VALIDATION: Vérifier que la cote est cohérente avec la probabilité estimée
         if(!isNaN(oddValue) && oddValue > 1) {
           // ✅ AFFICHER LA COTE (trouvée par l'API)
-          // Pas de validation - si l'API la trouve, c'est une vraie cote!
           opt.realCote = oddValue;
           opt.bookmaker = result.bookmaker;
           return mkSel(label, est, rngLocal, opt, marketId);
