@@ -773,44 +773,31 @@ function detectCompetitionType(leagueName, competitionName) {
 // 0.0 = pas de momentum, 0.5 = modéré, 1.0 = agressif
 const MOMENTUM_STRENGTH = 0.5;  // ⭐ Valeur recommandée: 0.5 ou 0.6
 
-// 🏆 ELO FIFA DE BASE - Reflète la vraie force initiale de chaque équipe
-// Source: FIFA World Rankings approximatifs (non exhaustif, adapté)
+// 🏆 ELO FIFA DE BASE - Reflète la vraie force initiale
 const TEAM_BASE_ELO = {
-  // Top 10
   'Argentina': 1790, 'Brazil': 1760, 'France': 1750, 'England': 1740,
   'Belgium': 1730, 'Netherlands': 1720, 'Germany': 1710, 'Spain': 1705,
-  'Italy': 1700, 'Portugal': 1695,
-  
-  // Top 20
-  'Denmark': 1680, 'Uruguay': 1675, 'Mexico': 1650, 'Switzerland': 1645,
-  'Sweden': 1640, 'Poland': 1635, 'Austria': 1630, 'Ukraine': 1625,
-  'Czech Republic': 1620, 'Norway': 1615,
-  
-  // Top 50
+  'Italy': 1700, 'Portugal': 1695, 'Denmark': 1680, 'Uruguay': 1675,
+  'Mexico': 1650, 'Switzerland': 1645, 'Sweden': 1640, 'Poland': 1635,
+  'Austria': 1630, 'Ukraine': 1625, 'Czech Republic': 1620, 'Norway': 1615,
   'Japan': 1600, 'South Korea': 1595, 'Australia': 1590, 'Canada': 1585,
   'USA': 1580, 'Morocco': 1575, 'Senegal': 1570, 'Tunisia': 1560,
-  'Cameroon': 1550, 'Ghana': 1540,
-  
-  // Autres pays
-  'Iceland': 1520, 'Costa Rica': 1510, 'Nigeria': 1500, 'Egypt': 1490,
-  'Ivory Coast': 1480, 'South Africa': 1470, 'Turkey': 1460,
-  'Greece': 1450, 'Israel': 1440, 'Saudi Arabia': 1420,
+  'Cameroon': 1550, 'Ghana': 1540, 'Iceland': 1520, 'Costa Rica': 1510,
+  'Nigeria': 1500, 'Egypt': 1490, 'Ivory Coast': 1480, 'South Africa': 1470,
+  'Turkey': 1460, 'Greece': 1450, 'Israel': 1440, 'Saudi Arabia': 1420,
   'UAE': 1400, 'China': 1390, 'Vietnam': 1380, 'Thailand': 1370,
   'Indonesia': 1360, 'Philippines': 1350, 'Cape Verde Islands': 1350,
-  'Honduras': 1340, 'Jamaica': 1330, 'Panama': 1320,
-  'Paraguay': 1310, 'Bolivia': 1300, 'Venezuela': 1290,
-  
-  // Par défaut
-  'default': 1600
+  'Honduras': 1340, 'Jamaica': 1330, 'Panama': 1320, 'Paraguay': 1310,
+  'Bolivia': 1300, 'Venezuela': 1290
 };
 
 function getTeamBaseElo(teamName) {
-  if(!teamName) return TEAM_BASE_ELO.default;
+  if(!teamName) return 1600;
   
   // Chercher correspondance exacte
   if(TEAM_BASE_ELO[teamName]) return TEAM_BASE_ELO[teamName];
   
-  // Chercher correspondance partielle (ex: "Cape Verde" vs "Cape Verde Islands")
+  // Chercher correspondance partielle
   const name = teamName.toLowerCase();
   for(let key in TEAM_BASE_ELO) {
     if(key.toLowerCase().includes(name) || name.includes(key.toLowerCase())) {
@@ -818,7 +805,7 @@ function getTeamBaseElo(teamName) {
     }
   }
   
-  return TEAM_BASE_ELO.default;
+  return 1600;  // ✅ Fallback au lieu de undefined!
 }
 
 // 🌍 OBTENIR LES PROPRIÉTÉS DE LA COMPÉTITION
@@ -995,21 +982,30 @@ function calculateLocalSOS(teamId, lastMatches, competitionType = 'CHAMPIONSHIP'
 
 function calculateEloFromResults(teamName, form, gf, ga, matches, sosValue = 1.0) {
   // 🏆 ELO = BASE FIFA + PERFORMANCE BONUS + SOS BONUS
-  // Reflète la vraie force de l'équipe!
   
-  const BASE_ELO = getTeamBaseElo(teamName);  // ← ELO FIFA de base!
+  const BASE_ELO = getTeamBaseElo(teamName);
   const K_FACTOR = 32;
   
-  if (!form || form.length === 0) return BASE_ELO;
+  // 🔴 DEBUG
+  if(!form || form.length === 0) {
+    console.log(`⚠️ ELO ${teamName}: form vide, retour BASE=${BASE_ELO}`);
+    return BASE_ELO;
+  }
+  
+  // Vérifications de sécurité
+  gf = typeof gf === 'number' ? gf : 0;
+  ga = typeof ga === 'number' ? ga : 0;
+  matches = typeof matches === 'number' ? matches : form.length;
+  sosValue = typeof sosValue === 'number' ? sosValue : 1.0;
   
   const winCount = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0);
   const drawCount = form.split('').reduce((s,c) => s + (c==='D'?1:0), 0);
-  const matchCount = form.length;
+  const matchCount = Math.max(1, form.length);
   
   const totalPoints = winCount * 3 + drawCount;
   const avgPerformance = totalPoints / (matchCount * 3);
   
-  let elo = BASE_ELO;  // ← Commencer par BASE au lieu de 1600!
+  let elo = BASE_ELO;
   
   // 1️⃣ BONUS PERFORMANCE
   const performanceBonus = K_FACTOR * (avgPerformance - 0.5) * matchCount;
@@ -1022,20 +1018,21 @@ function calculateEloFromResults(teamName, form, gf, ga, matches, sosValue = 1.0
   const goalsBonus = goalDiff * 200;
   elo += goalsBonus;
   
-  // 3️⃣ BONUS SOS (Force des adversaires) ⭐ NOUVEAU!
-  // Si SOS = 1.1 → adversaires 10% plus forts → +100 ELO bonus
-  // Si SOS = 0.9 → adversaires 10% plus faibles → -100 ELO bonus
+  // 3️⃣ BONUS SOS
   const sosBonus = (sosValue - 1.0) * 1000;
   elo += sosBonus;
   
-  // 4️⃣ FACTEUR DE CONFIANCE
+  // 4️⃣ CONFIANCE
   const confidence = Math.min(0.95, 0.4 + (matchCount / 30));
   
-  // 5️⃣ BLEND AVEC BASE
+  // 5️⃣ BLEND
   elo = BASE_ELO * (1 - confidence) + elo * confidence;
   
-  // 6️⃣ LISSER LES EXTRÊMES
+  // 6️⃣ CLAMP
   elo = clamp(elo, 1100, 2100);
+  
+  // 🔴 DEBUG
+  console.log(`✅ ELO ${teamName}: BASE=${BASE_ELO}, perf=${performanceBonus.toFixed(0)}, goals=${goalsBonus.toFixed(0)}, sos=${sosBonus.toFixed(0)} = ${elo.toFixed(0)}`);
   
   return elo;
 }
@@ -1598,8 +1595,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   ELO_CACHE = {}; // ← VIDER LE CACHE pour recalculer!
   
   // 4️⃣ ELO
-  const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches, sosHome);
-  const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches, sosAway);
+  const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches, sosHome.sos);
+  const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches, sosAway.sos);
   
   // Convertir Elo difference en multiplicateur
   const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
