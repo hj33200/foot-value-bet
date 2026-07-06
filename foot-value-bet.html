@@ -773,6 +773,54 @@ function detectCompetitionType(leagueName, competitionName) {
 // 0.0 = pas de momentum, 0.5 = modéré, 1.0 = agressif
 const MOMENTUM_STRENGTH = 0.5;  // ⭐ Valeur recommandée: 0.5 ou 0.6
 
+// 🏆 ELO FIFA DE BASE - Reflète la vraie force initiale de chaque équipe
+// Source: FIFA World Rankings approximatifs (non exhaustif, adapté)
+const TEAM_BASE_ELO = {
+  // Top 10
+  'Argentina': 1790, 'Brazil': 1760, 'France': 1750, 'England': 1740,
+  'Belgium': 1730, 'Netherlands': 1720, 'Germany': 1710, 'Spain': 1705,
+  'Italy': 1700, 'Portugal': 1695,
+  
+  // Top 20
+  'Denmark': 1680, 'Uruguay': 1675, 'Mexico': 1650, 'Switzerland': 1645,
+  'Sweden': 1640, 'Poland': 1635, 'Austria': 1630, 'Ukraine': 1625,
+  'Czech Republic': 1620, 'Norway': 1615,
+  
+  // Top 50
+  'Japan': 1600, 'South Korea': 1595, 'Australia': 1590, 'Canada': 1585,
+  'USA': 1580, 'Morocco': 1575, 'Senegal': 1570, 'Tunisia': 1560,
+  'Cameroon': 1550, 'Ghana': 1540,
+  
+  // Autres pays
+  'Iceland': 1520, 'Costa Rica': 1510, 'Nigeria': 1500, 'Egypt': 1490,
+  'Ivory Coast': 1480, 'South Africa': 1470, 'Turkey': 1460,
+  'Greece': 1450, 'Israel': 1440, 'Saudi Arabia': 1420,
+  'UAE': 1400, 'China': 1390, 'Vietnam': 1380, 'Thailand': 1370,
+  'Indonesia': 1360, 'Philippines': 1350, 'Cape Verde Islands': 1350,
+  'Honduras': 1340, 'Jamaica': 1330, 'Panama': 1320,
+  'Paraguay': 1310, 'Bolivia': 1300, 'Venezuela': 1290,
+  
+  // Par défaut
+  'default': 1600
+};
+
+function getTeamBaseElo(teamName) {
+  if(!teamName) return TEAM_BASE_ELO.default;
+  
+  // Chercher correspondance exacte
+  if(TEAM_BASE_ELO[teamName]) return TEAM_BASE_ELO[teamName];
+  
+  // Chercher correspondance partielle (ex: "Cape Verde" vs "Cape Verde Islands")
+  const name = teamName.toLowerCase();
+  for(let key in TEAM_BASE_ELO) {
+    if(key.toLowerCase().includes(name) || name.includes(key.toLowerCase())) {
+      return TEAM_BASE_ELO[key];
+    }
+  }
+  
+  return TEAM_BASE_ELO.default;
+}
+
 // 🌍 OBTENIR LES PROPRIÉTÉS DE LA COMPÉTITION
 function getCompetitionProperties(competitionType) {
   // ⚽ Home Advantage ACTIVÉ pour championnats (terrain réel)
@@ -945,51 +993,57 @@ function calculateLocalSOS(teamId, lastMatches, competitionType = 'CHAMPIONSHIP'
   return clamp(localSOS, 0.7, 1.3);  // Limiter entre 0.7 et 1.3
 }
 
-function calculateEloFromResults(teamName, form, gf, ga, matches) {
-  const PRIOR_ELO = 1600;
-  if (!form || form.length === 0) return PRIOR_ELO;
+function calculateEloFromResults(teamName, form, gf, ga, matches, sosValue = 1.0) {
+  // 🏆 ELO = BASE FIFA + PERFORMANCE BONUS + SOS BONUS
+  // Reflète la vraie force de l'équipe!
   
+  const BASE_ELO = getTeamBaseElo(teamName);  // ← ELO FIFA de base!
+  const K_FACTOR = 32;
   
-  // 1️⃣ WIN RATE
+  if (!form || form.length === 0) return BASE_ELO;
+  
   const winCount = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0);
   const drawCount = form.split('').reduce((s,c) => s + (c==='D'?1:0), 0);
-  const winRate = (winCount * 3 + drawCount) / (form.length * 3);
+  const matchCount = form.length;
   
+  const totalPoints = winCount * 3 + drawCount;
+  const avgPerformance = totalPoints / (matchCount * 3);
   
-  // RÉDUIT de 600 → 350 (moins extrême)
-  const performanceBonus = (winRate - 0.5) * 350;
+  let elo = BASE_ELO;  // ← Commencer par BASE au lieu de 1600!
   
-  // 2️⃣ BUTS/MATCH
-  const goalsFor = gf / Math.max(1, matches);
-  const goalsAgainst = ga / Math.max(1, matches);
-  const goalsDiff = goalsFor - goalsAgainst;
+  // 1️⃣ BONUS PERFORMANCE
+  const performanceBonus = K_FACTOR * (avgPerformance - 0.5) * matchCount;
+  elo += performanceBonus;
   
+  // 2️⃣ BONUS BUTS
+  const goalsFor = gf / Math.max(1, matchCount);
+  const goalsAgainst = ga / Math.max(1, matchCount);
+  const goalDiff = goalsFor - goalsAgainst;
+  const goalsBonus = goalDiff * 200;
+  elo += goalsBonus;
   
-  // RÉDUIT de 250 → 120 (moins extrême)
-  const goalsBonus = goalsDiff * 120;
+  // 3️⃣ BONUS SOS (Force des adversaires) ⭐ NOUVEAU!
+  // Si SOS = 1.1 → adversaires 10% plus forts → +100 ELO bonus
+  // Si SOS = 0.9 → adversaires 10% plus faibles → -100 ELO bonus
+  const sosBonus = (sosValue - 1.0) * 1000;
+  elo += sosBonus;
   
-  // Elo brut
-  let eloRaw = PRIOR_ELO + performanceBonus + goalsBonus;
+  // 4️⃣ FACTEUR DE CONFIANCE
+  const confidence = Math.min(0.95, 0.4 + (matchCount / 30));
   
-  // 3️⃣ FACTEUR DE CONFIANCE (basé sur le nombre de matchs)
-  // 5 matches = 70% confident
-  // 10 matches = 85% confident
-  // 20 matches = 95% confident
-  const confidence = Math.min(0.95, 0.4 + (matches / 30));
+  // 5️⃣ BLEND AVEC BASE
+  elo = BASE_ELO * (1 - confidence) + elo * confidence;
   
-  // Blend: Prior + Elo_calculé pondéré par confiance
-  let elo = PRIOR_ELO * (1 - confidence) + eloRaw * confidence;
-  
-  // LISSER LES EXTRÊMES: min 1200, max 2000 (au lieu de 800-2800)
-  elo = clamp(elo, 1200, 2000);
+  // 6️⃣ LISSER LES EXTRÊMES
+  elo = clamp(elo, 1100, 2100);
   
   return elo;
 }
 
-function getElo(teamId, teamName, form, gf, ga, matches) {
+function getElo(teamId, teamName, form, gf, ga, matches, sos = 1.0) {
   if (ELO_CACHE[teamId]) return ELO_CACHE[teamId];
   
-  const elo = calculateEloFromResults(teamName, form, gf, ga, matches);
+  const elo = calculateEloFromResults(teamName, form, gf, ga, matches, sos);
   ELO_CACHE[teamId] = elo;
   
   return elo;
@@ -1544,8 +1598,8 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   ELO_CACHE = {}; // ← VIDER LE CACHE pour recalculer!
   
   // 4️⃣ ELO
-  const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches);
-  const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches);
+  const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches, sosHome);
+  const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches, sosAway);
   
   // Convertir Elo difference en multiplicateur
   const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
