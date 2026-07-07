@@ -491,7 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.3 - Stack Trace Debug</b>
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.5 - Stats from Form</b>
     </div>
   </aside>
 
@@ -3670,11 +3670,15 @@ function getMatchData(id){
   const homeForm = calcForm(m.home);
   const awayForm = calcForm(m.away);
   
+  // ✅ Utiliser la longueur de la form pour les matches, pas m.home.matches!
+  const homeMatches = homeForm.length > 0 ? homeForm.length : (m.home.matches || 34);
+  const awayMatches = awayForm.length > 0 ? awayForm.length : (m.away.matches || 34);
+  
   // 📊 Calculer Elo pour chaque équipe (avec rangs FIFA)
   const homeRank = getRankingByTeamName(m.home.name);
   const awayRank = getRankingByTeamName(m.away.name);
-  const homeElo = getElo(m.home.id, m.home.name, homeForm, m.home.gf || 0, m.home.ga || 0, m.home.matches || 34, homeRank);
-  const awayElo = getElo(m.away.id, m.away.name, awayForm, m.away.gf || 0, m.away.ga || 0, m.away.matches || 34, awayRank);
+  const homeElo = getElo(m.home.id, m.home.name, homeForm, m.home.gf || 0, m.home.ga || 0, homeMatches, homeRank);
+  const awayElo = getElo(m.away.id, m.away.name, awayForm, m.away.gf || 0, m.away.ga || 0, awayMatches, awayRank);
   
   // 📈 Parser les stats de forme
   const formH = { wins: (homeForm.match(/V/g) || []).length, draws: (homeForm.match(/D/g) || []).length, losses: (homeForm.match(/L/g) || []).length, ratio: calcAdvancedFormMult(homeForm) };
