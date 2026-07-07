@@ -491,7 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.2.3 - Deterministic RNG</b>
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.3 - ELO Cache Fix</b>
     </div>
   </aside>
 
@@ -1590,11 +1590,11 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   
   // 4️⃣ ELO RATING - Pondération scientifiquement validée
-  ELO_CACHE = {}; // ← VIDER LE CACHE pour recalculer!
+  // ✅ NE PAS vider le cache - réutiliser les ELOs déjà calculés!
   
   // 4️⃣ ELO
-  const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches);
-  const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches);
+  const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches, homeRank);
+  const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches, awayRank);
   
   // Convertir Elo difference en multiplicateur
   const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
@@ -1957,7 +1957,7 @@ function poissonProb(lambda, k) {
   return numerator / denominator;
 }
 
-function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
+function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1',homeRank=50,awayRank=50){
   try {
     // 🎯 UTILISER LE MODÈLE AVANCÉ POUR CALCULER LES LAMBDAS
     const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey);
@@ -3672,7 +3672,7 @@ function getMatchData(id){
   const formH = { wins: (homeForm.match(/V/g) || []).length, draws: (homeForm.match(/D/g) || []).length, losses: (homeForm.match(/L/g) || []).length, ratio: calcAdvancedFormMult(homeForm) };
   const formA = { wins: (awayForm.match(/V/g) || []).length, draws: (awayForm.match(/D/g) || []).length, losses: (awayForm.match(/L/g) || []).length, ratio: calcAdvancedFormMult(awayForm) };
   
-  const model = buildModel(m.home, m.away, homeForm, awayForm, rng, m.lg);
+  const model = buildModel(m.home, m.away, homeForm, awayForm, rng, m.lg, homeRank, awayRank);
   const data = {
     meta: { ...m, homeElo, awayElo },  // Ajouter Elo à meta
     model,
