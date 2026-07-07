@@ -491,7 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.4.1 - Cache Persistence Final</b>
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.3 - Stack Trace Debug</b>
     </div>
   </aside>
 
@@ -3615,9 +3615,14 @@ const FOOTBALL_API = {
 let matchCache={};
 
 function getMatchData(id){
+  console.log(`\n📍 getMatchData(${id}) appelée`);
+  console.trace('   📍 Origine:');  // Stack trace complète
+  
   if(matchCache[id]) {
-    return matchCache[id];  // ✅ Réutiliser le cache
+    console.log(`✅ CACHE HIT pour match ${id} (données existantes)`);
+    return matchCache[id];
   }
+  console.log(`❌ CACHE MISS pour match ${id} - calcul nécessaire`);
   const m=MATCHES.find(x=>x.id===id);
   
   // ⚠️ Vérifier que le match existe
@@ -3689,6 +3694,7 @@ function getMatchData(id){
   };
   
   matchCache[id] = data;
+  console.log(`✅ CACHE FILLED pour match ${id}`);
   return data;
 }
 
@@ -4058,6 +4064,7 @@ function viewAnalytics(){
    PAGE: DASHBOARD
    ============================================================ */
 function viewDashboard(){
+  console.log(`📊 viewDashboard() appelée`);
   const leagueOpts='<option value="all">Tous les championnats</option>'+
     Object.entries(LEAGUES).map(([k,v])=>`<option value="${k}" ${state.filterLeague===k?'selected':''}>${v.name}</option>`).join('');
   const matches=MATCHES.filter(m=>
@@ -4177,7 +4184,8 @@ async function openDetail(id){
           timestamp: Date.now()  // ⏰ Ajouter le timestamp
         };
         
-        // ✅ NE PAS vider le cache - juste afficher les nouvelles cotes!
+        // Invalider le cache et forcer le re-render
+        delete matchCache[id];
         render();
         toast('✅ Cotes réelles chargées');
       } else {
@@ -5620,6 +5628,8 @@ async function loadDashboardMatches() {
     }));
     
     MATCHES.splice(0, MATCHES.length, ...newMatches);
+    console.log(`🧹 CACHE VIDÉ dans loadDashboardMatches()!`);
+    matchCache = {};
     state.footballDataReady = true;
     toast(newMatches.length + ' match(s)');
     
@@ -5678,6 +5688,8 @@ async function loadAndApplyRealData() {
     });
   
   MATCHES.splice(0, MATCHES.length, ...upcomingMatches);
+  console.log(`🧹 CACHE VIDÉ dans loadAndApplyRealData()!`);
+  matchCache = {};
   
   alert('✅ Données Ligue 1 réelles chargées!\n\n' + 
     data.teams.length + ' équipes, ' + 
