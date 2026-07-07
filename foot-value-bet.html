@@ -491,7 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.1 - Cache Debug</b>
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.2 - Debug Double Render</b>
     </div>
   </aside>
 
@@ -4061,6 +4061,7 @@ function viewAnalytics(){
    PAGE: DASHBOARD
    ============================================================ */
 function viewDashboard(){
+  console.log(`📊 viewDashboard() appelée`);
   const leagueOpts='<option value="all">Tous les championnats</option>'+
     Object.entries(LEAGUES).map(([k,v])=>`<option value="${k}" ${state.filterLeague===k?'selected':''}>${v.name}</option>`).join('');
   const matches=MATCHES.filter(m=>
@@ -4157,9 +4158,6 @@ async function openDetail(id){
   
   // L'ID du match EST le fixtureId de l'API-Football
   const fixtureId = m?.id || m?.fixture?.id;
-  
-  // Invalider immédiatement le cache
-  delete matchCache[id];
   
   // Aller à la page Détail
   go('detail');
