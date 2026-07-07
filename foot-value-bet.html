@@ -928,16 +928,61 @@ const FIFA_RANKINGS = {
   'Uzbekistan': 50, 'Saudi Arabia': 61, 'Haiti': 83, 'Scotland': 42
 };
 
+// 🔄 TABLE D'ALIAS - Variations de noms d'équipes
+const TEAM_NAME_ALIASES = {
+  'DR Congo': 'Congo DR',
+  'DRC': 'Congo DR',
+  'Democratic Republic of Congo': 'Congo DR',
+  'South Korea': 'South Korea',
+  'Korea': 'South Korea',
+  'Republic of Korea': 'South Korea',
+  'Ivory Coast': 'Ivory Coast',
+  'Côte d\'Ivoire': 'Ivory Coast',
+  'Czech Republic': 'Czechia',
+  'Bosnia': 'Bosnia and Herzegovina',
+  'Bosnia-Herzegovina': 'Bosnia and Herzegovina',
+  'United States': 'USA',
+  'USMNT': 'USA',
+  'Cape Verde': 'Cape Verde',
+  'Cabo Verde': 'Cape Verde'
+};
+
 function getRankingByTeamName(teamName) {
-  // Cherche le rang exact
-  if (FIFA_RANKINGS[teamName]) return FIFA_RANKINGS[teamName];
+  if (!teamName) return 50;
   
-  // Cherche par substring (en cas de variation)
+  // Normaliser: trim et lowercase pour comparaison
+  const normalized = teamName.trim();
+  
+  // 1️⃣ Cherche le rang exact
+  if (FIFA_RANKINGS[normalized]) {
+    return FIFA_RANKINGS[normalized];
+  }
+  
+  // 2️⃣ Cherche avec alias
+  if (TEAM_NAME_ALIASES[normalized]) {
+    const aliased = TEAM_NAME_ALIASES[normalized];
+    if (FIFA_RANKINGS[aliased]) {
+      return FIFA_RANKINGS[aliased];
+    }
+  }
+  
+  // 3️⃣ Cherche par substring (insensible à la casse)
+  const lowerName = normalized.toLowerCase();
   for (let key in FIFA_RANKINGS) {
-    if (teamName && teamName.toLowerCase().includes(key.toLowerCase())) {
+    if (key.toLowerCase() === lowerName) {
       return FIFA_RANKINGS[key];
     }
   }
+  
+  // 4️⃣ Cherche par inclusion
+  for (let key in FIFA_RANKINGS) {
+    if (lowerName.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerName)) {
+      return FIFA_RANKINGS[key];
+    }
+  }
+  
+  // 5️⃣ Log de débogage
+  console.warn(`⚠️ Rang non trouvé pour: "${teamName}" → défaut 50`);
   
   // Défaut: rang 50
   return 50;
@@ -1007,7 +1052,7 @@ function calculateEloFromResults(teamName, form, gf, ga, matches, rank) {
   const eloFinal = clamp(elo, 1200, 2000);
   
   // 🔍 LOGS DE DÉBOGAGE (à activer pour vérification)
-  console.log(`\n📊 === ELO CALCULATION: ${teamName} ===`);
+  console.log(`\n📊 === ELO CALCULATION: ${teamName} (Rank: ${rank}) ===`);
   console.log(`   Rank: ${rank}, Form: ${form}, GF: ${gf}, GA: ${ga}, Matches: ${matches}`);
   console.log(`   1️⃣ Base Elo: ${eloBase.toFixed(2)}`);
   console.log(`   2️⃣ Win Rate: ${(winRate*100).toFixed(1)}% (W:${winCount} D:${drawCount})`);
