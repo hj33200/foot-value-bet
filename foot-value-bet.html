@@ -1524,13 +1524,15 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const awayLastMatches = getLastMatches(away.id, 10) || [];
   const bookmakerData = calculateBookmakerAnalysis(homeLastMatches, awayLastMatches, home.id, away.id, compProps.isNeutralGround);
   
+  // ✅ UTILISER LA FORM COMME SOURCE DE VÉRITÉ pour les stats!
+  const homeMatches = homeForm.length > 0 ? homeForm.length : (homeStats.matches || home.matches || 1);
+  const awayMatches = awayForm.length > 0 ? awayForm.length : (awayStats.matches || away.matches || 1);
+  
+  // Si on a les vraies stats de l'API, les utiliser. Sinon, garder celles du match
   const homeGF = homeStats.gf || home.gf || 1;
   const homeGA = homeStats.ga || home.ga || 1;
-  const homeMatches = (homeStats.matches || 0) > 0 ? homeStats.matches : (homeForm.length > 0 ? homeForm.length : (home.matches || 1));
-  
   const awayGF = awayStats.gf || away.gf || 1;
   const awayGA = awayStats.ga || away.ga || 1;
-  const awayMatches = (awayStats.matches || 0) > 0 ? awayStats.matches : (awayForm.length > 0 ? awayForm.length : (away.matches || 1));
   
   
   // 🔴 CALCUL SOS EN PREMIER (avant de normaliser les stats)
