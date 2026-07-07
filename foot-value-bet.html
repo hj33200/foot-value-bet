@@ -491,7 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.2 - Debug Double Render</b>
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.3 - Stack Trace Debug</b>
     </div>
   </aside>
 
@@ -3615,8 +3615,11 @@ const FOOTBALL_API = {
 let matchCache={};
 
 function getMatchData(id){
+  console.log(`\n📍 getMatchData(${id}) appelée`);
+  console.trace('   📍 Origine:');  // Stack trace complète
+  
   if(matchCache[id]) {
-    console.log(`✅ CACHE HIT pour match ${id}`);
+    console.log(`✅ CACHE HIT pour match ${id} (données existantes)`);
     return matchCache[id];
   }
   console.log(`❌ CACHE MISS pour match ${id} - calcul nécessaire`);
@@ -5625,6 +5628,7 @@ async function loadDashboardMatches() {
     }));
     
     MATCHES.splice(0, MATCHES.length, ...newMatches);
+    console.log(`🧹 CACHE VIDÉ dans loadDashboardMatches()!`);
     matchCache = {};
     state.footballDataReady = true;
     toast(newMatches.length + ' match(s)');
@@ -5684,6 +5688,7 @@ async function loadAndApplyRealData() {
     });
   
   MATCHES.splice(0, MATCHES.length, ...upcomingMatches);
+  console.log(`🧹 CACHE VIDÉ dans loadAndApplyRealData()!`);
   matchCache = {};
   
   alert('✅ Données Ligue 1 réelles chargées!\n\n' + 
