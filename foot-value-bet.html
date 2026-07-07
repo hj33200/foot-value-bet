@@ -491,8 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Données <b>fictives</b> · branchement <b>API-Football</b> prévu.<br>
-      Modèle de Poisson local · v1.0
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.2 - ELO Clean</b>
     </div>
   </aside>
 
@@ -934,51 +933,74 @@ function calculateLocalSOS(teamId, lastMatches, competitionType = 'CHAMPIONSHIP'
   return clamp(localSOS, 0.7, 1.3);  // Limiter entre 0.7 et 1.3
 }
 
-function calculateEloFromResults(teamName, form, gf, ga, matches) {
-  const PRIOR_ELO = 1600;
-  if (!form || form.length === 0) return PRIOR_ELO;
-  
-  
-  // 1️⃣ WIN RATE
-  const winCount = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0);
-  const drawCount = form.split('').reduce((s,c) => s + (c==='D'?1:0), 0);
-  const winRate = (winCount * 3 + drawCount) / (form.length * 3);
-  
-  
-  // RÉDUIT de 600 → 350 (moins extrême)
-  const performanceBonus = (winRate - 0.5) * 350;
-  
-  // 2️⃣ BUTS/MATCH
-  const goalsFor = gf / Math.max(1, matches);
-  const goalsAgainst = ga / Math.max(1, matches);
-  const goalsDiff = goalsFor - goalsAgainst;
-  
-  
-  // RÉDUIT de 250 → 120 (moins extrême)
-  const goalsBonus = goalsDiff * 120;
-  
-  // Elo brut
-  let eloRaw = PRIOR_ELO + performanceBonus + goalsBonus;
-  
-  // 3️⃣ FACTEUR DE CONFIANCE (basé sur le nombre de matchs)
-  // 5 matches = 70% confident
-  // 10 matches = 85% confident
-  // 20 matches = 95% confident
-  const confidence = Math.min(0.95, 0.4 + (matches / 30));
-  
-  // Blend: Prior + Elo_calculé pondéré par confiance
-  let elo = PRIOR_ELO * (1 - confidence) + eloRaw * confidence;
-  
-  // LISSER LES EXTRÊMES: min 1200, max 2000 (au lieu de 800-2800)
-  elo = clamp(elo, 1200, 2000);
-  
-  return elo;
+// 🏆 FORMULE ELO RÉALISTE - NOUVELLE IMPLÉMENTATION PROPRE
+function rankingToElo(rank) {
+  // Convertit le rang FIFA en ELO de base
+  // Rang 1 (Argentina) → 1700, Rang 50 → 1614
+  if(!rank || rank <= 0) return 1600;
+  return 1600 + (100 / Math.sqrt(rank));
 }
 
-function getElo(teamId, teamName, form, gf, ga, matches) {
+function calcTemporalFormMult(form) {
+  // Forme pondérée temporellement
+  // Plus récent = plus lourd: [0.10, 0.15, 0.20, 0.25, 0.30]
+  if(!form || form.length === 0) return 1.0;
+  
+  const weights = [0.10, 0.15, 0.20, 0.25, 0.30];
+  let weightedPoints = 0;
+  let totalWeight = 0;
+  
+  for(let i = 0; i < form.length; i++) {
+    const weight = weights[i] || 0.05;
+    const points = form[i]==='V' ? 3 : form[i]==='D' ? 1 : 0;
+    weightedPoints += points * weight;
+    totalWeight += 3 * weight;
+  }
+  
+  const ratio = weightedPoints / totalWeight;
+  return 0.5 + ratio;  // Entre 0.5 et 1.5
+}
+
+function calculateEloFromResults(teamName, form, gf, ga, matches, rank) {
+  // NOUVELLE FORMULE ELO RÉALISTE
+  // Elo = Base_FIFA + Performance_Bonus + Goals_Bonus + blend_avec_confiance
+  
+  if(!form || form.length === 0) return rankingToElo(rank || 50);
+  
+  // 1️⃣ ELO DE BASE (par rang FIFA)
+  const eloBase = rankingToElo(rank || 50);
+  
+  // 2️⃣ PERFORMANCE BONUS (K-factor standard = 32)
+  const K_FACTOR = 32;
+  const winCount = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0);
+  const drawCount = form.split('').reduce((s,c) => s + (c==='D'?1:0), 0);
+  const points = winCount * 3 + drawCount;
+  const winRate = points / (matches * 3);
+  const performanceBonus = K_FACTOR * (winRate - 0.5) * matches;
+  
+  // 3️⃣ BUTS BONUS (coefficient 50, pas 100!)
+  const avgGF = gf / Math.max(1, matches);
+  const avgGA = ga / Math.max(1, matches);
+  const goalDiff = avgGF - avgGA;
+  const goalsBonus = goalDiff * 50;
+  
+  // 4️⃣ CALCUL ELO RAW
+  let eloRaw = eloBase + performanceBonus + goalsBonus;
+  
+  // 5️⃣ FACTEUR DE CONFIANCE (plus de matchs = plus confiant)
+  const confidence = Math.min(0.95, 0.4 + (matches / 30));
+  
+  // 6️⃣ BLEND avec base (si peu de matchs, rester proche du base)
+  let elo = eloBase * (1 - confidence) + eloRaw * confidence;
+  
+  // 7️⃣ CLAMP [1200, 2000]
+  return clamp(elo, 1200, 2000);
+}
+
+function getElo(teamId, teamName, form, gf, ga, matches, rank) {
   if (ELO_CACHE[teamId]) return ELO_CACHE[teamId];
   
-  const elo = calculateEloFromResults(teamName, form, gf, ga, matches);
+  const elo = calculateEloFromResults(teamName, form, gf, ga, matches, rank);
   ELO_CACHE[teamId] = elo;
   
   return elo;
@@ -1127,11 +1149,10 @@ function calculateForm(matches, teamId) {
   return recentWeight > 0 ? recentPoints / recentWeight : 0.5;
 }
 
-// 📊 FONCTION UTILITAIRE - Convertir Forme en Multiplicateur (0.5x à 1.5x)
+// 📊 FONCTION UTILITAIRE - Convertir Forme en Multiplicateur avec poids temporels
 function calcAdvancedFormMult(form) {
-  // form = 0 (très mauvais) à 1 (excellent)
-  // Multiplicateur = 0.5 (terrible) à 1.5 (excellent)
-  return 0.5 + form;
+  // Utilise calcTemporalFormMult pour la pondération temporelle
+  return calcTemporalFormMult(form);
 }
 
 // 🎯 CALCUL 1N2 AVANCÉ - HYBRIDE DATA + ANALYSE SPORTIVE
@@ -1459,11 +1480,11 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const sosHome_local = calculateLocalSOS(home.id, homeLastMatches, leagueKey);
   const sosAway_local = calculateLocalSOS(away.id, awayLastMatches, leagueKey);
   
-  // ✅ GARDER LES STATS BRUTES (pas de normalisation par SOS)
-  const homeOffense = homeOffense_raw;
-  const homeDefense = homeDefense_raw;
-  const awayOffense = awayOffense_raw;
-  const awayDefense = awayDefense_raw;
+  // Normaliser UNE SEULE FOIS par SOS local
+  const homeOffense = homeOffense_raw / sosHome_local;
+  const homeDefense = homeDefense_raw / sosHome_local;
+  const awayOffense = awayOffense_raw / sosAway_local;
+  const awayDefense = awayDefense_raw / sosAway_local;
   
   
   
@@ -3564,9 +3585,9 @@ function getMatchData(id){
   const homeForm = calcForm(m.home);
   const awayForm = calcForm(m.away);
   
-  // 📊 Calculer Elo pour chaque équipe
-  const homeElo = getElo(m.home.id, m.home.name, homeForm, m.home.gf || 0, m.home.ga || 0, m.home.matches || 34);
-  const awayElo = getElo(m.away.id, m.away.name, awayForm, m.away.gf || 0, m.away.ga || 0, m.away.matches || 34);
+  // 📊 Calculer Elo pour chaque équipe (avec rangs FIFA)
+  const homeElo = getElo(m.home.id, m.home.name, homeForm, m.home.gf || 0, m.home.ga || 0, m.home.matches || 34, m.home.ranking || 50);
+  const awayElo = getElo(m.away.id, m.away.name, awayForm, m.away.gf || 0, m.away.ga || 0, m.away.matches || 34, m.away.ranking || 50);
   
   // 📈 Parser les stats de forme
   const formH = { wins: (homeForm.match(/V/g) || []).length, draws: (homeForm.match(/D/g) || []).length, losses: (homeForm.match(/L/g) || []).length, ratio: calcAdvancedFormMult(homeForm) };
