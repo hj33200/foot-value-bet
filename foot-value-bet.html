@@ -491,7 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.3 - ELO Cache Fix</b>
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.1 - Cache Debug</b>
     </div>
   </aside>
 
@@ -2711,7 +2711,7 @@ function buildMarkets(m,model){
     for(let bm of priority) {
       if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
         const cotes = realOdds[bm].markets[marketName];
-        console.log(`✅ TROUVÉ ${marketName} chez ${bm}:`, cotes);  // DEBUG
+        // console.log(`✅ TROUVÉ ${marketName} chez ${bm}:`, cotes);  // DEBUG - DÉCOMMENTER si besoin
         
         if(marketName === 'Double Chance') {
           // ✅ SANS VALIDATION - On prend les vraies cotes telles qu'elles sont
@@ -3615,7 +3615,11 @@ const FOOTBALL_API = {
 let matchCache={};
 
 function getMatchData(id){
-  if(matchCache[id])return matchCache[id];
+  if(matchCache[id]) {
+    console.log(`✅ CACHE HIT pour match ${id}`);
+    return matchCache[id];
+  }
+  console.log(`❌ CACHE MISS pour match ${id} - calcul nécessaire`);
   const m=MATCHES.find(x=>x.id===id);
   
   // ⚠️ Vérifier que le match existe
@@ -3687,6 +3691,7 @@ function getMatchData(id){
   };
   
   matchCache[id] = data;
+  console.log(`✅ CACHE FILLED pour match ${id}`);
   return data;
 }
 
