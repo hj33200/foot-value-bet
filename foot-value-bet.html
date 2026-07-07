@@ -491,7 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.2 - ELO Clean</b>
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.2.1 - FIFA Rankings Fix</b>
     </div>
   </aside>
 
@@ -931,6 +931,35 @@ function calculateLocalSOS(teamId, lastMatches, competitionType = 'CHAMPIONSHIP'
   // SOS = force moyenne des adversaires normalisée
   const localSOS = totalAdversaire / totalPoids;
   return clamp(localSOS, 0.7, 1.3);  // Limiter entre 0.7 et 1.3
+}
+
+// 🏆 LOOKUP TABLE - FIFA RANKINGS 2026
+const FIFA_RANKINGS = {
+  'Argentina': 1, 'Spain': 2, 'France': 3, 'England': 4, 'Portugal': 5,
+  'Brazil': 6, 'Morocco': 7, 'Netherlands': 8, 'Belgium': 9, 'Germany': 10,
+  'Croatia': 11, 'Italy': 12, 'Colombia': 13, 'Mexico': 14, 'Senegal': 15,
+  'Uruguay': 16, 'USA': 17, 'Japan': 18, 'Switzerland': 19, 'Iran': 20,
+  'Denmark': 21, 'Turkey': 22, 'Ecuador': 23, 'Austria': 24, 'South Korea': 25,
+  'Nigeria': 26, 'Australia': 27, 'Egypt': 29, 'Canada': 30, 'Norway': 31,
+  'Ivory Coast': 33, 'Panama': 34, 'Paraguay': 41, 'Czechia': 40, 'Ghana': 73,
+  'South Africa': 60, 'Algeria': 2, 'Congo DR': 46, 'Cape Verde': 127,
+  'Jordan': 63, 'Bosnia and Herzegovina': 64, 'Qatar': 57, 'Iraq': 57,
+  'Uzbekistan': 50, 'Saudi Arabia': 61, 'Haiti': 83, 'Scotland': 42
+};
+
+function getRankingByTeamName(teamName) {
+  // Cherche le rang exact
+  if (FIFA_RANKINGS[teamName]) return FIFA_RANKINGS[teamName];
+  
+  // Cherche par substring (en cas de variation)
+  for (let key in FIFA_RANKINGS) {
+    if (teamName && teamName.toLowerCase().includes(key.toLowerCase())) {
+      return FIFA_RANKINGS[key];
+    }
+  }
+  
+  // Défaut: rang 50
+  return 50;
 }
 
 // 🏆 FORMULE ELO RÉALISTE - NOUVELLE IMPLÉMENTATION PROPRE
@@ -3601,8 +3630,10 @@ function getMatchData(id){
   const awayForm = calcForm(m.away);
   
   // 📊 Calculer Elo pour chaque équipe (avec rangs FIFA)
-  const homeElo = getElo(m.home.id, m.home.name, homeForm, m.home.gf || 0, m.home.ga || 0, m.home.matches || 34, m.home.ranking || 50);
-  const awayElo = getElo(m.away.id, m.away.name, awayForm, m.away.gf || 0, m.away.ga || 0, m.away.matches || 34, m.away.ranking || 50);
+  const homeRank = getRankingByTeamName(m.home.name);
+  const awayRank = getRankingByTeamName(m.away.name);
+  const homeElo = getElo(m.home.id, m.home.name, homeForm, m.home.gf || 0, m.home.ga || 0, m.home.matches || 34, homeRank);
+  const awayElo = getElo(m.away.id, m.away.name, awayForm, m.away.gf || 0, m.away.ga || 0, m.away.matches || 34, awayRank);
   
   // 📈 Parser les stats de forme
   const formH = { wins: (homeForm.match(/V/g) || []).length, draws: (homeForm.match(/D/g) || []).length, losses: (homeForm.match(/L/g) || []).length, ratio: calcAdvancedFormMult(homeForm) };
