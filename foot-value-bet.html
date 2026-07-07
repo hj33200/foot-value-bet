@@ -491,7 +491,8 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.4.1 - Cache Persistence Final</b>
+      Données <b>fictives</b> · branchement <b>API-Football</b> prévu.<br>
+      Modèle de Poisson local · v1.4
     </div>
   </aside>
 
@@ -781,7 +782,26 @@ function getCompetitionProperties(competitionType) {
 }
 
 // 🌍 TABLE FIFA RANKINGS (mise à jour octobre 2024)
+const FIFA_RANKINGS = {
+  'Argentina': 1, 'France': 2, 'Brazil': 3, 'England': 4, 'Belgium': 5,
+  'Netherlands': 6, 'Portugal': 7, 'Spain': 8, 'Germany': 9, 'Italy': 10,
+  'Uruguay': 11, 'Mexico': 12, 'Denmark': 13, 'Croatia': 14, 'Poland': 15,
+  'USA': 16, 'Colombia': 17, 'Wales': 18, 'Senegal': 19, 'Switzerland': 20,
+  'Austria': 21, 'Czech Republic': 22, 'Serbia': 23, 'Turkey': 24, 'Ukraine': 25,
+  'Japan': 26, 'Morocco': 27, 'Ecuador': 28, 'Sweden': 29, 'Scotland': 30,
+  'Norway': 31, 'Romania': 32, 'Greece': 33, 'Slovakia': 34, 'Bosnia': 35,
+  'Iceland': 40, 'Peru': 24, 'Northern Ireland': 38, 'Ivory Coast': 53,
+  'Egypt': 42, 'Saudi Arabia': 51, 'Congo DR': 70, 'Mali': 85, 'Benin': 90,
+  'Sudan': 115, 'Gambia': 105, 'Azerbaijan': 110
+};
 
+// 🎯 Convertir ranking FIFA → Elo (linéaire)
+function rankingToElo(ranking) {
+  // Formule: Elo = 1850 - (ranking × 2.5)
+  // Rang 1 = 1850, Rang 50 = 1725, Rang 100 = 1600, Rang 200 = 1350
+  const elo = 1850 - (ranking * 2.5);
+  return clamp(elo, 1200, 1900);
+}
 
 // 🎯 Calculer la force d'une équipe (opponent strength) - SANS REQUÊTE
 function getOpponentStrength(teamId, teamName) {
@@ -914,163 +934,51 @@ function calculateLocalSOS(teamId, lastMatches, competitionType = 'CHAMPIONSHIP'
   return clamp(localSOS, 0.7, 1.3);  // Limiter entre 0.7 et 1.3
 }
 
-// 🏆 LOOKUP TABLE - FIFA RANKINGS 2026
-const FIFA_RANKINGS = {
-  'Argentina': 1, 'Spain': 2, 'France': 3, 'England': 4, 'Portugal': 5,
-  'Brazil': 6, 'Morocco': 7, 'Netherlands': 8, 'Belgium': 9, 'Germany': 10,
-  'Croatia': 11, 'Italy': 12, 'Colombia': 13, 'Mexico': 14, 'Senegal': 15,
-  'Uruguay': 16, 'USA': 17, 'Japan': 18, 'Switzerland': 19, 'Iran': 20,
-  'Denmark': 21, 'Turkey': 22, 'Ecuador': 23, 'Austria': 24, 'South Korea': 25,
-  'Nigeria': 26, 'Australia': 27, 'Egypt': 29, 'Canada': 30, 'Norway': 31,
-  'Ivory Coast': 33, 'Panama': 34, 'Paraguay': 41, 'Czechia': 40, 'Ghana': 73,
-  'South Africa': 60, 'Algeria': 2, 'Congo DR': 46, 'Cape Verde': 127,
-  'Jordan': 63, 'Bosnia and Herzegovina': 64, 'Qatar': 57, 'Iraq': 57,
-  'Uzbekistan': 50, 'Saudi Arabia': 61, 'Haiti': 83, 'Scotland': 42
-};
-
-// 🔄 TABLE D'ALIAS - Variations de noms d'équipes
-const TEAM_NAME_ALIASES = {
-  'DR Congo': 'Congo DR',
-  'DRC': 'Congo DR',
-  'Democratic Republic of Congo': 'Congo DR',
-  'South Korea': 'South Korea',
-  'Korea': 'South Korea',
-  'Republic of Korea': 'South Korea',
-  'Ivory Coast': 'Ivory Coast',
-  'Côte d\'Ivoire': 'Ivory Coast',
-  'Czech Republic': 'Czechia',
-  'Bosnia': 'Bosnia and Herzegovina',
-  'Bosnia-Herzegovina': 'Bosnia and Herzegovina',
-  'United States': 'USA',
-  'USMNT': 'USA',
-  'Cape Verde': 'Cape Verde',
-  'Cabo Verde': 'Cape Verde'
-};
-
-function getRankingByTeamName(teamName) {
-  if (!teamName) return 50;
+function calculateEloFromResults(teamName, form, gf, ga, matches) {
+  const PRIOR_ELO = 1600;
+  if (!form || form.length === 0) return PRIOR_ELO;
   
-  // Normaliser: trim et lowercase pour comparaison
-  const normalized = teamName.trim();
   
-  // 1️⃣ Cherche le rang exact
-  if (FIFA_RANKINGS[normalized]) {
-    return FIFA_RANKINGS[normalized];
-  }
-  
-  // 2️⃣ Cherche avec alias
-  if (TEAM_NAME_ALIASES[normalized]) {
-    const aliased = TEAM_NAME_ALIASES[normalized];
-    if (FIFA_RANKINGS[aliased]) {
-      return FIFA_RANKINGS[aliased];
-    }
-  }
-  
-  // 3️⃣ Cherche par substring (insensible à la casse)
-  const lowerName = normalized.toLowerCase();
-  for (let key in FIFA_RANKINGS) {
-    if (key.toLowerCase() === lowerName) {
-      return FIFA_RANKINGS[key];
-    }
-  }
-  
-  // 4️⃣ Cherche par inclusion
-  for (let key in FIFA_RANKINGS) {
-    if (lowerName.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerName)) {
-      return FIFA_RANKINGS[key];
-    }
-  }
-  
-  // 5️⃣ Log de débogage
-  console.warn(`⚠️ Rang non trouvé pour: "${teamName}" → défaut 50`);
-  
-  // Défaut: rang 50
-  return 50;
-}
-
-// 🏆 FORMULE ELO RÉALISTE - NOUVELLE IMPLÉMENTATION PROPRE
-function rankingToElo(rank) {
-  // Convertit le rang FIFA en ELO de base
-  // Rang 1 (Argentina) → 1700, Rang 50 → 1614
-  if(!rank || rank <= 0) return 1600;
-  return 1600 + (100 / Math.sqrt(rank));
-}
-
-function calcTemporalFormMult(form) {
-  // Forme pondérée temporellement
-  // Plus récent = plus lourd: [0.10, 0.15, 0.20, 0.25, 0.30]
-  if(!form || form.length === 0) return 1.0;
-  
-  const weights = [0.10, 0.15, 0.20, 0.25, 0.30];
-  let weightedPoints = 0;
-  let totalWeight = 0;
-  
-  for(let i = 0; i < form.length; i++) {
-    const weight = weights[i] || 0.05;
-    const points = form[i]==='V' ? 3 : form[i]==='D' ? 1 : 0;
-    weightedPoints += points * weight;
-    totalWeight += 3 * weight;
-  }
-  
-  const ratio = weightedPoints / totalWeight;
-  return 0.5 + ratio;  // Entre 0.5 et 1.5
-}
-
-function calculateEloFromResults(teamName, form, gf, ga, matches, rank) {
-  // NOUVELLE FORMULE ELO RÉALISTE
-  // Elo = Base_FIFA + Performance_Bonus + Goals_Bonus + blend_avec_confiance
-  
-  if(!form || form.length === 0) return rankingToElo(rank || 50);
-  
-  // 1️⃣ ELO DE BASE (par rang FIFA)
-  const eloBase = rankingToElo(rank || 50);
-  
-  // 2️⃣ PERFORMANCE BONUS (K-factor standard = 32)
-  const K_FACTOR = 32;
+  // 1️⃣ WIN RATE
   const winCount = form.split('').reduce((s,c) => s + (c==='V'?1:0), 0);
   const drawCount = form.split('').reduce((s,c) => s + (c==='D'?1:0), 0);
-  const points = winCount * 3 + drawCount;
-  const winRate = points / (matches * 3);
-  const performanceBonus = K_FACTOR * (winRate - 0.5) * matches;
+  const winRate = (winCount * 3 + drawCount) / (form.length * 3);
   
-  // 3️⃣ BUTS BONUS (coefficient 50, pas 100!)
-  const avgGF = gf / Math.max(1, matches);
-  const avgGA = ga / Math.max(1, matches);
-  const goalDiff = avgGF - avgGA;
-  const goalsBonus = goalDiff * 50;
   
-  // 4️⃣ CALCUL ELO RAW
-  let eloRaw = eloBase + performanceBonus + goalsBonus;
+  // RÉDUIT de 600 → 350 (moins extrême)
+  const performanceBonus = (winRate - 0.5) * 350;
   
-  // 5️⃣ FACTEUR DE CONFIANCE (plus de matchs = plus confiant)
+  // 2️⃣ BUTS/MATCH
+  const goalsFor = gf / Math.max(1, matches);
+  const goalsAgainst = ga / Math.max(1, matches);
+  const goalsDiff = goalsFor - goalsAgainst;
+  
+  
+  // RÉDUIT de 250 → 120 (moins extrême)
+  const goalsBonus = goalsDiff * 120;
+  
+  // Elo brut
+  let eloRaw = PRIOR_ELO + performanceBonus + goalsBonus;
+  
+  // 3️⃣ FACTEUR DE CONFIANCE (basé sur le nombre de matchs)
+  // 5 matches = 70% confident
+  // 10 matches = 85% confident
+  // 20 matches = 95% confident
   const confidence = Math.min(0.95, 0.4 + (matches / 30));
   
-  // 6️⃣ BLEND avec base (si peu de matchs, rester proche du base)
-  let elo = eloBase * (1 - confidence) + eloRaw * confidence;
+  // Blend: Prior + Elo_calculé pondéré par confiance
+  let elo = PRIOR_ELO * (1 - confidence) + eloRaw * confidence;
   
-  // 7️⃣ CLAMP [1200, 2000]
-  const eloFinal = clamp(elo, 1200, 2000);
+  // LISSER LES EXTRÊMES: min 1200, max 2000 (au lieu de 800-2800)
+  elo = clamp(elo, 1200, 2000);
   
-  // 🔍 LOGS DE DÉBOGAGE (à activer pour vérification)
-  console.log(`\n📊 === ELO CALCULATION: ${teamName} (Rank: ${rank}) ===`);
-  console.log(`   Rank: ${rank}, Form: ${form}, GF: ${gf}, GA: ${ga}, Matches: ${matches}`);
-  console.log(`   1️⃣ Base Elo: ${eloBase.toFixed(2)}`);
-  console.log(`   2️⃣ Win Rate: ${(winRate*100).toFixed(1)}% (W:${winCount} D:${drawCount})`);
-  console.log(`   2️⃣ Performance Bonus: ${performanceBonus.toFixed(2)}`);
-  console.log(`   3️⃣ Avg GF/GA: ${avgGF.toFixed(2)}/${avgGA.toFixed(2)} → Diff: ${goalDiff.toFixed(2)}`);
-  console.log(`   3️⃣ Goals Bonus: ${goalsBonus.toFixed(2)}`);
-  console.log(`   4️⃣ Elo Raw: ${eloRaw.toFixed(2)}`);
-  console.log(`   5️⃣ Confidence: ${(confidence*100).toFixed(1)}%`);
-  console.log(`   6️⃣ Elo After Blend: ${elo.toFixed(2)}`);
-  console.log(`   7️⃣ Elo Final (clamped): ${eloFinal.toFixed(0)} ✅\n`);
-  
-  return eloFinal;
+  return elo;
 }
 
-function getElo(teamId, teamName, form, gf, ga, matches, rank) {
+function getElo(teamId, teamName, form, gf, ga, matches) {
   if (ELO_CACHE[teamId]) return ELO_CACHE[teamId];
   
-  const elo = calculateEloFromResults(teamName, form, gf, ga, matches, rank);
+  const elo = calculateEloFromResults(teamName, form, gf, ga, matches);
   ELO_CACHE[teamId] = elo;
   
   return elo;
@@ -1219,10 +1127,11 @@ function calculateForm(matches, teamId) {
   return recentWeight > 0 ? recentPoints / recentWeight : 0.5;
 }
 
-// 📊 FONCTION UTILITAIRE - Convertir Forme en Multiplicateur avec poids temporels
+// 📊 FONCTION UTILITAIRE - Convertir Forme en Multiplicateur (0.5x à 1.5x)
 function calcAdvancedFormMult(form) {
-  // Utilise calcTemporalFormMult pour la pondération temporelle
-  return calcTemporalFormMult(form);
+  // form = 0 (très mauvais) à 1 (excellent)
+  // Multiplicateur = 0.5 (terrible) à 1.5 (excellent)
+  return 0.5 + form;
 }
 
 // 🎯 CALCUL 1N2 AVANCÉ - HYBRIDE DATA + ANALYSE SPORTIVE
@@ -1507,7 +1416,7 @@ function calculateHalfTimeStats(teamId, lastMatches, sosValue = 1.0) {
   };
 }
 
-function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey='l1', homeRank=50, awayRank=50) {
+function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey='l1') {
   
   // 🌍 DÉTECTER TYPE DE COMPÉTITION
   const leagueName = LEAGUES[leagueKey]?.name || 'Championnat';
@@ -1590,11 +1499,11 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   
   // 4️⃣ ELO RATING - Pondération scientifiquement validée
-  // ✅ NE PAS vider le cache - réutiliser les ELOs déjà calculés!
+  ELO_CACHE = {}; // ← VIDER LE CACHE pour recalculer!
   
   // 4️⃣ ELO
-  const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches, homeRank);
-  const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches, awayRank);
+  const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches);
+  const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches);
   
   // Convertir Elo difference en multiplicateur
   const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
@@ -1957,10 +1866,10 @@ function poissonProb(lambda, k) {
   return numerator / denominator;
 }
 
-function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1',homeRank=50,awayRank=50){
+function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1'){
   try {
     // 🎯 UTILISER LE MODÈLE AVANCÉ POUR CALCULER LES LAMBDAS
-    const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey, homeRank, awayRank);
+    const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey);
     if (!advanced) {
       console.error('❌ calculateAdvancedProbabilities retourné undefined!');
       return null;
@@ -2711,7 +2620,7 @@ function buildMarkets(m,model){
     for(let bm of priority) {
       if(realOdds[bm] && realOdds[bm].markets && realOdds[bm].markets[marketName]) {
         const cotes = realOdds[bm].markets[marketName];
-        // console.log(`✅ TROUVÉ ${marketName} chez ${bm}:`, cotes);  // DEBUG - DÉCOMMENTER si besoin
+        console.log(`✅ TROUVÉ ${marketName} chez ${bm}:`, cotes);  // DEBUG
         
         if(marketName === 'Double Chance') {
           // ✅ SANS VALIDATION - On prend les vraies cotes telles qu'elles sont
@@ -3615,9 +3524,7 @@ const FOOTBALL_API = {
 let matchCache={};
 
 function getMatchData(id){
-  if(matchCache[id]) {
-    return matchCache[id];  // ✅ Réutiliser le cache
-  }
+  if(matchCache[id])return matchCache[id];
   const m=MATCHES.find(x=>x.id===id);
   
   // ⚠️ Vérifier que le match existe
@@ -3630,32 +3537,25 @@ function getMatchData(id){
   const seed = hashStr(m.id + m.home.id + m.away.id);
   const rng = mulberry32(seed);
   
-  // Generate form from REAL stats via cache (ATTENDRE que le cache se remplisse!)
+  // Generate form from REAL stats via cache
   const calcForm = (team) => {
     // ✅ PRIORITÉ: Essayer d'obtenir les VRAIES stats du cache API
     const realStats = FOOTBALL_API.getTeamStats(team.id);
     if (realStats && realStats.form) {
-      console.log(`✅ Real form for ${team.name}: ${realStats.form}`);
       return realStats.form;
     }
     
-    // Fallback: utiliser les stats du standings si disponibles
+    // Fallback: générer à partir des stats du standings
     const matches = team.matches || 34;
-    const gf = team.gf || 0;
-    const ga = team.ga || 0;
+    const gf = team.gf || 0, ga = team.ga || 0;
+    const avgGoals = matches > 0 ? gf / matches : 0;
+    const strength = avgGoals / 2.2; // 2.2 is average
     
-    // Ne PAS générer aléatoirement - utiliser des données réelles!
-    // Si pas de vraies stats, mieux vaut retourner une forme neutre
-    console.warn(`⚠️ No real form for ${team.name}, using standings: ${matches}M, ${gf}GF, ${ga}GA`);
-    
-    // Générer form basée sur les standings (déterministe, pas aléatoire!)
     let form = '';
-    const winRate = gf > 0 ? gf / (matches * 2.5) : 0.4; // Ratio wins estimé
-    for(let i = 0; i < 10; i++) {
-      // Utiliser le RNG déterministe du match, pas Math.random()!
-      const r = rng();
-      if(r < Math.min(0.9, winRate)) form += 'V';
-      else if(r < Math.min(0.95, winRate + 0.2)) form += 'D';
+    for(let i = 0; i < 5; i++) {
+      const r = Math.random();
+      if(r < 0.30 + strength * 0.3) form += 'V';
+      else if(r < 0.55 + strength * 0.25) form += 'D';
       else form += 'L';
     }
     return form;
@@ -3664,17 +3564,15 @@ function getMatchData(id){
   const homeForm = calcForm(m.home);
   const awayForm = calcForm(m.away);
   
-  // 📊 Calculer Elo pour chaque équipe (avec rangs FIFA)
-  const homeRank = getRankingByTeamName(m.home.name);
-  const awayRank = getRankingByTeamName(m.away.name);
-  const homeElo = getElo(m.home.id, m.home.name, homeForm, m.home.gf || 0, m.home.ga || 0, m.home.matches || 34, homeRank);
-  const awayElo = getElo(m.away.id, m.away.name, awayForm, m.away.gf || 0, m.away.ga || 0, m.away.matches || 34, awayRank);
+  // 📊 Calculer Elo pour chaque équipe
+  const homeElo = getElo(m.home.id, m.home.name, homeForm, m.home.gf || 0, m.home.ga || 0, m.home.matches || 34);
+  const awayElo = getElo(m.away.id, m.away.name, awayForm, m.away.gf || 0, m.away.ga || 0, m.away.matches || 34);
   
   // 📈 Parser les stats de forme
   const formH = { wins: (homeForm.match(/V/g) || []).length, draws: (homeForm.match(/D/g) || []).length, losses: (homeForm.match(/L/g) || []).length, ratio: calcAdvancedFormMult(homeForm) };
   const formA = { wins: (awayForm.match(/V/g) || []).length, draws: (awayForm.match(/D/g) || []).length, losses: (awayForm.match(/L/g) || []).length, ratio: calcAdvancedFormMult(awayForm) };
   
-  const model = buildModel(m.home, m.away, homeForm, awayForm, rng, m.lg, homeRank, awayRank);
+  const model = buildModel(m.home, m.away, homeForm, awayForm, rng, m.lg);
   const data = {
     meta: { ...m, homeElo, awayElo },  // Ajouter Elo à meta
     model,
@@ -4177,7 +4075,7 @@ async function openDetail(id){
           timestamp: Date.now()  // ⏰ Ajouter le timestamp
         };
         
-        // ✅ NE PAS vider le cache - juste afficher les nouvelles cotes!
+        // Afficher les cotes réelles
         render();
         toast('✅ Cotes réelles chargées');
       } else {
