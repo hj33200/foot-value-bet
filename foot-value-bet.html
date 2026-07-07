@@ -1459,11 +1459,11 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const sosHome_local = calculateLocalSOS(home.id, homeLastMatches, leagueKey);
   const sosAway_local = calculateLocalSOS(away.id, awayLastMatches, leagueKey);
   
-  // Normaliser UNE SEULE FOIS par SOS local
-  const homeOffense = homeOffense_raw / sosHome_local;
-  const homeDefense = homeDefense_raw / sosHome_local;
-  const awayOffense = awayOffense_raw / sosAway_local;
-  const awayDefense = awayDefense_raw / sosAway_local;
+  // ✅ GARDER LES STATS BRUTES (pas de normalisation par SOS)
+  const homeOffense = homeOffense_raw;
+  const homeDefense = homeDefense_raw;
+  const awayOffense = awayOffense_raw;
+  const awayDefense = awayDefense_raw;
   
   
   
