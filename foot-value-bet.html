@@ -491,7 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.4 - Cache Fix + 1N2 Logs</b>
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.3.3 - Stack Trace Debug</b>
     </div>
   </aside>
 
@@ -1595,7 +1595,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   // 4️⃣ ELO
   const homeElo = getElo(home.id, home.name, homeForm, homeGF, homeGA, homeMatches, homeRank);
   const awayElo = getElo(away.id, away.name, awayForm, awayGF, awayGA, awayMatches, awayRank);
-  console.log(`\n✅ 1N2 CALCUL: ${home.name} ELO ${homeElo} vs ${away.name} ELO ${awayElo}`);
   
   // Convertir Elo difference en multiplicateur
   const eloWinProb = getWinProbabilityFromElo(homeElo, awayElo);
@@ -1612,7 +1611,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   
   lambdaHome = clamp(lambdaHome, 0.3, 5.0);
   lambdaAway = clamp(lambdaAway, 0.3, 5.0);
-  console.log(`⚽ Lambdas: ${home.name} ${lambdaHome.toFixed(2)} vs ${away.name} ${lambdaAway.toFixed(2)}`);
 
   
   // 🎯 CALCULS BASÉS SUR L'ANALYSE RÉELLE (0% IMAGINATION, 100% DATA)
@@ -1624,7 +1622,6 @@ function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKe
   const pH = result1N2.pH;
   const pD = result1N2.pD;
   const pA = result1N2.pA;
-  console.log(`📊 Probas 1N2: ${home.name} ${(pH*100).toFixed(1)}% | Draw ${(pD*100).toFixed(1)}% | ${away.name} ${(pA*100).toFixed(1)}%`);
   
   // Home marque vs Away encaisse
   const homeGoalsExpected = bookmakerData.homeOffensiveVsAwayDefense;
@@ -3618,7 +3615,13 @@ const FOOTBALL_API = {
 let matchCache={};
 
 function getMatchData(id){
-  if(matchCache[id])return matchCache[id];
+  console.log(`\n📍 getMatchData(${id}) appelée`);
+  
+  if(matchCache[id]) {
+    console.log(`✅ CACHE HIT pour match ${id} (données existantes)`);
+    return matchCache[id];
+  }
+  console.log(`❌ CACHE MISS pour match ${id} - calcul nécessaire`);
   const m=MATCHES.find(x=>x.id===id);
   
   // ⚠️ Vérifier que le match existe
@@ -3690,6 +3693,7 @@ function getMatchData(id){
   };
   
   matchCache[id] = data;
+  console.log(`✅ CACHE FILLED pour match ${id}`);
   return data;
 }
 
@@ -4059,6 +4063,7 @@ function viewAnalytics(){
    PAGE: DASHBOARD
    ============================================================ */
 function viewDashboard(){
+  console.log(`📊 viewDashboard() appelée`);
   const leagueOpts='<option value="all">Tous les championnats</option>'+
     Object.entries(LEAGUES).map(([k,v])=>`<option value="${k}" ${state.filterLeague===k?'selected':''}>${v.name}</option>`).join('');
   const matches=MATCHES.filter(m=>
@@ -4178,7 +4183,8 @@ async function openDetail(id){
           timestamp: Date.now()  // ⏰ Ajouter le timestamp
         };
         
-        // Afficher les cotes réelles sans vider le cache
+        // Invalider le cache et forcer le re-render
+        delete matchCache[id];
         render();
         toast('✅ Cotes réelles chargées');
       } else {
@@ -5621,6 +5627,8 @@ async function loadDashboardMatches() {
     }));
     
     MATCHES.splice(0, MATCHES.length, ...newMatches);
+    console.log(`🧹 CACHE VIDÉ dans loadDashboardMatches()!`);
+    matchCache = {};
     state.footballDataReady = true;
     toast(newMatches.length + ' match(s)');
     
@@ -5679,6 +5687,8 @@ async function loadAndApplyRealData() {
     });
   
   MATCHES.splice(0, MATCHES.length, ...upcomingMatches);
+  console.log(`🧹 CACHE VIDÉ dans loadAndApplyRealData()!`);
+  matchCache = {};
   
   alert('✅ Données Ligue 1 réelles chargées!\n\n' + 
     data.teams.length + ' équipes, ' + 
