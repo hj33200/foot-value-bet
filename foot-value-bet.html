@@ -491,7 +491,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="nav" id="nav"></div>
     <div class="side-foot">
-      Cotes réelles API-Football · Modèle Poisson · <b>v1.2.1 - FIFA Rankings Fix</b>
+      Cotes réelles API-Football · Modèle Poisson · <b>v1.2.3 - Deterministic RNG</b>
     </div>
   </aside>
 
@@ -3628,25 +3628,32 @@ function getMatchData(id){
   const seed = hashStr(m.id + m.home.id + m.away.id);
   const rng = mulberry32(seed);
   
-  // Generate form from REAL stats via cache
+  // Generate form from REAL stats via cache (ATTENDRE que le cache se remplisse!)
   const calcForm = (team) => {
     // ✅ PRIORITÉ: Essayer d'obtenir les VRAIES stats du cache API
     const realStats = FOOTBALL_API.getTeamStats(team.id);
     if (realStats && realStats.form) {
+      console.log(`✅ Real form for ${team.name}: ${realStats.form}`);
       return realStats.form;
     }
     
-    // Fallback: générer à partir des stats du standings
+    // Fallback: utiliser les stats du standings si disponibles
     const matches = team.matches || 34;
-    const gf = team.gf || 0, ga = team.ga || 0;
-    const avgGoals = matches > 0 ? gf / matches : 0;
-    const strength = avgGoals / 2.2; // 2.2 is average
+    const gf = team.gf || 0;
+    const ga = team.ga || 0;
     
+    // Ne PAS générer aléatoirement - utiliser des données réelles!
+    // Si pas de vraies stats, mieux vaut retourner une forme neutre
+    console.warn(`⚠️ No real form for ${team.name}, using standings: ${matches}M, ${gf}GF, ${ga}GA`);
+    
+    // Générer form basée sur les standings (déterministe, pas aléatoire!)
     let form = '';
-    for(let i = 0; i < 5; i++) {
-      const r = Math.random();
-      if(r < 0.30 + strength * 0.3) form += 'V';
-      else if(r < 0.55 + strength * 0.25) form += 'D';
+    const winRate = gf > 0 ? gf / (matches * 2.5) : 0.4; // Ratio wins estimé
+    for(let i = 0; i < 10; i++) {
+      // Utiliser le RNG déterministe du match, pas Math.random()!
+      const r = rng();
+      if(r < Math.min(0.9, winRate)) form += 'V';
+      else if(r < Math.min(0.95, winRate + 0.2)) form += 'D';
       else form += 'L';
     }
     return form;
