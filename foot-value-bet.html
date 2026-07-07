@@ -994,7 +994,22 @@ function calculateEloFromResults(teamName, form, gf, ga, matches, rank) {
   let elo = eloBase * (1 - confidence) + eloRaw * confidence;
   
   // 7️⃣ CLAMP [1200, 2000]
-  return clamp(elo, 1200, 2000);
+  const eloFinal = clamp(elo, 1200, 2000);
+  
+  // 🔍 LOGS DE DÉBOGAGE (à activer pour vérification)
+  console.log(`\n📊 === ELO CALCULATION: ${teamName} ===`);
+  console.log(`   Rank: ${rank}, Form: ${form}, GF: ${gf}, GA: ${ga}, Matches: ${matches}`);
+  console.log(`   1️⃣ Base Elo: ${eloBase.toFixed(2)}`);
+  console.log(`   2️⃣ Win Rate: ${(winRate*100).toFixed(1)}% (W:${winCount} D:${drawCount})`);
+  console.log(`   2️⃣ Performance Bonus: ${performanceBonus.toFixed(2)}`);
+  console.log(`   3️⃣ Avg GF/GA: ${avgGF.toFixed(2)}/${avgGA.toFixed(2)} → Diff: ${goalDiff.toFixed(2)}`);
+  console.log(`   3️⃣ Goals Bonus: ${goalsBonus.toFixed(2)}`);
+  console.log(`   4️⃣ Elo Raw: ${eloRaw.toFixed(2)}`);
+  console.log(`   5️⃣ Confidence: ${(confidence*100).toFixed(1)}%`);
+  console.log(`   6️⃣ Elo After Blend: ${elo.toFixed(2)}`);
+  console.log(`   7️⃣ Elo Final (clamped): ${eloFinal.toFixed(0)} ✅\n`);
+  
+  return eloFinal;
 }
 
 function getElo(teamId, teamName, form, gf, ga, matches, rank) {
