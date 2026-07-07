@@ -1507,7 +1507,7 @@ function calculateHalfTimeStats(teamId, lastMatches, sosValue = 1.0) {
   };
 }
 
-function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey='l1') {
+function calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey='l1', homeRank=50, awayRank=50) {
   
   // 🌍 DÉTECTER TYPE DE COMPÉTITION
   const leagueName = LEAGUES[leagueKey]?.name || 'Championnat';
@@ -1960,7 +1960,7 @@ function poissonProb(lambda, k) {
 function buildModel(home,away,homeForm,awayForm,rng,leagueKey='l1',homeRank=50,awayRank=50){
   try {
     // 🎯 UTILISER LE MODÈLE AVANCÉ POUR CALCULER LES LAMBDAS
-    const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey);
+    const advanced = calculateAdvancedProbabilities(home, away, homeForm, awayForm, leagueKey, homeRank, awayRank);
     if (!advanced) {
       console.error('❌ calculateAdvancedProbabilities retourné undefined!');
       return null;
