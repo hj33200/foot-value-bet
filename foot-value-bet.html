@@ -781,26 +781,7 @@ function getCompetitionProperties(competitionType) {
 }
 
 // 🌍 TABLE FIFA RANKINGS (mise à jour octobre 2024)
-const FIFA_RANKINGS = {
-  'Argentina': 1, 'France': 2, 'Brazil': 3, 'England': 4, 'Belgium': 5,
-  'Netherlands': 6, 'Portugal': 7, 'Spain': 8, 'Germany': 9, 'Italy': 10,
-  'Uruguay': 11, 'Mexico': 12, 'Denmark': 13, 'Croatia': 14, 'Poland': 15,
-  'USA': 16, 'Colombia': 17, 'Wales': 18, 'Senegal': 19, 'Switzerland': 20,
-  'Austria': 21, 'Czech Republic': 22, 'Serbia': 23, 'Turkey': 24, 'Ukraine': 25,
-  'Japan': 26, 'Morocco': 27, 'Ecuador': 28, 'Sweden': 29, 'Scotland': 30,
-  'Norway': 31, 'Romania': 32, 'Greece': 33, 'Slovakia': 34, 'Bosnia': 35,
-  'Iceland': 40, 'Peru': 24, 'Northern Ireland': 38, 'Ivory Coast': 53,
-  'Egypt': 42, 'Saudi Arabia': 51, 'Congo DR': 70, 'Mali': 85, 'Benin': 90,
-  'Sudan': 115, 'Gambia': 105, 'Azerbaijan': 110
-};
 
-// 🎯 Convertir ranking FIFA → Elo (linéaire)
-function rankingToElo(ranking) {
-  // Formule: Elo = 1850 - (ranking × 2.5)
-  // Rang 1 = 1850, Rang 50 = 1725, Rang 100 = 1600, Rang 200 = 1350
-  const elo = 1850 - (ranking * 2.5);
-  return clamp(elo, 1200, 1900);
-}
 
 // 🎯 Calculer la force d'une équipe (opponent strength) - SANS REQUÊTE
 function getOpponentStrength(teamId, teamName) {
