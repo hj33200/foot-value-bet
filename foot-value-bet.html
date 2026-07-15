@@ -309,6 +309,15 @@
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
         }
         
+        #search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+        
+        #search-btn:active {
+            transform: translateY(0);
+        }
+        
         .info-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -347,7 +356,7 @@
     <div class="page active" id="dashboard">
         <h1 class="page-title">Dashboard</h1>
         
-        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 40px; display: grid; grid-template-columns: 1fr 1fr 120px; gap: 20px; align-items: flex-end;">
             <div>
                 <label style="display: block; margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600;">Championnat</label>
                 <select id="filter-league" style="width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;">
@@ -376,6 +385,9 @@
                     <div id="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center;"></div>
                 </div>
             </div>
+            <button id="search-btn" style="padding: 12px 24px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border: none; border-radius: 8px; color: var(--bg-dark); font-weight: 700; cursor: pointer; transition: all 0.3s; font-size: 14px;">
+                🔍 Rechercher
+            </button>
         </div>
         
         <div class="section-title">Matchs Disponibles</div>
@@ -827,11 +839,13 @@
             // Set today's date
             document.getElementById('filter-date').value = filters.date;
             
-            // Listen to league changes
+            // Listen to league changes (auto-search disabled, now needs button click)
             document.getElementById('filter-league').addEventListener('change', (e) => {
                 filters.league = e.target.value;
-                loadMatches();
             });
+            
+            // Listen to search button
+            document.getElementById('search-btn').addEventListener('click', loadMatches);
             
             // Listen to date picker
             document.getElementById('filter-date').addEventListener('click', toggleDatePicker);
