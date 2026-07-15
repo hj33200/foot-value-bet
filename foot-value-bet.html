@@ -729,11 +729,17 @@
         async function loadMatches() {
             try {
                 const leagueId = filters.league === 'all' ? 140 : filters.league;
-                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&season=2025&date=${filters.date}&league=${leagueId}`;
+                
+                // Extraire l'année de la date sélectionnée pour la saison
+                const selectedYear = filters.date.split('-')[0];
+                const season = selectedYear; // Utiliser l'année de la date comme saison
+                
+                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&season=${season}&date=${filters.date}&league=${leagueId}`;
                 
                 document.getElementById('matches-list').innerHTML = '<div class="loading">⏳ Chargement des matchs...</div>';
                 
                 console.log('🔗 URL API:', url);
+                console.log('📅 Date:', filters.date, '| Saison:', season, '| Ligue:', leagueId);
                 
                 const response = await fetch(url);
                 console.log('📊 Réponse status:', response.status);
