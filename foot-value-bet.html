@@ -834,51 +834,67 @@
         function getEloWithSOS(teamId, teamName, form, gf, ga, matches, rank, sosElo) {
             return calculateEloFromResultsWithSOS(teamName, form, gf, ga, matches, rank, sosElo);
         }
-        async function getTeamLastMatches(teamId) {
+        async function getTeamLastMatches(teamId, leagueId) {
             try {
-                // Utiliser &last=10 pour les X derniers matchs
-                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&last=10`;
-                
-                console.log(`   🔗 Récupère les 10 derniers matchs pour équipe ${teamId}`);
+                // Utiliser l'endpoint /standings qui inclut la form de chaque équipe
+                const url = `${PROXY_URL}?endpoint=/standings&apikey=${API_KEY}&season=2026&league=${leagueId}`;
                 
                 const response = await fetch(url);
                 
                 if (!response.ok) {
-                    console.warn(`   ⚠️ Erreur HTTP ${response.status} pour équipe ${teamId}`);
+                    console.warn(`   ⚠️ Erreur HTTP ${response.status} pour standings ligue ${leagueId}`);
                     return [];
                 }
                 
                 const data = await response.json();
                 
-                if (!data.response || data.response.length === 0) {
-                    console.log(`   ⚠️ Aucun match trouvé pour équipe ${teamId}`);
+                if (!data.response || !Array.isArray(data.response)) {
+                    console.log(`   ⚠️ Aucun standing trouvé pour ligue ${leagueId}`);
                     return [];
                 }
                 
-                // Filtrer: garder SEULEMENT les matchs avec résultats
-                const matchesWithResults = data.response.filter(m => 
-                    m.goals.home !== null && m.goals.away !== null
-                );
+                // Chercher l'équipe dans les standings
+                let teamStats = null;
+                for (let group of data.response) {
+                    if (group.group) {
+                        for (let team of group.standings) {
+                            if (team.team.id === teamId) {
+                                teamStats = team;
+                                break;
+                            }
+                        }
+                    } else {
+                        for (let team of group) {
+                            if (team.team.id === teamId) {
+                                teamStats = team;
+                                break;
+                            }
+                        }
+                    }
+                    if (teamStats) break;
+                }
                 
-                if (matchesWithResults.length === 0) {
-                    console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
+                if (!teamStats) {
+                    console.log(`   ⚠️ Équipe ${teamId} non trouvée dans standings ligue ${leagueId}`);
                     return [];
                 }
                 
-                // Trier par date CROISSANTE (ancien → récent)
-                const sorted = matchesWithResults.sort((a, b) => {
-                    return new Date(a.fixture.date) - new Date(b.fixture.date);
-                });
+                // Récupérer la form (ex: "WDVDL")
+                const form = teamStats.form || '';
+                const played = teamStats.all?.played || 0;
+                const gf = teamStats.all?.goals?.for || 0;
+                const ga = teamStats.all?.goals?.against || 0;
                 
-                // Prendre les 10 DERNIERS (slice(-10) = 10 derniers)
-                const last10 = sorted.slice(-10);
+                console.log(`   ✅ Équipe ${teamId} (ligue ${leagueId}): Form=${form}, ${played}M, ${gf}GF, ${ga}GA`);
                 
-                console.log(`   ✅ Équipe ${teamId}: ${last10.length} derniers matchs (${sorted.length} avec résultats)`);
-                console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
-                
-                return last10;
+                // Retourner un objet "fictif" pour que calculateTeamStats marche
+                // On retourne un tableau de 1 élément avec les stats
+                return [{
+                    form: form,
+                    stats: { gf, ga, played }
+                }];
             } catch (error) {
-                console.error(`   ❌ Erreur stats équipe ${teamId}:`, error);
+                console.error(`   ❌ Erreur standings équipe ${teamId}:`, error);
                 return [];
             }
         }
@@ -1116,24 +1132,51 @@ Vérifie:
                 console.log(`\n⚽ === MATCH ${idx + 1}: ${match.teams.home.name} vs ${match.teams.away.name} ===`);
                 
                 // Get last matches and stats
-                const homeMatches = await getTeamLastMatches(homeId);
-                const awayMatches = await getTeamLastMatches(awayId);
+                const leagueId = match.league.id;
+                const homeStandingsData = await getTeamLastMatches(homeId, leagueId);
+                const awayStandingsData = await getTeamLastMatches(awayId, leagueId);
                 
-                console.log(`   📥 ${match.teams.home.name}: ${homeMatches.length} derniers matchs`);
-                console.log(`   📥 ${match.teams.away.name}: ${awayMatches.length} derniers matchs`);
+                // Extraire form et stats directement
+                let homeForm = 'N/A';
+                let homeStats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: 0 };
+                let awayForm = 'N/A';
+                let awayStats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: 0 };
                 
-                const homeStats = calculateTeamStats(homeMatches, homeId);
-                const awayStats = calculateTeamStats(awayMatches, awayId);
+                if (homeStandingsData.length > 0) {
+                    const homeData = homeStandingsData[0];
+                    homeForm = homeData.form || 'N/A';
+                    if (homeData.stats) {
+                        homeStats = {
+                            gf: homeData.stats.gf || 0,
+                            ga: homeData.stats.ga || 0,
+                            w: 0, d: 0, l: 0,
+                            matches: homeData.stats.played || 0
+                        };
+                    }
+                }
                 
-                const homeForm = calculateForm(homeMatches, homeId);
-                const awayForm = calculateForm(awayMatches, awayId);
+                if (awayStandingsData.length > 0) {
+                    const awayData = awayStandingsData[0];
+                    awayForm = awayData.form || 'N/A';
+                    if (awayData.stats) {
+                        awayStats = {
+                            gf: awayData.stats.gf || 0,
+                            ga: awayData.stats.ga || 0,
+                            w: 0, d: 0, l: 0,
+                            matches: awayData.stats.played || 0
+                        };
+                    }
+                }
+                
+                console.log(`   📥 ${match.teams.home.name}: Form=${homeForm}`);
+                console.log(`   📥 ${match.teams.away.name}: Form=${awayForm}`);
                 
                 console.log(`   📊 ${match.teams.home.name}: ${homeStats.gf}BM, ${homeStats.ga}BE, Form: ${homeForm}`);
                 console.log(`   📊 ${match.teams.away.name}: ${awayStats.gf}BM, ${awayStats.ga}BE, Form: ${awayForm}`);
                 
-                // Calculate Strength of Schedule
-                const homeSOS = calculateSOS(homeMatches, homeId);
-                const awaySOS = calculateSOS(awayMatches, awayId);
+                // Calculate Strength of Schedule (SOS moyens par défaut)
+                const homeSOS = 1600;
+                const awaySOS = 1600;
                 
                 // Get real FIFA rankings
                 const homeRank = getRankingByTeamName(match.teams.home.name);
@@ -1197,20 +1240,47 @@ Vérifie:
             const match = matchesData[idx];
             const homeId = match.teams.home.id;
             const awayId = match.teams.away.id;
+            const leagueId = match.league.id;
             
-            // Get stats
-            const homeMatches = await getTeamLastMatches(homeId);
-            const awayMatches = await getTeamLastMatches(awayId);
+            // Get stats from standings
+            const homeStandingsData = await getTeamLastMatches(homeId, leagueId);
+            const awayStandingsData = await getTeamLastMatches(awayId, leagueId);
             
-            const homeStats = calculateTeamStats(homeMatches, homeId);
-            const awayStats = calculateTeamStats(awayMatches, awayId);
+            // Extraire form et stats directement
+            let homeForm = 'N/A';
+            let homeStats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: 0 };
+            let awayForm = 'N/A';
+            let awayStats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: 0 };
             
-            const homeForm = calculateForm(homeMatches, homeId);
-            const awayForm = calculateForm(awayMatches, awayId);
+            if (homeStandingsData.length > 0) {
+                const homeData = homeStandingsData[0];
+                homeForm = homeData.form || 'N/A';
+                if (homeData.stats) {
+                    homeStats = {
+                        gf: homeData.stats.gf || 0,
+                        ga: homeData.stats.ga || 0,
+                        w: 0, d: 0, l: 0,
+                        matches: homeData.stats.played || 0
+                    };
+                }
+            }
             
-            // Calculate Strength of Schedule
-            const homeSOS = calculateSOS(homeMatches, homeId);
-            const awaySOS = calculateSOS(awayMatches, awayId);
+            if (awayStandingsData.length > 0) {
+                const awayData = awayStandingsData[0];
+                awayForm = awayData.form || 'N/A';
+                if (awayData.stats) {
+                    awayStats = {
+                        gf: awayData.stats.gf || 0,
+                        ga: awayData.stats.ga || 0,
+                        w: 0, d: 0, l: 0,
+                        matches: awayData.stats.played || 0
+                    };
+                }
+            }
+            
+            // Calculate Strength of Schedule (simplified - pas de matchs disponibles)
+            const homeSOS = 1600;  // SOS moyen
+            const awaySOS = 1600;
             
             // Get real FIFA rankings
             const homeRank = getRankingByTeamName(match.teams.home.name);
@@ -1219,30 +1289,6 @@ Vérifie:
             // Calculate ELO with SOS adjustment (using real FIFA ranks)
             const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, homeRank, homeSOS);
             const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, awayRank, awaySOS);
-            
-            // Format last matches
-            const formatMatches = (matches, teamId) => {
-                if (!matches || matches.length === 0) return '<tr><td colspan="5">Aucun match</td></tr>';
-                return matches.map(m => {
-                    const isHome = m.teams.home.id === teamId;
-                    const opponent = isHome ? m.teams.away.name : m.teams.home.name;
-                    const goalsFor = isHome ? m.goals.home : m.goals.away;
-                    const goalsAgainst = isHome ? m.goals.away : m.goals.home;
-                    let result = '?';
-                    if (goalsFor > goalsAgainst) result = 'V';
-                    else if (goalsFor === goalsAgainst) result = 'D';
-                    else result = 'L';
-                    
-                    return `
-                        <tr style="border-bottom: 1px solid var(--border);">
-                            <td style="padding: 8px; font-size: 12px; color: var(--text-secondary);">${new Date(m.fixture.date).toLocaleDateString('fr-FR')}</td>
-                            <td style="padding: 8px; font-size: 12px;">${opponent}</td>
-                            <td style="padding: 8px; font-size: 12px; text-align: center;">${goalsFor}:${goalsAgainst}</td>
-                            <td style="padding: 8px; text-align: center; font-weight: 700; font-size: 13px; color: ${result === 'V' ? 'var(--primary)' : result === 'D' ? 'var(--accent)' : '#ff6b6b'};">${result}</td>
-                        </tr>
-                    `;
-                }).join('');
-            };
             
             const html = `
                 <div class="matches-grid">
@@ -1298,45 +1344,6 @@ Vérifie:
                                         <div style="margin-top: 5px;">${awayStats.w}V - ${awayStats.d}D - ${awayStats.l}L</div>
                                         <div style="color: var(--secondary); font-weight: 600; margin-top: 5px;">Moy: ${(awayStats.gf / awayStats.matches).toFixed(2)} buts/match</div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
-                            <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">📋 10 DERNIERS MATCHS</h3>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                                <div>
-                                    <h4 style="color: var(--primary); margin-bottom: 10px; font-size: 12px;">${match.teams.home.name} (${homeMatches.length} matchs)</h4>
-                                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                                        <thead style="background: rgba(16, 185, 129, 0.1);">
-                                            <tr>
-                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Date</th>
-                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Adversaire</th>
-                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Score</th>
-                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Rés.</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${formatMatches(homeMatches, homeId)}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div>
-                                    <h4 style="color: var(--secondary); margin-bottom: 10px; font-size: 12px;">${match.teams.away.name} (${awayMatches.length} matchs)</h4>
-                                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                                        <thead style="background: rgba(6, 182, 212, 0.1);">
-                                            <tr>
-                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Date</th>
-                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Adversaire</th>
-                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Score</th>
-                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Rés.</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${formatMatches(awayMatches, awayId)}
-                                        </tbody>
-                                    </table>
                                 </div>
                             </div>
                         </div>
