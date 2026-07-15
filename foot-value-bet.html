@@ -829,9 +829,15 @@
         function getEloWithSOS(teamId, teamName, form, gf, ga, matches, rank, sosElo) {
             return calculateEloFromResultsWithSOS(teamName, form, gf, ga, matches, rank, sosElo);
         }
-        async function getTeamLastMatches(teamId, leagueId) {
+        async function getTeamLastMatches(teamId, matchDate) {
             try {
-                const season = new Date().getFullYear();
+                // Calculer la saison en fonction de la date du match
+                const matchYear = new Date(matchDate).getFullYear();
+                const matchMonth = new Date(matchDate).getMonth() + 1;
+                
+                // Saison: si match avant juillet = saison précédente, sinon saison courante
+                const season = matchMonth < 7 ? matchYear - 1 : matchYear;
+                
                 const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&season=${season}&team=${teamId}&last=10`;
                 const response = await fetch(url);
                 const data = await response.json();
@@ -846,10 +852,11 @@
                     // Prendre seulement les 10 derniers
                     const last10 = sorted.slice(0, 10);
                     
-                    console.log(`   📥 Équipe ${teamId}: ${last10.length} matchs (dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')})`);
+                    console.log(`   📥 Équipe ${teamId}: ${last10.length} matchs en saison ${season} (dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')})`);
                     
                     return last10;
                 }
+                console.log(`   ⚠️ Aucun match trouvé pour équipe ${teamId} en saison ${season}`);
                 return [];
             } catch (error) {
                 console.error('Erreur stats équipe:', error);
@@ -1090,8 +1097,8 @@ Vérifie:
                 console.log(`\n⚽ === MATCH ${idx + 1}: ${match.teams.home.name} vs ${match.teams.away.name} ===`);
                 
                 // Get last matches and stats
-                const homeMatches = await getTeamLastMatches(homeId);
-                const awayMatches = await getTeamLastMatches(awayId);
+                const homeMatches = await getTeamLastMatches(homeId, match.fixture.date);
+                const awayMatches = await getTeamLastMatches(awayId, match.fixture.date);
                 
                 console.log(`   📥 ${match.teams.home.name}: ${homeMatches.length} derniers matchs`);
                 console.log(`   📥 ${match.teams.away.name}: ${awayMatches.length} derniers matchs`);
@@ -1173,8 +1180,8 @@ Vérifie:
             const awayId = match.teams.away.id;
             
             // Get stats
-            const homeMatches = await getTeamLastMatches(homeId);
-            const awayMatches = await getTeamLastMatches(awayId);
+            const homeMatches = await getTeamLastMatches(homeId, match.fixture.date);
+            const awayMatches = await getTeamLastMatches(awayId, match.fixture.date);
             
             const homeStats = calculateTeamStats(homeMatches, homeId);
             const awayStats = calculateTeamStats(awayMatches, awayId);
