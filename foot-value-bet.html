@@ -679,14 +679,16 @@
             return eloFinal;
         }
         
-        // Calculate average opponent ELO (Strength of Schedule)
+        // Calculate average opponent ELO (Strength of Schedule) from last 10 matches
         function calculateSOS(matches, teamId) {
             if (!matches || matches.length === 0) return 1600;
             
+            // Limiter à 10 matchs
+            const last10 = matches.slice(0, 10);
             let totalOpponentElo = 0;
             let count = 0;
             
-            matches.forEach(match => {
+            last10.forEach(match => {
                 const isHome = match.teams.home.id === teamId;
                 const opponent = isHome ? match.teams.away : match.teams.home;
                 
@@ -697,7 +699,7 @@
             });
             
             const sosElo = count > 0 ? totalOpponentElo / count : 1600;
-            console.log(`   📊 SOS pour équipe ${teamId}: ${sosElo.toFixed(0)} (${count} matchs)`);
+            console.log(`   📊 SOS pour équipe ${teamId}: ${sosElo.toFixed(0)} (${count} matchs max 10)`);
             return sosElo;
         }
         
@@ -801,13 +803,16 @@
             }
         }
         
-        // Calculate form from last matches
+        // Calculate form from last 10 matches
         function calculateForm(matches, teamId) {
             if (!matches || matches.length === 0) return 'N/A';
             
+            // Limiter à 10 matchs
+            const last10 = matches.slice(0, 10);
             let form = '';
-            for (let i = 0; i < Math.min(10, matches.length); i++) {
-                const match = matches[i];
+            
+            for (let i = 0; i < last10.length; i++) {
+                const match = last10[i];
                 const isHome = match.teams.home.id === teamId;
                 const goalsFor = isHome ? match.goals.home : match.goals.away;
                 const goalsAgainst = isHome ? match.goals.away : match.goals.home;
@@ -819,11 +824,13 @@
             return form || 'N/A';
         }
         
-        // Calculate basic stats from last matches
+        // Calculate basic stats from last 10 matches
         function calculateTeamStats(matches, teamId) {
-            let stats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: matches.length };
+            // Limiter à 10 matchs
+            const last10 = matches.slice(0, 10);
+            let stats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: last10.length };
             
-            matches.forEach(match => {
+            last10.forEach(match => {
                 const isHome = match.teams.home.id === teamId;
                 const goalsFor = isHome ? match.goals.home : match.goals.away;
                 const goalsAgainst = isHome ? match.goals.away : match.goals.home;
@@ -1090,6 +1097,30 @@ Vérifie:
             const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, 50, homeSOS);
             const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, 50, awaySOS);
             
+            // Format last matches
+            const formatMatches = (matches, teamId) => {
+                if (!matches || matches.length === 0) return '<tr><td colspan="5">Aucun match</td></tr>';
+                return matches.map(m => {
+                    const isHome = m.teams.home.id === teamId;
+                    const opponent = isHome ? m.teams.away.name : m.teams.home.name;
+                    const goalsFor = isHome ? m.goals.home : m.goals.away;
+                    const goalsAgainst = isHome ? m.goals.away : m.goals.home;
+                    let result = '?';
+                    if (goalsFor > goalsAgainst) result = 'V';
+                    else if (goalsFor === goalsAgainst) result = 'D';
+                    else result = 'L';
+                    
+                    return `
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-size: 12px; color: var(--text-secondary);">${new Date(m.fixture.date).toLocaleDateString('fr-FR')}</td>
+                            <td style="padding: 8px; font-size: 12px;">${opponent}</td>
+                            <td style="padding: 8px; font-size: 12px; text-align: center;">${goalsFor}:${goalsAgainst}</td>
+                            <td style="padding: 8px; text-align: center; font-weight: 700; font-size: 13px; color: ${result === 'V' ? 'var(--primary)' : result === 'D' ? 'var(--accent)' : '#ff6b6b'};">${result}</td>
+                        </tr>
+                    `;
+                }).join('');
+            };
+            
             const html = `
                 <div class="matches-grid">
                     <div class="match-card" style="grid-column: 1/-1;">
@@ -1144,6 +1175,45 @@ Vérifie:
                                         <div style="margin-top: 5px;">${awayStats.w}V - ${awayStats.d}D - ${awayStats.l}L</div>
                                         <div style="color: var(--secondary); font-weight: 600; margin-top: 5px;">Moy: ${(awayStats.gf / awayStats.matches).toFixed(2)} buts/match</div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
+                            <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">📋 10 DERNIERS MATCHS</h3>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                <div>
+                                    <h4 style="color: var(--primary); margin-bottom: 10px; font-size: 12px;">${match.teams.home.name} (${homeMatches.length} matchs)</h4>
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                        <thead style="background: rgba(16, 185, 129, 0.1);">
+                                            <tr>
+                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Date</th>
+                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Adversaire</th>
+                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Score</th>
+                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Rés.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${formatMatches(homeMatches, homeId)}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div>
+                                    <h4 style="color: var(--secondary); margin-bottom: 10px; font-size: 12px;">${match.teams.away.name} (${awayMatches.length} matchs)</h4>
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                        <thead style="background: rgba(6, 182, 212, 0.1);">
+                                            <tr>
+                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Date</th>
+                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Adversaire</th>
+                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Score</th>
+                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Rés.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${formatMatches(awayMatches, awayId)}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
