@@ -634,6 +634,9 @@
             document.getElementById('max-odds').value = settings.maxOdds;
         }
         
+        // Utility functions - MUST BE FIRST
+        const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+        
         // FIFA Rankings table
         const FIFA_RANKINGS = {
             'Argentina': 1, 'Spain': 2, 'France': 3, 'England': 4, 'Portugal': 5,
