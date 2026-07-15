@@ -407,7 +407,7 @@
         <h1 class="page-title">Paramètres</h1>
         
         <div class="content-box" style="text-align: left; padding: 30px;">
-            <h3 style="color: var(--primary); margin-bottom: 20px;">Configuration</h3>
+            <h3 style="color: var(--primary); margin-bottom: 30px; font-size: 18px;">⚙️ Configuration API</h3>
             
             <div style="margin-bottom: 20px;">
                 <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 13px;">API Key</label>
@@ -419,7 +419,63 @@
                 <input type="text" id="proxy-url" value="https://foot-value-bet.vercel.app/api/proxy" style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary);">
             </div>
             
-            <button style="padding: 12px 24px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border: none; border-radius: 8px; color: var(--bg-dark); font-weight: 600; cursor: pointer; margin-top: 20px;">Enregistrer</button>
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 40px 0;">
+            
+            <h3 style="color: var(--primary); margin-bottom: 30px; font-size: 18px;">💰 Gestion de Bankroll</h3>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 13px;">Bankroll Total (€)</label>
+                <input type="number" id="bankroll" value="1000" style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary);">
+                <small style="color: var(--text-secondary); font-size: 11px; margin-top: 5px; display: block;">Montant total disponible pour les paris</small>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 13px;">% Kelly Criterion</label>
+                <select id="kelly-fraction" style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary);">
+                    <option value="0.25">25% Kelly (Très conservateur)</option>
+                    <option value="0.5">50% Kelly (Conservateur)</option>
+                    <option value="0.75">75% Kelly (Modéré)</option>
+                    <option value="1" selected>100% Kelly (Optimal)</option>
+                    <option value="1.5">150% Kelly (Agressif)</option>
+                </select>
+                <small style="color: var(--text-secondary); font-size: 11px; margin-top: 5px; display: block;">Contrôle l'agressivité des mises par rapport au Kelly optimal</small>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 13px;">Mise Minimale (€)</label>
+                <input type="number" id="min-bet" value="5" step="0.5" style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary);">
+                <small style="color: var(--text-secondary); font-size: 11px; margin-top: 5px; display: block;">Montant minimum d'une mise</small>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 13px;">Mise Maximale (€)</label>
+                <input type="number" id="max-bet" value="100" step="5" style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary);">
+                <small style="color: var(--text-secondary); font-size: 11px; margin-top: 5px; display: block;">Montant maximum d'une mise</small>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 40px 0;">
+            
+            <h3 style="color: var(--primary); margin-bottom: 30px; font-size: 18px;">📊 Filtres de Sélection</h3>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 13px;">Valeur Minimale (%)</label>
+                <input type="number" id="min-value" value="5" step="1" style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary);">
+                <small style="color: var(--text-secondary); font-size: 11px; margin-top: 5px; display: block;">Afficher uniquement les paris avec au moins X% de valeur</small>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 13px;">Cote Minimale</label>
+                <input type="number" id="min-odds" value="1.5" step="0.1" style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary);">
+                <small style="color: var(--text-secondary); font-size: 11px; margin-top: 5px; display: block;">Cote minimale des paris</small>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 13px;">Cote Maximale</label>
+                <input type="number" id="max-odds" value="5.0" step="0.1" style="width: 100%; padding: 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary);">
+                <small style="color: var(--text-secondary); font-size: 11px; margin-top: 5px; display: block;">Cote maximale des paris</small>
+            </div>
+            
+            <button style="padding: 12px 24px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border: none; border-radius: 8px; color: var(--bg-dark); font-weight: 600; cursor: pointer; margin-top: 30px; width: 100%;">Enregistrer les paramètres</button>
         </div>
     </div>
     
@@ -457,6 +513,68 @@
         
         let matchesData = [];
         
+        // Settings object
+        const settings = {
+            bankroll: 1000,
+            kellyFraction: 1,
+            minBet: 5,
+            maxBet: 100,
+            minValue: 5,
+            minOdds: 1.5,
+            maxOdds: 5.0
+        };
+        
+        // Load settings from localStorage
+        function loadSettings() {
+            const saved = localStorage.getItem('footValueBetSettings');
+            if (saved) {
+                Object.assign(settings, JSON.parse(saved));
+                updateSettingsUI();
+            }
+        }
+        
+        // Save settings to localStorage
+        function saveSettings() {
+            settings.bankroll = parseFloat(document.getElementById('bankroll').value);
+            settings.kellyFraction = parseFloat(document.getElementById('kelly-fraction').value);
+            settings.minBet = parseFloat(document.getElementById('min-bet').value);
+            settings.maxBet = parseFloat(document.getElementById('max-bet').value);
+            settings.minValue = parseFloat(document.getElementById('min-value').value);
+            settings.minOdds = parseFloat(document.getElementById('min-odds').value);
+            settings.maxOdds = parseFloat(document.getElementById('max-odds').value);
+            
+            localStorage.setItem('footValueBetSettings', JSON.stringify(settings));
+            alert('✅ Paramètres enregistrés!');
+        }
+        
+        // Update UI with saved settings
+        function updateSettingsUI() {
+            document.getElementById('bankroll').value = settings.bankroll;
+            document.getElementById('kelly-fraction').value = settings.kellyFraction;
+            document.getElementById('min-bet').value = settings.minBet;
+            document.getElementById('max-bet').value = settings.maxBet;
+            document.getElementById('min-value').value = settings.minValue;
+            document.getElementById('min-odds').value = settings.minOdds;
+            document.getElementById('max-odds').value = settings.maxOdds;
+        }
+        
+        // Calculate Kelly bet size
+        function calculateKellyBet(probability, odds) {
+            // Kelly formula: f* = (b*p - q) / b
+            // where p = probability, q = 1-p, b = odds-1
+            const b = odds - 1;
+            const p = probability;
+            const q = 1 - p;
+            
+            const kellyFraction = (b * p - q) / b;
+            const adjustedFraction = kellyFraction * settings.kellyFraction;
+            
+            let betSize = settings.bankroll * adjustedFraction;
+            betSize = Math.max(settings.minBet, Math.min(betSize, settings.maxBet));
+            
+            return Math.round(betSize * 100) / 100;
+        }
+        
         // Switch pages
         function switchPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -464,6 +582,12 @@
             
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
             event.target.closest('.nav-item').classList.add('active');
+            
+            if (pageId === 'parametres') {
+                loadSettings();
+                const saveBtn = document.querySelector('#parametres button');
+                saveBtn.addEventListener('click', saveSettings);
+            }
         }
         
         // Load matches from API
