@@ -837,9 +837,10 @@
                 const data = await response.json();
                 
                 if (data.response && data.response.length > 0) {
-                    // TRIER par date décroissante (les plus récents d'abord)
+                    // TRIER par date CROISSANTE (plus ANCIENS d'abord)
+                    // Parce que on veut lire: ancien → récent
                     const sorted = data.response.sort((a, b) => {
-                        return new Date(b.fixture.date) - new Date(a.fixture.date);
+                        return new Date(a.fixture.date) - new Date(b.fixture.date);
                     });
                     
                     // Prendre seulement les 10 derniers
