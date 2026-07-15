@@ -771,7 +771,12 @@
         
         // Calculate ELO with SOS adjustment
         function calculateEloFromResultsWithSOS(teamName, form, gf, ga, matches, rank, sosElo) {
-            if (!form || form.length === 0) return rankingToElo(rank || 50);
+            // FALLBACK: Si pas de matchs trouvés, retourner ELO de base
+            if (!form || form.length === 0 || matches === 0) {
+                const eloBase = rankingToElo(rank || 50);
+                console.log(`   ⚠️ FALLBACK: Pas de form trouvée, utiliser ELO Base (rank ${rank}) = ${eloBase.toFixed(0)}`);
+                return eloBase;
+            }
             
             console.log(`\n🔍 === CALCUL ELO: ${teamName} ===`);
             console.log(`   📋 Données: Form=${form}, GF=${gf}, GA=${ga}, Matches=${matches}, Rank FIFA=${rank}`);
@@ -829,45 +834,51 @@
         function getEloWithSOS(teamId, teamName, form, gf, ga, matches, rank, sosElo) {
             return calculateEloFromResultsWithSOS(teamName, form, gf, ga, matches, rank, sosElo);
         }
-        async function getTeamLastMatches(teamId, matchDate) {
+        async function getTeamLastMatches(teamId) {
             try {
-                // Utiliser une plage de dates pour récupérer TOUS les matchs
-                // au lieu de &last=10 qui peut être incomplet
-                const fromDate = '2023-01-01';
-                const toDate = '2026-12-31';
+                // Utiliser &last=10 pour les X derniers matchs
+                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&last=10`;
                 
-                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&from=${fromDate}&to=${toDate}`;
+                console.log(`   🔗 Récupère les 10 derniers matchs pour équipe ${teamId}`);
+                
                 const response = await fetch(url);
+                
+                if (!response.ok) {
+                    console.warn(`   ⚠️ Erreur HTTP ${response.status} pour équipe ${teamId}`);
+                    return [];
+                }
+                
                 const data = await response.json();
                 
-                if (data.response && data.response.length > 0) {
-                    // Filtrer: garder SEULEMENT les matchs avec résultats
-                    const matchesWithResults = data.response.filter(m => 
-                        m.goals.home !== null && m.goals.away !== null
-                    );
-                    
-                    if (matchesWithResults.length === 0) {
-                        console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
-                        return [];
-                    }
-                    
-                    // Trier par date CROISSANTE (ancien → récent)
-                    const sorted = matchesWithResults.sort((a, b) => {
-                        return new Date(a.fixture.date) - new Date(b.fixture.date);
-                    });
-                    
-                    // Prendre les 10 DERNIERS (slice(-10) = 10 derniers)
-                    const last10 = sorted.slice(-10);
-                    
-                    console.log(`   📥 Équipe ${teamId}: ${last10.length} derniers matchs (${sorted.length} total)`);
-                    console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
-                    
-                    return last10;
+                if (!data.response || data.response.length === 0) {
+                    console.log(`   ⚠️ Aucun match trouvé pour équipe ${teamId}`);
+                    return [];
                 }
-                console.log(`   ⚠️ Aucun match trouvé pour équipe ${teamId}`);
-                return [];
+                
+                // Filtrer: garder SEULEMENT les matchs avec résultats
+                const matchesWithResults = data.response.filter(m => 
+                    m.goals.home !== null && m.goals.away !== null
+                );
+                
+                if (matchesWithResults.length === 0) {
+                    console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
+                    return [];
+                }
+                
+                // Trier par date CROISSANTE (ancien → récent)
+                const sorted = matchesWithResults.sort((a, b) => {
+                    return new Date(a.fixture.date) - new Date(b.fixture.date);
+                });
+                
+                // Prendre les 10 DERNIERS (slice(-10) = 10 derniers)
+                const last10 = sorted.slice(-10);
+                
+                console.log(`   ✅ Équipe ${teamId}: ${last10.length} derniers matchs (${sorted.length} avec résultats)`);
+                console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
+                
+                return last10;
             } catch (error) {
-                console.error('Erreur stats équipe:', error);
+                console.error(`   ❌ Erreur stats équipe ${teamId}:`, error);
                 return [];
             }
         }
