@@ -729,19 +729,44 @@
         async function loadMatches() {
             try {
                 const leagueId = filters.league === 'all' ? 140 : filters.league;
-                const response = await fetch(`${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&season=2025&date=${filters.date}&league=${leagueId}`);
-                const data = await response.json();
+                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&season=2025&date=${filters.date}&league=${leagueId}`;
                 
-                if (data.response) {
+                document.getElementById('matches-list').innerHTML = '<div class="loading">⏳ Chargement des matchs...</div>';
+                
+                console.log('🔗 URL API:', url);
+                
+                const response = await fetch(url);
+                console.log('📊 Réponse status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`Erreur API: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('📈 Données reçues:', data);
+                
+                if (data.response && data.response.length > 0) {
                     matchesData = data.response.slice(0, 15);
                     displayMatches();
                     updateAnalytics();
+                    console.log('✅ Matchs affichés:', matchesData.length);
                 } else {
-                    document.getElementById('matches-list').innerHTML = '<div class="loading">Aucun match disponible pour cette date</div>';
+                    document.getElementById('matches-list').innerHTML = '<div class="loading">❌ Aucun match disponible pour cette date et ce championnat</div>';
+                    console.log('⚠️ Pas de matchs trouvés');
                 }
             } catch (error) {
-                console.error('Erreur API:', error);
-                document.getElementById('matches-list').innerHTML = '<div class="loading">Erreur lors du chargement des matchs</div>';
+                console.error('❌ Erreur complète:', error);
+                document.getElementById('matches-list').innerHTML = `
+                    <div class="loading" style="color: #ff6b6b; text-align: left; white-space: pre-wrap; font-size: 12px;">
+                        ❌ Erreur: ${error.message}
+                        
+Vérifie:
+1. La date sélectionnée
+2. Le championnat choisi
+3. La connexion internet
+4. Le proxy API
+                    </div>
+                `;
             }
         }
         
