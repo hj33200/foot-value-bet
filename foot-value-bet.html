@@ -352,12 +352,16 @@
                 <label style="display: block; margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600;">Championnat</label>
                 <select id="filter-league" style="width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;">
                     <option value="all">Tous les championnats</option>
+                    <option value="1">🌍 Coupe du Monde 2026</option>
                     <option value="140">Ligue 1 (France)</option>
+                    <option value="61">Premier League (Angleterre)</option>
                     <option value="135">Serie A (Italie)</option>
-                    <option value="39">Serie A TIM (Italie)</option>
                     <option value="78">Bundesliga (Allemagne)</option>
-                    <option value="61">Ligue 1 (France)</option>
+                    <option value="39">La Liga (Espagne)</option>
                     <option value="2">UEFA Champions League</option>
+                    <option value="48">Coupe de France</option>
+                    <option value="50">Coupe d'Angleterre (FA Cup)</option>
+                    <option value="82">Coppa Italia</option>
                 </select>
             </div>
             <div>
@@ -572,12 +576,16 @@
         // League mapping
         const LEAGUES = {
             'all': { id: null, name: 'Tous les championnats' },
+            '1': { id: 1, name: 'Coupe du Monde 2026' },
             '140': { id: 140, name: 'Ligue 1 (France)' },
+            '61': { id: 61, name: 'Premier League (Angleterre)' },
             '135': { id: 135, name: 'Serie A (Italie)' },
-            '39': { id: 39, name: 'Serie A TIM (Italie)' },
             '78': { id: 78, name: 'Bundesliga (Allemagne)' },
-            '61': { id: 61, name: 'Ligue 1' },
-            '2': { id: 2, name: 'UEFA Champions League' }
+            '39': { id: 39, name: 'La Liga (Espagne)' },
+            '2': { id: 2, name: 'UEFA Champions League' },
+            '48': { id: 48, name: 'Coupe de France' },
+            '50': { id: 50, name: 'Coupe d\'Angleterre (FA Cup)' },
+            '82': { id: 82, name: 'Coppa Italia' }
         };
         
         // Load settings from localStorage
