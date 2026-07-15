@@ -117,6 +117,19 @@
             color: var(--bg-dark);
         }
         
+        #date-picker-container {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        #date-picker-container button {
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        #date-picker-container button:hover {
+            background: rgba(16, 185, 129, 0.3) !important;
+        }
+        
         .section-title {
             font-size: 14px;
             font-weight: 700;
@@ -286,10 +299,14 @@
         
         .nav-icon { font-size: 24px; }
         
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-secondary);
+        select, input[type="text"] {
+            transition: all 0.3s;
+        }
+        
+        select:focus, input[type="text"]:focus {
+            border-color: var(--primary) !important;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
         }
         
         .info-grid {
@@ -330,16 +347,37 @@
     <div class="page active" id="dashboard">
         <h1 class="page-title">Dashboard</h1>
         
-        <div class="filters">
-            <div class="filter-chip active">Tous les championnats</div>
-            <div class="filter-chip">Demain</div>
-            <div class="filter-chip">Cette semaine</div>
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <label style="display: block; margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600;">Championnat</label>
+                <select id="filter-league" style="width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;">
+                    <option value="all">Tous les championnats</option>
+                    <option value="140">Ligue 1 (France)</option>
+                    <option value="135">Serie A (Italie)</option>
+                    <option value="39">Serie A TIM (Italie)</option>
+                    <option value="78">Bundesliga (Allemagne)</option>
+                    <option value="61">Ligue 1 (France)</option>
+                    <option value="2">UEFA Champions League</option>
+                </select>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600;">Date</label>
+                <input type="text" id="filter-date" style="width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;" readonly placeholder="Sélectionner une date">
+                <div id="date-picker-container" style="display: none; position: absolute; background: rgba(30, 41, 59, 0.9); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 5px; z-index: 500; min-width: 300px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <button id="prev-month" style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--primary); color: var(--primary); padding: 6px 12px; border-radius: 6px; cursor: pointer;">← Prev</button>
+                        <span id="month-year" style="font-weight: 600; color: var(--text-primary);">Avril 2025</span>
+                        <button id="next-month" style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--primary); color: var(--primary); padding: 6px 12px; border-radius: 6px; cursor: pointer;">Next →</button>
+                    </div>
+                    <div id="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center;"></div>
+                </div>
+            </div>
         </div>
         
         <div class="section-title">Matchs Disponibles</div>
         
         <div class="matches-grid" id="matches-list">
-            <div class="loading">Chargement des matchs...</div>
+            <div class="loading">Sélectionne une date et un championnat pour charger les matchs...</div>
         </div>
     </div>
     
@@ -512,6 +550,7 @@
         const PROXY_URL = 'https://foot-value-bet.vercel.app/api/proxy';
         
         let matchesData = [];
+        let currentDatePickerMonth = new Date();
         
         // Settings object
         const settings = {
@@ -522,6 +561,23 @@
             minValue: 5,
             minOdds: 1.5,
             maxOdds: 5.0
+        };
+        
+        // Filter state
+        const filters = {
+            league: 'all',
+            date: new Date().toISOString().slice(0, 10)
+        };
+        
+        // League mapping
+        const LEAGUES = {
+            'all': { id: null, name: 'Tous les championnats' },
+            '140': { id: 140, name: 'Ligue 1 (France)' },
+            '135': { id: 135, name: 'Serie A (Italie)' },
+            '39': { id: 39, name: 'Serie A TIM (Italie)' },
+            '78': { id: 78, name: 'Bundesliga (Allemagne)' },
+            '61': { id: 61, name: 'Ligue 1' },
+            '2': { id: 2, name: 'UEFA Champions League' }
         };
         
         // Load settings from localStorage
@@ -560,8 +616,6 @@
         
         // Calculate Kelly bet size
         function calculateKellyBet(probability, odds) {
-            // Kelly formula: f* = (b*p - q) / b
-            // where p = probability, q = 1-p, b = odds-1
             const b = odds - 1;
             const p = probability;
             const q = 1 - p;
@@ -573,6 +627,67 @@
             betSize = Math.max(settings.minBet, Math.min(betSize, settings.maxBet));
             
             return Math.round(betSize * 100) / 100;
+        }
+        
+        // Render calendar
+        function renderCalendar() {
+            const year = currentDatePickerMonth.getFullYear();
+            const month = currentDatePickerMonth.getMonth();
+            
+            document.getElementById('month-year').textContent = 
+                currentDatePickerMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            let html = '';
+            
+            // Empty cells
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div></div>';
+            }
+            
+            // Days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = String(year).padStart(4, '0') + '-' + 
+                                String(month + 1).padStart(2, '0') + '-' + 
+                                String(day).padStart(2, '0');
+                const isToday = dateStr === new Date().toISOString().slice(0, 10);
+                const isSelected = dateStr === filters.date;
+                
+                html += `<button onclick="selectDate('${dateStr}')" style="
+                    padding: 8px;
+                    border-radius: 6px;
+                    border: 1px solid var(--border);
+                    background: ${isSelected ? 'var(--primary)' : (isToday ? 'rgba(16, 185, 129, 0.2)' : 'rgba(15, 23, 42, 0.3)')};
+                    color: ${isSelected ? 'var(--bg-dark)' : 'var(--text-primary)'};
+                    cursor: pointer;
+                    font-weight: 600;
+                    font-size: 12px;
+                ">${day}</button>`;
+            }
+            
+            document.getElementById('calendar-grid').innerHTML = html;
+        }
+        
+        // Select date from calendar
+        function selectDate(dateStr) {
+            filters.date = dateStr;
+            document.getElementById('filter-date').value = dateStr;
+            document.getElementById('date-picker-container').style.display = 'none';
+            loadMatches();
+        }
+        
+        // Toggle date picker
+        function toggleDatePicker() {
+            const container = document.getElementById('date-picker-container');
+            if (container.style.display === 'none') {
+                currentDatePickerMonth = new Date(filters.date);
+                renderCalendar();
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
         }
         
         // Switch pages
@@ -593,13 +708,16 @@
         // Load matches from API
         async function loadMatches() {
             try {
-                const response = await fetch(`${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&season=2025&status=NS&league=140`);
+                const leagueId = filters.league === 'all' ? 140 : filters.league;
+                const response = await fetch(`${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&season=2025&date=${filters.date}&league=${leagueId}`);
                 const data = await response.json();
                 
                 if (data.response) {
-                    matchesData = data.response.slice(0, 10);
+                    matchesData = data.response.slice(0, 15);
                     displayMatches();
                     updateAnalytics();
+                } else {
+                    document.getElementById('matches-list').innerHTML = '<div class="loading">Aucun match disponible pour cette date</div>';
                 }
             } catch (error) {
                 console.error('Erreur API:', error);
@@ -612,7 +730,7 @@
             const html = matchesData.map((match, idx) => `
                 <div class="match-card" onclick="showMatchDetail(${idx})">
                     <div class="match-header">
-                        <div class="match-date">📅 ${new Date(match.fixture.date).toLocaleDateString('fr-FR')}</div>
+                        <div class="match-date">📅 ${new Date(match.fixture.date).toLocaleDateString('fr-FR')} ${match.fixture.date.split('T')[1].substring(0, 5)}</div>
                         <div class="match-cotes">
                             <div class="cote-badge">U</div>
                             <div class="cote-badge">B</div>
@@ -631,18 +749,18 @@
                     <div class="stats">
                         <div class="stat-badge">
                             <div class="stat-label">Ligue</div>
-                            <div class="stat-value">${match.league.name.substring(0, 3)}</div>
+                            <div class="stat-value">${match.league.name.substring(0, 8)}</div>
                         </div>
                         <div class="stat-badge">
-                            <div class="stat-label">Stade</div>
-                            <div class="stat-value">${match.fixture.venue?.name ? match.fixture.venue.name.substring(0, 10) : 'TBD'}</div>
+                            <div class="stat-label">Statut</div>
+                            <div class="stat-value">${match.fixture.status.short}</div>
                         </div>
                     </div>
                     <button class="btn-detail">Voir détail →</button>
                 </div>
             `).join('');
             
-            document.getElementById('matches-list').innerHTML = html;
+            document.getElementById('matches-list').innerHTML = html || '<div class="loading">Aucun match trouvé</div>';
         }
         
         // Show match detail
@@ -697,7 +815,42 @@
         }
         
         // Initialize
-        loadMatches();
+        function initializeDashboard() {
+            // Set today's date
+            document.getElementById('filter-date').value = filters.date;
+            
+            // Listen to league changes
+            document.getElementById('filter-league').addEventListener('change', (e) => {
+                filters.league = e.target.value;
+                loadMatches();
+            });
+            
+            // Listen to date picker
+            document.getElementById('filter-date').addEventListener('click', toggleDatePicker);
+            document.getElementById('prev-month').addEventListener('click', () => {
+                currentDatePickerMonth.setMonth(currentDatePickerMonth.getMonth() - 1);
+                renderCalendar();
+            });
+            document.getElementById('next-month').addEventListener('click', () => {
+                currentDatePickerMonth.setMonth(currentDatePickerMonth.getMonth() + 1);
+                renderCalendar();
+            });
+            
+            // Close date picker when clicking outside
+            document.addEventListener('click', (e) => {
+                const container = document.getElementById('date-picker-container');
+                const dateInput = document.getElementById('filter-date');
+                if (!container.contains(e.target) && e.target !== dateInput) {
+                    container.style.display = 'none';
+                }
+            });
+            
+            // Load initial matches
+            loadMatches();
+        }
+        
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', initializeDashboard);
     </script>
 </body>
 </html>
