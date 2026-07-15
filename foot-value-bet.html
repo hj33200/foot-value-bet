@@ -634,8 +634,66 @@
             document.getElementById('max-odds').value = settings.maxOdds;
         }
         
-        // Utility functions
-        const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+        // FIFA Rankings table
+        const FIFA_RANKINGS = {
+            'Argentina': 1, 'Spain': 2, 'France': 3, 'England': 4, 'Portugal': 5,
+            'Brazil': 6, 'Morocco': 7, 'Netherlands': 8, 'Belgium': 9, 'Germany': 10,
+            'Croatia': 11, 'Italy': 12, 'Colombia': 13, 'Mexico': 14, 'Senegal': 15,
+            'Uruguay': 16, 'USA': 17, 'Japan': 18, 'Switzerland': 19, 'Iran': 20,
+            'Denmark': 21, 'Turkey': 22, 'Ecuador': 23, 'Austria': 24, 'South Korea': 25,
+            'Nigeria': 26, 'Australia': 27, 'Egypt': 29, 'Canada': 30, 'Norway': 31,
+            'Ivory Coast': 33, 'Panama': 34, 'Paraguay': 41, 'Czechia': 40, 'Ghana': 73,
+            'South Africa': 60, 'Algeria': 2, 'Congo DR': 46, 'Cape Verde': 127,
+            'Jordan': 63, 'Bosnia and Herzegovina': 64, 'Qatar': 57, 'Iraq': 57,
+            'Uzbekistan': 50, 'Saudi Arabia': 61, 'Haiti': 83, 'Scotland': 42,
+            'Poland': 26, 'Greece': 50, 'Serbia': 21, 'Czech Republic': 40,
+            'Romania': 45, 'Bulgaria': 70, 'Hungary': 35, 'Slovakia': 48,
+            'Wales': 19, 'Ukraine': 25, 'Austria': 24, 'Switzerland': 19
+        };
+        
+        // Team name aliases for matching variations
+        const TEAM_NAME_ALIASES = {
+            'DR Congo': 'Congo DR',
+            'DRC': 'Congo DR',
+            'Democratic Republic of Congo': 'Congo DR',
+            'South Korea': 'South Korea',
+            'Korea': 'South Korea',
+            'Republic of Korea': 'South Korea',
+            'Côte d\'Ivoire': 'Ivory Coast',
+            'Czech Republic': 'Czechia',
+            'Bosnia': 'Bosnia and Herzegovina',
+            'Bosnia-Herzegovina': 'Bosnia and Herzegovina',
+            'United States': 'USA',
+            'USMNT': 'USA',
+            'Cape Verde': 'Cape Verde',
+            'Cabo Verde': 'Cape Verde'
+        };
+        
+        // Get FIFA ranking by team name
+        function getRankingByTeamName(teamName) {
+            if (!teamName) return 50;
+            
+            // Exact match
+            if (FIFA_RANKINGS[teamName]) {
+                return FIFA_RANKINGS[teamName];
+            }
+            
+            // Try alias
+            const aliased = TEAM_NAME_ALIASES[teamName];
+            if (aliased && FIFA_RANKINGS[aliased]) {
+                return FIFA_RANKINGS[aliased];
+            }
+            
+            // Try partial match
+            for (let key in FIFA_RANKINGS) {
+                if (key.toLowerCase().includes(teamName.toLowerCase())) {
+                    return FIFA_RANKINGS[key];
+                }
+            }
+            
+            // Default
+            return 50;
+        }
         
         // Convert FIFA ranking to base ELO
         function rankingToElo(rank) {
@@ -713,7 +771,7 @@
             if (!form || form.length === 0) return rankingToElo(rank || 50);
             
             console.log(`\n🔍 === CALCUL ELO: ${teamName} ===`);
-            console.log(`   📋 Données: Form=${form}, GF=${gf}, GA=${ga}, Matches=${matches}, Rank=${rank}`);
+            console.log(`   📋 Données: Form=${form}, GF=${gf}, GA=${ga}, Matches=${matches}, Rank FIFA=${rank}`);
             
             const eloBase = rankingToElo(rank || 50);
             console.log(`   1️⃣ ELO Base (rank ${rank}): ${eloBase.toFixed(2)}`);
@@ -775,8 +833,18 @@
                 const response = await fetch(url);
                 const data = await response.json();
                 
-                if (data.response) {
-                    return data.response;
+                if (data.response && data.response.length > 0) {
+                    // TRIER par date décroissante (les plus récents d'abord)
+                    const sorted = data.response.sort((a, b) => {
+                        return new Date(b.fixture.date) - new Date(a.fixture.date);
+                    });
+                    
+                    // Prendre seulement les 10 derniers
+                    const last10 = sorted.slice(0, 10);
+                    
+                    console.log(`   📥 Équipe ${teamId}: ${last10.length} matchs (dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')})`);
+                    
+                    return last10;
                 }
                 return [];
             } catch (error) {
@@ -810,17 +878,33 @@
             // Limiter à 10 matchs
             const last10 = matches.slice(0, 10);
             let form = '';
+            let details = [];
             
             for (let i = 0; i < last10.length; i++) {
                 const match = last10[i];
                 const isHome = match.teams.home.id === teamId;
+                const opponent = isHome ? match.teams.away.name : match.teams.home.name;
                 const goalsFor = isHome ? match.goals.home : match.goals.away;
                 const goalsAgainst = isHome ? match.goals.away : match.goals.home;
                 
-                if (goalsFor > goalsAgainst) form += 'V';
-                else if (goalsFor === goalsAgainst) form += 'D';
-                else form += 'L';
+                let result = '?';
+                if (goalsFor > goalsAgainst) {
+                    form += 'V';
+                    result = 'V';
+                } else if (goalsFor === goalsAgainst) {
+                    form += 'D';
+                    result = 'D';
+                } else {
+                    form += 'L';
+                    result = 'L';
+                }
+                
+                details.push(`${match.fixture.date.split('T')[0]} vs ${opponent}: ${goalsFor}:${goalsAgainst} (${result})`);
             }
+            
+            console.log(`   📊 Forme (${last10.length} matchs): ${form}`);
+            console.log(`      ${details.join(' | ')}`);
+            
             return form || 'N/A';
         }
         
@@ -1021,9 +1105,14 @@ Vérifie:
                 const homeSOS = calculateSOS(homeMatches, homeId);
                 const awaySOS = calculateSOS(awayMatches, awayId);
                 
-                // Calculate ELO with SOS adjustment
-                const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, 50, homeSOS);
-                const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, 50, awaySOS);
+                // Get real FIFA rankings
+                const homeRank = getRankingByTeamName(match.teams.home.name);
+                const awayRank = getRankingByTeamName(match.teams.away.name);
+                console.log(`   🏆 FIFA Rank: ${match.teams.home.name}=#${homeRank}, ${match.teams.away.name}=#${awayRank}`);
+                
+                // Calculate ELO with SOS adjustment (using real FIFA ranks)
+                const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, homeRank, homeSOS);
+                const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, awayRank, awaySOS);
                 
                 console.log(`   ✅ Résultat: ${match.teams.home.name} ELO ${homeElo.toFixed(0)} vs ${match.teams.away.name} ELO ${awayElo.toFixed(0)}\n`);
                 
@@ -1093,9 +1182,13 @@ Vérifie:
             const homeSOS = calculateSOS(homeMatches, homeId);
             const awaySOS = calculateSOS(awayMatches, awayId);
             
-            // Calculate ELO with SOS adjustment
-            const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, 50, homeSOS);
-            const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, 50, awaySOS);
+            // Get real FIFA rankings
+            const homeRank = getRankingByTeamName(match.teams.home.name);
+            const awayRank = getRankingByTeamName(match.teams.away.name);
+            
+            // Calculate ELO with SOS adjustment (using real FIFA ranks)
+            const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, homeRank, homeSOS);
+            const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, awayRank, awaySOS);
             
             // Format last matches
             const formatMatches = (matches, teamId) => {
