@@ -831,77 +831,50 @@
         }
         async function getTeamLastMatches(teamId, leagueId) {
             try {
-                // Utiliser la VRAIE API directement + SEASON REQUIRED!
+                // Utiliser le PROXY comme pour les matchs! C'était plus simple!
                 const season = 2026;
-                const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&season=${season}&from=2023-01-01&to=2026-06-30`;
                 
-                console.log(`   🔗 API directe pour équipe ${teamId}`);
-                console.log(`      URL: ${url}`);
-                console.log(`      API Key: ${API_KEY.substring(0, 5)}...`);
+                // Récupérer les fixtures de l'équipe via le proxy
+                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=10`;
                 
-                const response = await fetch(url, {
-                    headers: {
-                        'x-apisports-key': API_KEY
-                    }
-                });
+                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId}`);
                 
-                console.log(`   📡 Status: ${response.status}`);
+                const response = await fetch(url);
                 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.warn(`   ⚠️ Erreur HTTP ${response.status}: ${errorText}`);
+                    console.warn(`   ⚠️ Erreur HTTP ${response.status}`);
                     return [];
                 }
                 
                 const data = await response.json();
-                console.log(`   📦 Response:`, data);
-                console.log(`   📦 Errors:`, data.errors);
-                
                 const matches = data.response || [];
-                console.log(`   📊 Results: ${data.results}, Matches trouvés: ${matches.length}`);
                 
-                if (matches.length > 0) {
-                    console.log(`   📋 Premiers matchs:`);
-                    matches.slice(0, 3).forEach((m, i) => {
-                        console.log(`      [${i}] ${m.teams.home.name} vs ${m.teams.away.name} | League: ${m.league.name} (ID: ${m.league.id}) | Status: ${m.fixture.status}`);
-                    });
-                }
+                console.log(`   📊 Matches trouvés: ${matches.length}`);
                 
                 if (matches.length === 0) {
                     console.log(`   ⚠️ Aucun match pour équipe ${teamId}`);
                     return [];
                 }
                 
-                // FILTRER: Garder seulement les matchs avec résultats (pas null-null)
-                // ET status = FT (Finished)
-                const matchesWithResults = matches.filter(m => {
-                    const hasResult = m.goals.home !== null && m.goals.away !== null;
-                    const isFinished = m.fixture.status === 'FT';
-                    return hasResult && isFinished;
-                });
-                
-                console.log(`   🔍 Après filtre (hasResult + FT): ${matchesWithResults.length} matchs`);
-                
-                if (matchesWithResults.length > 0) {
-                    matchesWithResults.slice(0, 2).forEach((m, i) => {
-                        console.log(`      ✅ [${i}] ${m.teams.home.name} vs ${m.teams.away.name} | ${m.goals.home}:${m.goals.away}`);
-                    });
-                }
+                // Filtrer: garder seulement les matchs avec résultats
+                const matchesWithResults = matches.filter(m => 
+                    m.goals.home !== null && m.goals.away !== null
+                );
                 
                 if (matchesWithResults.length === 0) {
-                    console.log(`   ⚠️ Aucun match avec résultat FT pour équipe ${teamId}`);
+                    console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
                     return [];
                 }
                 
-                // Trier par date (ancien → récent)
-                const sortedByDate = matchesWithResults.sort((a, b) => 
-                    new Date(a.fixture.date) - new Date(b.fixture.date)
-                );
+                // Trier par date croissante (ancien → récent)
+                const sorted = matchesWithResults.sort((a, b) => {
+                    return new Date(a.fixture.date) - new Date(b.fixture.date);
+                });
                 
-                // Prendre les 10 DERNIERS matchs
-                const last10 = sortedByDate.slice(-10);
+                // Prendre les 10 derniers
+                const last10 = sorted.slice(-10);
                 
-                console.log(`   ✅ Équipe ${teamId}: ${last10.length} derniers matchs (${matches.length} total)`);
+                console.log(`   ✅ Équipe ${teamId}: ${last10.length} derniers matchs`);
                 console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
                 
                 return last10;
