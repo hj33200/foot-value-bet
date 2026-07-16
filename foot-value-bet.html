@@ -831,8 +831,9 @@
         }
         async function getTeamLastMatches(teamId, leagueId) {
             try {
-                // Utiliser la VRAIE API directement comme l'ancien code!
-                const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&from=2023-01-01&to=2026-06-30`;
+                // Utiliser la VRAIE API directement + SEASON REQUIRED!
+                const season = 2026;
+                const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&season=${season}&from=2023-01-01&to=2026-06-30`;
                 
                 console.log(`   🔗 API directe pour équipe ${teamId}`);
                 console.log(`      URL: ${url}`);
@@ -865,12 +866,20 @@
                 }
                 
                 // FILTRER: Garder seulement les matchs avec résultats (pas null-null)
-                const matchesWithResults = matches.filter(m => 
-                    m.goals.home !== null && m.goals.away !== null
-                );
+                // ET exclure les matchs de club (domestic leagues)
+                // Les compétitions nationales ont des league.id bas (1-100 environ) ou type="friendly"
+                const CLUB_LEAGUES = [39, 40, 41, 48, 50, 61, 78, 82, 84, 135, 140]; // Club leagues
+                
+                const matchesWithResults = matches.filter(m => {
+                    const hasResult = m.goals.home !== null && m.goals.away !== null;
+                    const isFinished = m.fixture.status === 'FT';
+                    const isCompetitionOrFriendly = !CLUB_LEAGUES.includes(m.league.id);
+                    
+                    return hasResult && isFinished && isCompetitionOrFriendly;
+                });
                 
                 if (matchesWithResults.length === 0) {
-                    console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
+                    console.log(`   ⚠️ Aucun match de compétition/amical pour équipe ${teamId}`);
                     return [];
                 }
                 
