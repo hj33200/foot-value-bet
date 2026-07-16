@@ -917,14 +917,14 @@
             }
         }
         
-        // Format form string with colors (V=gold, D=light gold, L=red)
+        // Format form string with colors (V=green, D=yellow, L=red)
         function formatFormWithColors(form) {
             if (!form || form === 'N/A') return form;
             
             return form.split('').map(letter => {
                 let color = '#888';
-                if (letter === 'V') color = '#d4af37'; // Gold
-                else if (letter === 'D') color = '#f0d74e'; // Light Gold
+                if (letter === 'V') color = '#10b981'; // Green
+                else if (letter === 'D') color = '#f59e0b'; // Yellow/Orange
                 else if (letter === 'L') color = '#ef4444'; // Red
                 
                 return `<span style="color: ${color}; font-weight: 600; margin: 0 2px;">${letter}</span>`;
