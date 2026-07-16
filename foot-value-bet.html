@@ -8,20 +8,20 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         :root {
-            --primary: #10b981;
-            --secondary: #06b6d4;
-            --accent: #f59e0b;
-            --bg-dark: #0f1419;
-            --bg-darker: #0a0e1f;
-            --card: #1e293b;
-            --border: #334155;
+            --primary: #d4af37;
+            --secondary: #f0d74e;
+            --accent: #d4af37;
+            --bg-dark: #0a0a0a;
+            --bg-darker: #000000;
+            --card: #1a1a1a;
+            --border: #3d3d3d;
             --text-primary: #e0e0e0;
-            --text-secondary: #94a3b8;
+            --text-secondary: #a0a0a0;
         }
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, var(--bg-darker) 0%, #1a1f3a 100%);
+            background: linear-gradient(135deg, var(--bg-darker) 0%, #0a0a0a 100%);
             color: var(--text-primary);
             padding-bottom: 100px;
         }
@@ -50,7 +50,7 @@
         .logo-text h1 {
             font-size: 18px;
             font-weight: 700;
-            background: linear-gradient(135deg, #10b981, #06b6d4);
+            background: linear-gradient(135deg, #d4af37, #f0d74e);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -127,7 +127,7 @@
         }
         
         #date-picker-container button:hover {
-            background: rgba(16, 185, 129, 0.3) !important;
+            background: rgba(212, 175, 55, 0.3) !important;
         }
         
         .section-title {
@@ -170,7 +170,7 @@
             background: rgba(30, 41, 59, 0.8);
             border-color: var(--primary);
             transform: translateY(-4px);
-            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.1);
+            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.1);
         }
         
         .match-header {
@@ -292,7 +292,7 @@
         }
         
         .nav-item.active {
-            background: rgba(16, 185, 129, 0.15);
+            background: rgba(212, 175, 55, 0.15);
             color: var(--primary);
             border-color: var(--primary);
         }
@@ -306,12 +306,12 @@
         select:focus, input[type="text"]:focus {
             border-color: var(--primary) !important;
             outline: none;
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
         }
         
         #search-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
         }
         
         #search-btn:active {
@@ -378,9 +378,9 @@
                 <input type="text" id="filter-date" style="width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;" readonly placeholder="Sélectionner une date">
                 <div id="date-picker-container" style="display: none; position: absolute; background: rgba(30, 41, 59, 0.9); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 5px; z-index: 500; min-width: 300px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <button id="prev-month" style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--primary); color: var(--primary); padding: 6px 12px; border-radius: 6px; cursor: pointer;">← Prev</button>
+                        <button id="prev-month" style="background: rgba(212, 175, 55, 0.2); border: 1px solid var(--primary); color: var(--primary); padding: 6px 12px; border-radius: 6px; cursor: pointer;">← Prev</button>
                         <span id="month-year" style="font-weight: 600; color: var(--text-primary);">Avril 2025</span>
-                        <button id="next-month" style="background: rgba(16, 185, 129, 0.2); border: 1px solid var(--primary); color: var(--primary); padding: 6px 12px; border-radius: 6px; cursor: pointer;">Next →</button>
+                        <button id="next-month" style="background: rgba(212, 175, 55, 0.2); border: 1px solid var(--primary); color: var(--primary); padding: 6px 12px; border-radius: 6px; cursor: pointer;">Next →</button>
                     </div>
                     <div id="calendar-grid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center;"></div>
                 </div>
@@ -917,8 +917,19 @@
             }
         }
         
-        // Calculate form from last 10 matches
-        function calculateForm(matches, teamId) {
+        // Format form string with colors (V=gold, D=light gold, L=red)
+        function formatFormWithColors(form) {
+            if (!form || form === 'N/A') return form;
+            
+            return form.split('').map(letter => {
+                let color = '#888';
+                if (letter === 'V') color = '#d4af37'; // Gold
+                else if (letter === 'D') color = '#f0d74e'; // Light Gold
+                else if (letter === 'L') color = '#ef4444'; // Red
+                
+                return `<span style="color: ${color}; font-weight: 600; margin: 0 2px;">${letter}</span>`;
+            }).join('');
+        }
             if (!matches || matches.length === 0) return 'N/A';
             
             // Limiter à 10 matchs
@@ -1019,7 +1030,7 @@
                     padding: 8px;
                     border-radius: 6px;
                     border: 1px solid var(--border);
-                    background: ${isSelected ? 'var(--primary)' : (isToday ? 'rgba(16, 185, 129, 0.2)' : 'rgba(15, 23, 42, 0.3)')};
+                    background: ${isSelected ? 'var(--primary)' : (isToday ? 'rgba(212, 175, 55, 0.2)' : 'rgba(15, 23, 42, 0.3)')};
                     color: ${isSelected ? 'var(--bg-dark)' : 'var(--text-primary)'};
                     cursor: pointer;
                     font-weight: 600;
@@ -1288,11 +1299,11 @@ Vérifie:
                             </div>
                             <div class="info-card">
                                 <div class="info-label">Forme ${match.teams.home.name.substring(0,3)}</div>
-                                <div class="info-value" style="font-size: 14px; letter-spacing: 2px;">${homeForm}</div>
+                                <div class="info-value" style="font-size: 14px; letter-spacing: 2px;">${formatFormWithColors(homeForm)}</div>
                             </div>
                             <div class="info-card">
                                 <div class="info-label">Forme ${match.teams.away.name.substring(0,3)}</div>
-                                <div class="info-value" style="font-size: 14px; letter-spacing: 2px;">${awayForm}</div>
+                                <div class="info-value" style="font-size: 14px; letter-spacing: 2px;">${formatFormWithColors(awayForm)}</div>
                             </div>
                         </div>
                         
@@ -1326,7 +1337,7 @@ Vérifie:
                                 <div>
                                     <h4 style="color: var(--primary); margin-bottom: 10px; font-size: 12px;">${match.teams.home.name} (${homeMatches.length} matchs)</h4>
                                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                                        <thead style="background: rgba(16, 185, 129, 0.1);">
+                                        <thead style="background: rgba(212, 175, 55, 0.1);">
                                             <tr>
                                                 <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Date</th>
                                                 <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Adversaire</th>
@@ -1342,7 +1353,7 @@ Vérifie:
                                 <div>
                                     <h4 style="color: var(--secondary); margin-bottom: 10px; font-size: 12px;">${match.teams.away.name} (${awayMatches.length} matchs)</h4>
                                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                                        <thead style="background: rgba(6, 182, 212, 0.1);">
+                                        <thead style="background: rgba(240, 215, 78, 0.1);">
                                             <tr>
                                                 <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Date</th>
                                                 <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Adversaire</th>
