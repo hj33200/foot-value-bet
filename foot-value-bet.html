@@ -854,9 +854,10 @@
                 
                 const data = await response.json();
                 console.log(`   📦 Response:`, data);
+                console.log(`   📦 Errors:`, data.errors);
                 
                 const matches = data.response || [];
-                console.log(`   📊 Matches trouvés: ${matches.length}`);
+                console.log(`   📊 Results: ${data.results}, Matches trouvés: ${matches.length}`);
                 
                 if (matches.length === 0) {
                     console.log(`   ⚠️ Aucun match pour équipe ${teamId}`);
