@@ -771,12 +771,7 @@
         
         // Calculate ELO with SOS adjustment
         function calculateEloFromResultsWithSOS(teamName, form, gf, ga, matches, rank, sosElo) {
-            // FALLBACK: Si pas de matchs trouvés, retourner ELO de base
-            if (!form || form.length === 0 || matches === 0) {
-                const eloBase = rankingToElo(rank || 50);
-                console.log(`   ⚠️ FALLBACK: Pas de form trouvée, utiliser ELO Base (rank ${rank}) = ${eloBase.toFixed(0)}`);
-                return eloBase;
-            }
+            if (!form || form.length === 0) return rankingToElo(rank || 50);
             
             console.log(`\n🔍 === CALCUL ELO: ${teamName} ===`);
             console.log(`   📋 Données: Form=${form}, GF=${gf}, GA=${ga}, Matches=${matches}, Rank FIFA=${rank}`);
@@ -834,55 +829,45 @@
         function getEloWithSOS(teamId, teamName, form, gf, ga, matches, rank, sosElo) {
             return calculateEloFromResultsWithSOS(teamName, form, gf, ga, matches, rank, sosElo);
         }
-        async function getTeamLastMatches(teamId, leagueId) {
+        async function getTeamLastMatches(teamId, matchDate) {
             try {
-                // Utiliser la VRAIE API directement avec plage de dates
-                const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&from=2023-01-01&to=2026-06-30`;
+                // Utiliser une plage de dates pour récupérer TOUS les matchs
+                // au lieu de &last=10 qui peut être incomplet
+                const fromDate = '2023-01-01';
+                const toDate = '2026-12-31';
                 
-                console.log(`   🔗 API directe pour équipe ${teamId}`);
-                
-                const response = await fetch(url, {
-                    headers: {
-                        'x-apisports-key': API_KEY
-                    }
-                });
-                
-                if (!response.ok) {
-                    console.warn(`   ⚠️ Erreur HTTP ${response.status} pour équipe ${teamId}`);
-                    return [];
-                }
-                
+                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&from=${fromDate}&to=${toDate}`;
+                const response = await fetch(url);
                 const data = await response.json();
                 
-                if (!data.response || data.response.length === 0) {
-                    console.log(`   ⚠️ Aucun match trouvé pour équipe ${teamId}`);
-                    return [];
+                if (data.response && data.response.length > 0) {
+                    // Filtrer: garder SEULEMENT les matchs avec résultats
+                    const matchesWithResults = data.response.filter(m => 
+                        m.goals.home !== null && m.goals.away !== null
+                    );
+                    
+                    if (matchesWithResults.length === 0) {
+                        console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
+                        return [];
+                    }
+                    
+                    // Trier par date CROISSANTE (ancien → récent)
+                    const sorted = matchesWithResults.sort((a, b) => {
+                        return new Date(a.fixture.date) - new Date(b.fixture.date);
+                    });
+                    
+                    // Prendre les 10 DERNIERS (slice(-10) = 10 derniers)
+                    const last10 = sorted.slice(-10);
+                    
+                    console.log(`   📥 Équipe ${teamId}: ${last10.length} derniers matchs (${sorted.length} total)`);
+                    console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
+                    
+                    return last10;
                 }
-                
-                // Filtrer: garder SEULEMENT les matchs avec résultats
-                const matchesWithResults = data.response.filter(m => 
-                    m.goals.home !== null && m.goals.away !== null
-                );
-                
-                if (matchesWithResults.length === 0) {
-                    console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
-                    return [];
-                }
-                
-                // Trier par date CROISSANTE (ancien → récent)
-                const sorted = matchesWithResults.sort((a, b) => {
-                    return new Date(a.fixture.date) - new Date(b.fixture.date);
-                });
-                
-                // Prendre les 10 DERNIERS (.slice(-10))
-                const last10 = sorted.slice(-10);
-                
-                console.log(`   ✅ Équipe ${teamId}: ${last10.length} derniers matchs (${sorted.length} total avec résultats)`);
-                console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
-                
-                return last10;
+                console.log(`   ⚠️ Aucun match trouvé pour équipe ${teamId}`);
+                return [];
             } catch (error) {
-                console.error(`   ❌ Erreur équipe ${teamId}:`, error);
+                console.error('Erreur stats équipe:', error);
                 return [];
             }
         }
@@ -1120,26 +1105,24 @@ Vérifie:
                 console.log(`\n⚽ === MATCH ${idx + 1}: ${match.teams.home.name} vs ${match.teams.away.name} ===`);
                 
                 // Get last matches and stats
-                const leagueId = match.league.id;
-                const homeMatches = await getTeamLastMatches(homeId, leagueId);
-                const awayMatches = await getTeamLastMatches(awayId, leagueId);
+                const homeMatches = await getTeamLastMatches(homeId);
+                const awayMatches = await getTeamLastMatches(awayId);
                 
-                // Calculer les stats depuis les vrais matchs
+                console.log(`   📥 ${match.teams.home.name}: ${homeMatches.length} derniers matchs`);
+                console.log(`   📥 ${match.teams.away.name}: ${awayMatches.length} derniers matchs`);
+                
                 const homeStats = calculateTeamStats(homeMatches, homeId);
                 const awayStats = calculateTeamStats(awayMatches, awayId);
                 
                 const homeForm = calculateForm(homeMatches, homeId);
                 const awayForm = calculateForm(awayMatches, awayId);
                 
-                console.log(`   📥 ${match.teams.home.name}: Form=${homeForm}`);
-                console.log(`   📥 ${match.teams.away.name}: Form=${awayForm}`);
-                
                 console.log(`   📊 ${match.teams.home.name}: ${homeStats.gf}BM, ${homeStats.ga}BE, Form: ${homeForm}`);
                 console.log(`   📊 ${match.teams.away.name}: ${awayStats.gf}BM, ${awayStats.ga}BE, Form: ${awayForm}`);
                 
-                // Calculate Strength of Schedule (SOS moyens par défaut)
-                const homeSOS = 1600;
-                const awaySOS = 1600;
+                // Calculate Strength of Schedule
+                const homeSOS = calculateSOS(homeMatches, homeId);
+                const awaySOS = calculateSOS(awayMatches, awayId);
                 
                 // Get real FIFA rankings
                 const homeRank = getRankingByTeamName(match.teams.home.name);
@@ -1203,18 +1186,20 @@ Vérifie:
             const match = matchesData[idx];
             const homeId = match.teams.home.id;
             const awayId = match.teams.away.id;
-            const leagueId = match.league.id;
             
-            // Get last 10 matches
-            const homeMatches = await getTeamLastMatches(homeId, leagueId);
-            const awayMatches = await getTeamLastMatches(awayId, leagueId);
+            // Get stats
+            const homeMatches = await getTeamLastMatches(homeId);
+            const awayMatches = await getTeamLastMatches(awayId);
             
-            // Calculer stats depuis les vrais matchs
             const homeStats = calculateTeamStats(homeMatches, homeId);
             const awayStats = calculateTeamStats(awayMatches, awayId);
             
             const homeForm = calculateForm(homeMatches, homeId);
             const awayForm = calculateForm(awayMatches, awayId);
+            
+            // Calculate Strength of Schedule
+            const homeSOS = calculateSOS(homeMatches, homeId);
+            const awaySOS = calculateSOS(awayMatches, awayId);
             
             // Get real FIFA rankings
             const homeRank = getRankingByTeamName(match.teams.home.name);
@@ -1223,6 +1208,30 @@ Vérifie:
             // Calculate ELO with SOS adjustment (using real FIFA ranks)
             const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, homeRank, homeSOS);
             const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, awayRank, awaySOS);
+            
+            // Format last matches
+            const formatMatches = (matches, teamId) => {
+                if (!matches || matches.length === 0) return '<tr><td colspan="5">Aucun match</td></tr>';
+                return matches.map(m => {
+                    const isHome = m.teams.home.id === teamId;
+                    const opponent = isHome ? m.teams.away.name : m.teams.home.name;
+                    const goalsFor = isHome ? m.goals.home : m.goals.away;
+                    const goalsAgainst = isHome ? m.goals.away : m.goals.home;
+                    let result = '?';
+                    if (goalsFor > goalsAgainst) result = 'V';
+                    else if (goalsFor === goalsAgainst) result = 'D';
+                    else result = 'L';
+                    
+                    return `
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-size: 12px; color: var(--text-secondary);">${new Date(m.fixture.date).toLocaleDateString('fr-FR')}</td>
+                            <td style="padding: 8px; font-size: 12px;">${opponent}</td>
+                            <td style="padding: 8px; font-size: 12px; text-align: center;">${goalsFor}:${goalsAgainst}</td>
+                            <td style="padding: 8px; text-align: center; font-weight: 700; font-size: 13px; color: ${result === 'V' ? 'var(--primary)' : result === 'D' ? 'var(--accent)' : '#ff6b6b'};">${result}</td>
+                        </tr>
+                    `;
+                }).join('');
+            };
             
             const html = `
                 <div class="matches-grid">
@@ -1278,6 +1287,45 @@ Vérifie:
                                         <div style="margin-top: 5px;">${awayStats.w}V - ${awayStats.d}D - ${awayStats.l}L</div>
                                         <div style="color: var(--secondary); font-weight: 600; margin-top: 5px;">Moy: ${(awayStats.gf / awayStats.matches).toFixed(2)} buts/match</div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);">
+                            <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">📋 10 DERNIERS MATCHS</h3>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                <div>
+                                    <h4 style="color: var(--primary); margin-bottom: 10px; font-size: 12px;">${match.teams.home.name} (${homeMatches.length} matchs)</h4>
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                        <thead style="background: rgba(16, 185, 129, 0.1);">
+                                            <tr>
+                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Date</th>
+                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Adversaire</th>
+                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Score</th>
+                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Rés.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${formatMatches(homeMatches, homeId)}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div>
+                                    <h4 style="color: var(--secondary); margin-bottom: 10px; font-size: 12px;">${match.teams.away.name} (${awayMatches.length} matchs)</h4>
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                        <thead style="background: rgba(6, 182, 212, 0.1);">
+                                            <tr>
+                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Date</th>
+                                                <th style="padding: 8px; text-align: left; color: var(--text-secondary);">Adversaire</th>
+                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Score</th>
+                                                <th style="padding: 8px; text-align: center; color: var(--text-secondary);">Rés.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${formatMatches(awayMatches, awayId)}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
