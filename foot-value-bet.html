@@ -376,7 +376,7 @@
             <div>
                 <label style="display: block; margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600;">Date</label>
                 <input type="text" id="filter-date" style="width: 100%; padding: 12px; background: rgba(30, 30, 30, 0.8); border: 2px solid var(--primary); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;" readonly placeholder="Sélectionner une date">
-                <div id="date-picker-container" style="display: none; position: absolute; background: rgba(20, 20, 20, 0.95); border: 2px solid var(--primary); border-radius: 8px; padding: 20px; margin-top: 5px; z-index: 500; min-width: 300px;">
+                <div id="date-picker-container" style="display: none; position: fixed; background: rgba(20, 20, 20, 0.98); border: 2px solid var(--primary); border-radius: 8px; padding: 20px; z-index: 9999; min-width: 320px; top: auto; left: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <button id="prev-month" style="background: rgba(212, 175, 55, 0.2); border: 1px solid var(--primary); color: var(--primary); padding: 6px 12px; border-radius: 6px; cursor: pointer;">← Prev</button>
                         <span id="month-year" style="font-weight: 600; color: var(--text-primary);">Avril 2025</span>
@@ -1052,12 +1052,27 @@
         
         // Toggle date picker
         function toggleDatePicker() {
+            console.log('🔍 toggleDatePicker called');
             const container = document.getElementById('date-picker-container');
-            if (container.style.display === 'none') {
+            const dateInput = document.getElementById('filter-date');
+            console.log('📦 Container:', container);
+            console.log('📊 Display avant:', container.style.display);
+            
+            if (container.style.display === 'none' || container.style.display === '') {
+                console.log('✅ Ouverture du calendrier');
                 currentDatePickerMonth = new Date(filters.date);
                 renderCalendar();
+                
+                // Calculer la position relative à l'input
+                const rect = dateInput.getBoundingClientRect();
+                container.style.top = (rect.bottom + 10) + 'px';
+                container.style.left = rect.left + 'px';
+                container.style.width = rect.width + 'px';
+                
                 container.style.display = 'block';
+                console.log('✅ Display après:', container.style.display);
             } else {
+                console.log('❌ Fermeture du calendrier');
                 container.style.display = 'none';
             }
         }
@@ -1387,43 +1402,93 @@ Vérifie:
         
         // Initialize
         function initializeDashboard() {
-            // Set today's date
-            document.getElementById('filter-date').value = filters.date;
+            console.log('🚀 === DASHBOARD INITIALIZATION START ===');
             
-            // Listen to league changes (auto-search disabled, now needs button click)
-            document.getElementById('filter-league').addEventListener('change', (e) => {
-                filters.league = e.target.value;
-            });
-            
-            // Listen to search button
-            document.getElementById('search-btn').addEventListener('click', loadMatches);
-            
-            // Listen to date picker
-            document.getElementById('filter-date').addEventListener('click', toggleDatePicker);
-            document.getElementById('prev-month').addEventListener('click', () => {
-                currentDatePickerMonth.setMonth(currentDatePickerMonth.getMonth() - 1);
-                renderCalendar();
-            });
-            document.getElementById('next-month').addEventListener('click', () => {
-                currentDatePickerMonth.setMonth(currentDatePickerMonth.getMonth() + 1);
-                renderCalendar();
-            });
-            
-            // Close date picker when clicking outside
-            document.addEventListener('click', (e) => {
-                const container = document.getElementById('date-picker-container');
-                const dateInput = document.getElementById('filter-date');
-                if (!container.contains(e.target) && e.target !== dateInput) {
-                    container.style.display = 'none';
+            try {
+                // Set today's date
+                const filterDate = document.getElementById('filter-date');
+                console.log('1️⃣ filter-date element:', filterDate);
+                if (filterDate) filterDate.value = filters.date;
+                
+                // Listen to league changes
+                const filterLeague = document.getElementById('filter-league');
+                console.log('2️⃣ filter-league element:', filterLeague);
+                if (filterLeague) {
+                    filterLeague.addEventListener('change', (e) => {
+                        console.log('📊 League changed to:', e.target.value);
+                        filters.league = e.target.value;
+                    });
                 }
-            });
-            
-            // Load initial matches
-            loadMatches();
+                
+                // Listen to search button
+                const searchBtn = document.getElementById('search-btn');
+                console.log('3️⃣ search-btn element:', searchBtn);
+                if (searchBtn) {
+                    searchBtn.addEventListener('click', () => {
+                        console.log('🔍 Search button clicked!');
+                        loadMatches();
+                    });
+                }
+                
+                // Listen to date picker
+                const dateInput = document.getElementById('filter-date');
+                console.log('4️⃣ Date input element:', dateInput);
+                if (dateInput) {
+                    dateInput.addEventListener('click', (e) => {
+                        console.log('📅 Date input clicked!');
+                        e.stopPropagation();
+                        toggleDatePicker();
+                    });
+                }
+                
+                const prevMonth = document.getElementById('prev-month');
+                console.log('5️⃣ prev-month element:', prevMonth);
+                if (prevMonth) {
+                    prevMonth.addEventListener('click', () => {
+                        console.log('⬅️ Prev month clicked');
+                        currentDatePickerMonth.setMonth(currentDatePickerMonth.getMonth() - 1);
+                        renderCalendar();
+                    });
+                }
+                
+                const nextMonth = document.getElementById('next-month');
+                console.log('6️⃣ next-month element:', nextMonth);
+                if (nextMonth) {
+                    nextMonth.addEventListener('click', () => {
+                        console.log('➡️ Next month clicked');
+                        currentDatePickerMonth.setMonth(currentDatePickerMonth.getMonth() + 1);
+                        renderCalendar();
+                    });
+                }
+                
+                // Fermer le date picker si on clique ailleurs
+                document.addEventListener('click', (e) => {
+                    const dateInput = document.getElementById('filter-date');
+                    const container = document.getElementById('date-picker-container');
+                    if (dateInput && container && !dateInput.contains(e.target) && !container.contains(e.target)) {
+                        container.style.display = 'none';
+                    }
+                });
+                
+                console.log('✅ All listeners attached');
+                
+                // Load initial matches
+                console.log('7️⃣ Loading initial matches...');
+                loadMatches();
+                console.log('✅ === DASHBOARD INITIALIZATION COMPLETE ===');
+            } catch (err) {
+                console.error('❌ ERROR during initialization:', err);
+                console.error('📍 Stack:', err.stack);
+            }
         }
         
         // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', initializeDashboard);
+        console.log('📝 Adding DOMContentLoaded listener...');
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('📡 DOMContentLoaded fired!');
+            initializeDashboard();
+        });
+        console.log('✅ DOMContentLoaded listener registered');
     </script>
 </body>
 </html>
