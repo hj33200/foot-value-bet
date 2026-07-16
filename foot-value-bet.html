@@ -836,15 +836,14 @@
         }
         async function getTeamLastMatches(teamId, leagueId) {
             try {
-                // Utiliser la VRAIE API directement (pas le proxy) avec plage de dates
-                const apiKey = state.settings.apiKey;
+                // Utiliser la VRAIE API directement avec plage de dates
                 const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&from=2023-01-01&to=2026-06-30`;
                 
                 console.log(`   🔗 API directe pour équipe ${teamId}`);
                 
                 const response = await fetch(url, {
                     headers: {
-                        'x-apisports-key': apiKey
+                        'x-apisports-key': API_KEY
                     }
                 });
                 
