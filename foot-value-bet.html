@@ -960,13 +960,10 @@
                 const awayDefense = Math.max(0, Math.min(100, 100 - ((awayStats.ga / awayMatches / 2) * 100)));
                 
                 // Forme: wins=15pts, draws=5pts, max ~10 matchs = max 150pts → 0-100
-                const homeFormStr = (homeStats && homeStats.form) ? homeStats.form : '';
-                const awayFormStr = (awayStats && awayStats.form) ? awayStats.form : '';
-                
-                const homeWins = (homeFormStr.match(/V/g) || []).length;
-                const awayWins = (awayFormStr.match(/V/g) || []).length;
-                const homeDraws = (homeFormStr.match(/D/g) || []).length;
-                const awayDraws = (awayFormStr.match(/D/g) || []).length;
+                const homeWins = homeStats.w || 0;
+                const awayWins = awayStats.w || 0;
+                const homeDraws = homeStats.d || 0;
+                const awayDraws = awayStats.d || 0;
                 
                 const homeForm = Math.min(100, ((homeWins * 15 + homeDraws * 5) / 150) * 100);
                 const awayForm = Math.min(100, ((awayWins * 15 + awayDraws * 5) / 150) * 100);
