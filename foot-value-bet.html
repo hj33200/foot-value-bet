@@ -829,45 +829,57 @@
         function getEloWithSOS(teamId, teamName, form, gf, ga, matches, rank, sosElo) {
             return calculateEloFromResultsWithSOS(teamName, form, gf, ga, matches, rank, sosElo);
         }
-        async function getTeamLastMatches(teamId, matchDate) {
+        async function getTeamLastMatches(teamId, leagueId) {
             try {
-                // Utiliser une plage de dates pour récupérer TOUS les matchs
-                // au lieu de &last=10 qui peut être incomplet
-                const fromDate = '2023-01-01';
-                const toDate = '2026-12-31';
+                // Utiliser la VRAIE API directement comme l'ancien code!
+                // Plage: 2023-01-01 à 2026-06-30 (couvre toutes les qualifications + WC)
+                const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&from=2023-01-01&to=2026-06-30`;
                 
-                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&from=${fromDate}&to=${toDate}`;
-                const response = await fetch(url);
-                const data = await response.json();
+                console.log(`   🔗 API directe pour équipe ${teamId}`);
                 
-                if (data.response && data.response.length > 0) {
-                    // Filtrer: garder SEULEMENT les matchs avec résultats
-                    const matchesWithResults = data.response.filter(m => 
-                        m.goals.home !== null && m.goals.away !== null
-                    );
-                    
-                    if (matchesWithResults.length === 0) {
-                        console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
-                        return [];
+                const response = await fetch(url, {
+                    headers: {
+                        'x-apisports-key': API_KEY
                     }
-                    
-                    // Trier par date CROISSANTE (ancien → récent)
-                    const sorted = matchesWithResults.sort((a, b) => {
-                        return new Date(a.fixture.date) - new Date(b.fixture.date);
-                    });
-                    
-                    // Prendre les 10 DERNIERS (slice(-10) = 10 derniers)
-                    const last10 = sorted.slice(-10);
-                    
-                    console.log(`   📥 Équipe ${teamId}: ${last10.length} derniers matchs (${sorted.length} total)`);
-                    console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
-                    
-                    return last10;
+                });
+                
+                if (!response.ok) {
+                    console.warn(`   ⚠️ Erreur HTTP ${response.status} pour équipe ${teamId}`);
+                    return [];
                 }
-                console.log(`   ⚠️ Aucun match trouvé pour équipe ${teamId}`);
-                return [];
+                
+                const data = await response.json();
+                const matches = data.response || [];
+                
+                if (matches.length === 0) {
+                    console.log(`   ⚠️ Aucun match pour équipe ${teamId}`);
+                    return [];
+                }
+                
+                // FILTRER: Garder seulement les matchs avec résultats (pas null-null)
+                const matchesWithResults = matches.filter(m => 
+                    m.goals.home !== null && m.goals.away !== null
+                );
+                
+                if (matchesWithResults.length === 0) {
+                    console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
+                    return [];
+                }
+                
+                // Trier par date (ancien → récent)
+                const sortedByDate = matchesWithResults.sort((a, b) => 
+                    new Date(a.fixture.date) - new Date(b.fixture.date)
+                );
+                
+                // Prendre les 10 DERNIERS matchs
+                const last10 = sortedByDate.slice(-10);
+                
+                console.log(`   ✅ Équipe ${teamId}: ${last10.length} derniers matchs (${matches.length} total)`);
+                console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
+                
+                return last10;
             } catch (error) {
-                console.error('Erreur stats équipe:', error);
+                console.error(`   ❌ Erreur équipe ${teamId}:`, error);
                 return [];
             }
         }
@@ -1105,12 +1117,11 @@ Vérifie:
                 console.log(`\n⚽ === MATCH ${idx + 1}: ${match.teams.home.name} vs ${match.teams.away.name} ===`);
                 
                 // Get last matches and stats
-                const homeMatches = await getTeamLastMatches(homeId);
-                const awayMatches = await getTeamLastMatches(awayId);
+                const leagueId = match.league.id;
+                const homeMatches = await getTeamLastMatches(homeId, leagueId);
+                const awayMatches = await getTeamLastMatches(awayId, leagueId);
                 
-                console.log(`   📥 ${match.teams.home.name}: ${homeMatches.length} derniers matchs`);
-                console.log(`   📥 ${match.teams.away.name}: ${awayMatches.length} derniers matchs`);
-                
+                // Calculer les stats depuis les VRAIS matchs
                 const homeStats = calculateTeamStats(homeMatches, homeId);
                 const awayStats = calculateTeamStats(awayMatches, awayId);
                 
@@ -1186,11 +1197,13 @@ Vérifie:
             const match = matchesData[idx];
             const homeId = match.teams.home.id;
             const awayId = match.teams.away.id;
+            const leagueId = match.league.id;
             
-            // Get stats
-            const homeMatches = await getTeamLastMatches(homeId);
-            const awayMatches = await getTeamLastMatches(awayId);
+            // Get last 10 matches
+            const homeMatches = await getTeamLastMatches(homeId, leagueId);
+            const awayMatches = await getTeamLastMatches(awayId, leagueId);
             
+            // Calculer les stats depuis les VRAIS matchs
             const homeStats = calculateTeamStats(homeMatches, homeId);
             const awayStats = calculateTeamStats(awayMatches, awayId);
             
