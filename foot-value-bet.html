@@ -794,10 +794,12 @@
             
             const eloBase = rankingToElo(rank || 50);
             console.log(`   1️⃣ ELO Base (rank ${rank}): ${eloBase.toFixed(2)}`);
+            console.log(`      Formule: 1600 + (100 / √rank) = 1600 + (100 / √${rank}) = ${eloBase.toFixed(2)}`);
             
             // Strength of Schedule adjustment
             const sosRatio = sosElo / 1600;
             console.log(`   📊 SOS Ratio: ${sosRatio.toFixed(3)} (SOS=${sosElo.toFixed(0)}, moyenne=1600)`);
+            console.log(`      Calcul: ${sosElo.toFixed(0)} / 1600 = ${sosRatio.toFixed(3)}`);
             
             // PERFORMANCE BONUS with SOS multiplier
             const K_FACTOR = 32;
@@ -807,36 +809,51 @@
             const points = winCount * 3 + drawCount;
             const winRate = points / (matches * 3);
             
-            console.log(`   2️⃣ Performance: ${winCount}V, ${drawCount}D, ${lossCount}L → Points: ${points}, Taux: ${(winRate*100).toFixed(1)}%`);
+            console.log(`   2️⃣ Performance: ${winCount}V, ${drawCount}D, ${lossCount}L`);
+            console.log(`      Points: (${winCount}×3) + (${drawCount}×1) = ${points} pts`);
+            console.log(`      Taux: ${points} / (${matches}×3) = ${(winRate*100).toFixed(1)}%`);
             
             // Adjust K-factor based on SOS
             const adjustedKFactor = K_FACTOR * sosRatio;
             const performanceBonus = adjustedKFactor * (winRate - 0.5) * matches;
-            console.log(`   2️⃣ Performance Bonus: ${K_FACTOR} × ${sosRatio.toFixed(3)} × (${(winRate*100).toFixed(1)}% - 50%) × ${matches} = ${performanceBonus.toFixed(2)}`);
+            console.log(`   2️⃣ Performance Bonus:`);
+            console.log(`      K-factor ajusté: ${K_FACTOR} × ${sosRatio.toFixed(3)} = ${adjustedKFactor.toFixed(3)}`);
+            console.log(`      Formule: ${adjustedKFactor.toFixed(3)} × (${(winRate*100).toFixed(1)}% - 50%) × ${matches}`);
+            console.log(`      Résultat: ${performanceBonus.toFixed(2)}`);
             
             // GOALS BONUS (also affected by SOS)
             const avgGF = gf / Math.max(1, matches);
             const avgGA = ga / Math.max(1, matches);
             const goalDiff = avgGF - avgGA;
             const goalsBonus = goalDiff * 50 * sosRatio;
-            console.log(`   3️⃣ Goals: ${gf}/${ga} = ${avgGF.toFixed(2)}/${avgGA.toFixed(2)} → Diff: ${goalDiff.toFixed(2)}`);
+            console.log(`   3️⃣ Goals Differential:`);
+            console.log(`      Moyenne marqués: ${gf} / ${matches} = ${avgGF.toFixed(2)} buts/match`);
+            console.log(`      Moyenne encaissés: ${ga} / ${matches} = ${avgGA.toFixed(2)} buts/match`);
+            console.log(`      Différence: ${avgGF.toFixed(2)} - ${avgGA.toFixed(2)} = ${goalDiff.toFixed(2)}`);
             console.log(`   3️⃣ Goals Bonus: ${goalDiff.toFixed(2)} × 50 × ${sosRatio.toFixed(3)} = ${goalsBonus.toFixed(2)}`);
             
             // CALCULATE RAW ELO
             let eloRaw = eloBase + performanceBonus + goalsBonus;
-            console.log(`   4️⃣ ELO Raw: ${eloBase.toFixed(2)} + ${performanceBonus.toFixed(2)} + ${goalsBonus.toFixed(2)} = ${eloRaw.toFixed(2)}`);
+            console.log(`   4️⃣ ELO Raw:`);
+            console.log(`      ${eloBase.toFixed(2)} + ${performanceBonus.toFixed(2)} + ${goalsBonus.toFixed(2)} = ${eloRaw.toFixed(2)}`);
             
             // CONFIDENCE FACTOR
             const confidence = Math.min(0.95, 0.4 + (matches / 30));
-            console.log(`   5️⃣ Confidence Factor: min(0.95, 0.4 + ${matches}/30) = ${(confidence*100).toFixed(1)}%`);
+            console.log(`   5️⃣ Confidence Factor (sample size):`);
+            console.log(`      min(0.95, 0.4 + ${matches}/30) = min(0.95, ${(0.4 + matches/30).toFixed(3)}) = ${(confidence*100).toFixed(1)}%`);
             
             // BLEND
             let elo = eloBase * (1 - confidence) + eloRaw * confidence;
-            console.log(`   6️⃣ ELO après blend: ${eloBase.toFixed(2)} × ${((1-confidence)*100).toFixed(1)}% + ${eloRaw.toFixed(2)} × ${(confidence*100).toFixed(1)}% = ${elo.toFixed(2)}`);
+            const baseWeight = ((1-confidence)*100).toFixed(1);
+            const rawWeight = (confidence*100).toFixed(1);
+            console.log(`   6️⃣ ELO Blend (Base vs Raw):`);
+            console.log(`      ${eloBase.toFixed(2)} × ${baseWeight}% (conservateur)`);
+            console.log(`      ${eloRaw.toFixed(2)} × ${rawWeight}% (dynamique)`);
+            console.log(`      Résultat: ${elo.toFixed(2)}`);
             
             // CLAMP
             const eloFinal = clamp(elo, 1200, 2000);
-            console.log(`   7️⃣ ELO Final (clamped 1200-2000): ${eloFinal.toFixed(0)} ✅\n`);
+            console.log(`   7️⃣ ELO Final (limité 1200-2000): ${eloFinal.toFixed(0)} ✅\n`);
             
             return eloFinal;
         }
