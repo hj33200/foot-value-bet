@@ -930,6 +930,9 @@
                 return `<span style="color: ${color}; font-weight: 600; margin: 0 2px;">${letter}</span>`;
             }).join('');
         }
+        
+        // Calculate form from last 10 matches
+        function calculateForm(matches, teamId) {
             if (!matches || matches.length === 0) return 'N/A';
             
             // Limiter à 10 matchs
