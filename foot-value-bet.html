@@ -839,6 +839,8 @@
                 // Utiliser l'endpoint /standings qui inclut la form de chaque équipe
                 const url = `${PROXY_URL}?endpoint=/standings&apikey=${API_KEY}&season=2026&league=${leagueId}`;
                 
+                console.log(`   🔗 /standings pour ligue ${leagueId}, équipe ${teamId}`);
+                
                 const response = await fetch(url);
                 
                 if (!response.ok) {
@@ -855,17 +857,17 @@
                 
                 // Chercher l'équipe dans les standings
                 let teamStats = null;
-                for (let group of data.response) {
-                    if (group.group) {
-                        for (let team of group.standings) {
-                            if (team.team.id === teamId) {
-                                teamStats = team;
-                                break;
-                            }
-                        }
-                    } else {
-                        for (let team of group) {
-                            if (team.team.id === teamId) {
+                
+                for (let leagueGroup of data.response) {
+                    // Structure: { league: {...}, standings: [[...]] }
+                    if (leagueGroup.standings) {
+                        // standings peut être un tableau de tableaux [[...]]
+                        const standingsArray = Array.isArray(leagueGroup.standings[0]) 
+                            ? leagueGroup.standings.flat() 
+                            : leagueGroup.standings;
+                        
+                        for (let team of standingsArray) {
+                            if (team && team.team && team.team.id === teamId) {
                                 teamStats = team;
                                 break;
                             }
@@ -879,16 +881,15 @@
                     return [];
                 }
                 
-                // Récupérer la form (ex: "WDVDL")
+                // Récupérer la form (ex: "VVVVL" ou "WDVDL")
                 const form = teamStats.form || '';
                 const played = teamStats.all?.played || 0;
                 const gf = teamStats.all?.goals?.for || 0;
                 const ga = teamStats.all?.goals?.against || 0;
                 
-                console.log(`   ✅ Équipe ${teamId} (ligue ${leagueId}): Form=${form}, ${played}M, ${gf}GF, ${ga}GA`);
+                console.log(`   ✅ ${teamStats.team.name} (équipe ${teamId}): Form="${form}" | ${played}M | ${gf}GF ${ga}GA`);
                 
-                // Retourner un objet "fictif" pour que calculateTeamStats marche
-                // On retourne un tableau de 1 élément avec les stats
+                // Retourner un objet avec les stats
                 return [{
                     form: form,
                     stats: { gf, ga, played }
