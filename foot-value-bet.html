@@ -860,26 +860,36 @@
                 const matches = data.response || [];
                 console.log(`   📊 Results: ${data.results}, Matches trouvés: ${matches.length}`);
                 
+                if (matches.length > 0) {
+                    console.log(`   📋 Premiers matchs:`);
+                    matches.slice(0, 3).forEach((m, i) => {
+                        console.log(`      [${i}] ${m.teams.home.name} vs ${m.teams.away.name} | League: ${m.league.name} (ID: ${m.league.id}) | Status: ${m.fixture.status}`);
+                    });
+                }
+                
                 if (matches.length === 0) {
                     console.log(`   ⚠️ Aucun match pour équipe ${teamId}`);
                     return [];
                 }
                 
                 // FILTRER: Garder seulement les matchs avec résultats (pas null-null)
-                // ET exclure les matchs de club (domestic leagues)
-                // Les compétitions nationales ont des league.id bas (1-100 environ) ou type="friendly"
-                const CLUB_LEAGUES = [39, 40, 41, 48, 50, 61, 78, 82, 84, 135, 140]; // Club leagues
-                
+                // ET status = FT (Finished)
                 const matchesWithResults = matches.filter(m => {
                     const hasResult = m.goals.home !== null && m.goals.away !== null;
                     const isFinished = m.fixture.status === 'FT';
-                    const isCompetitionOrFriendly = !CLUB_LEAGUES.includes(m.league.id);
-                    
-                    return hasResult && isFinished && isCompetitionOrFriendly;
+                    return hasResult && isFinished;
                 });
                 
+                console.log(`   🔍 Après filtre (hasResult + FT): ${matchesWithResults.length} matchs`);
+                
+                if (matchesWithResults.length > 0) {
+                    matchesWithResults.slice(0, 2).forEach((m, i) => {
+                        console.log(`      ✅ [${i}] ${m.teams.home.name} vs ${m.teams.away.name} | ${m.goals.home}:${m.goals.away}`);
+                    });
+                }
+                
                 if (matchesWithResults.length === 0) {
-                    console.log(`   ⚠️ Aucun match de compétition/amical pour équipe ${teamId}`);
+                    console.log(`   ⚠️ Aucun match avec résultat FT pour équipe ${teamId}`);
                     return [];
                 }
                 
