@@ -917,6 +917,126 @@
             }
         }
         
+        // Calculer les stats avancées
+        function calculateAdvancedStats(matches, teamId) {
+            if (!matches || matches.length === 0) {
+                return {
+                    cleanSheets: 0,
+                    cleanSheetPct: 0,
+                    recentForm: 'N/A',
+                    recentTrend: 'N/A',
+                    longestStreak: 0,
+                    longestStreakType: '',
+                    efficiency: 0,
+                    defensiveRating: 0
+                };
+            }
+            
+            // 1. Clean Sheets (matchs sans encaisser)
+            let cleanSheets = 0;
+            matches.forEach(m => {
+                const isHome = m.teams.home.id === teamId;
+                const goalsAgainst = isHome ? m.goals.away : m.goals.home;
+                if (goalsAgainst === 0) cleanSheets++;
+            });
+            const cleanSheetPct = (cleanSheets / matches.length * 100).toFixed(1);
+            
+            // 2. Tendance: comparer form récente vs avant
+            let recentForm = '';
+            let olderForm = '';
+            
+            matches.forEach((m, idx) => {
+                const isHome = m.teams.home.id === teamId;
+                const goalsFor = isHome ? m.goals.home : m.goals.away;
+                const goalsAgainst = isHome ? m.goals.away : m.goals.home;
+                
+                let result = '?';
+                if (goalsFor > goalsAgainst) result = 'V';
+                else if (goalsFor === goalsAgainst) result = 'D';
+                else result = 'L';
+                
+                if (idx >= matches.length - 5) {
+                    recentForm += result;
+                } else if (idx < matches.length - 10) {
+                    olderForm += result;
+                }
+            });
+            
+            // Calculer la tendance
+            const recentWins = (recentForm.match(/V/g) || []).length;
+            const olderWins = (olderForm.match(/V/g) || []).length;
+            let recentTrend = '→';
+            if (recentWins > olderWins) recentTrend = '↑';
+            else if (recentWins < olderWins) recentTrend = '↓';
+            
+            // 3. Série: plus long streak de victoires consécutives
+            let longestStreak = 0;
+            let currentStreak = 0;
+            let longestStreakType = '';
+            let currentStreakType = '';
+            
+            matches.forEach(m => {
+                const isHome = m.teams.home.id === teamId;
+                const goalsFor = isHome ? m.goals.home : m.goals.away;
+                const goalsAgainst = isHome ? m.goals.away : m.goals.home;
+                
+                let result = '?';
+                if (goalsFor > goalsAgainst) result = 'V';
+                else if (goalsFor === goalsAgainst) result = 'D';
+                else result = 'L';
+                
+                if (result === 'V') {
+                    if (currentStreakType !== 'V') {
+                        currentStreak = 1;
+                        currentStreakType = 'V';
+                    } else {
+                        currentStreak++;
+                    }
+                } else if (result === 'D') {
+                    if (currentStreakType !== 'D') {
+                        currentStreak = 1;
+                        currentStreakType = 'D';
+                    } else {
+                        currentStreak++;
+                    }
+                } else {
+                    currentStreak = 0;
+                    currentStreakType = '';
+                }
+                
+                if (currentStreak > longestStreak) {
+                    longestStreak = currentStreak;
+                    longestStreakType = currentStreakType;
+                }
+            });
+            
+            // 4. Efficacité: buts par match
+            let totalGF = 0;
+            let totalGA = 0;
+            
+            matches.forEach(m => {
+                const isHome = m.teams.home.id === teamId;
+                const goalsFor = isHome ? m.goals.home : m.goals.away;
+                const goalsAgainst = isHome ? m.goals.away : m.goals.home;
+                totalGF += goalsFor;
+                totalGA += goalsAgainst;
+            });
+            
+            const efficiency = (totalGF / matches.length).toFixed(2);
+            const defensiveRating = (totalGA / matches.length).toFixed(2);
+            
+            return {
+                cleanSheets,
+                cleanSheetPct,
+                recentForm,
+                recentTrend,
+                longestStreak,
+                longestStreakType,
+                efficiency,
+                defensiveRating
+            };
+        }
+        
         // Get team statistics
         async function getTeamStats(teamId) {
             try {
@@ -1422,6 +1542,10 @@ Vérifie:
             const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, homeRank, homeSOS);
             const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, awayRank, awaySOS);
             
+            // Calculate advanced stats
+            const homeAdvanced = calculateAdvancedStats(homeMatches, homeId);
+            const awayAdvanced = calculateAdvancedStats(awayMatches, awayId);
+            
             // Format last matches
             const formatMatches = (matches, teamId) => {
                 if (!matches || matches.length === 0) return '<tr><td colspan="5">Aucun match</td></tr>';
@@ -1485,6 +1609,33 @@ Vérifie:
                             <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">📈 Comparaison des Forces</h3>
                             <div style="background: rgba(30, 30, 30, 0.5); border: 1px solid var(--border); border-radius: 8px; padding: 15px;">
                                 <canvas id="radarChart" style="max-width: 100%; height: 350px;"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                            <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">⚡ Stats Avancées</h3>
+                            
+                            <div class="info-grid">
+                                <div class="info-card">
+                                    <div class="info-label">${match.teams.home.name}</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
+                                        <div>🛡️ Clean Sheets: ${homeAdvanced.cleanSheets}/${homeMatches.length} (${homeAdvanced.cleanSheetPct}%)</div>
+                                        <div style="margin-top: 5px;">📈 Tendance: ${homeAdvanced.recentTrend} ${homeAdvanced.recentForm}</div>
+                                        <div style="margin-top: 5px;">🔥 Série: ${homeAdvanced.longestStreak}${homeAdvanced.longestStreakType || '?'}</div>
+                                        <div style="margin-top: 5px;">⚽ Efficacité: ${homeAdvanced.efficiency} buts/match</div>
+                                        <div style="margin-top: 5px;">🛡️ Défense: ${homeAdvanced.defensiveRating} encaissés/match</div>
+                                    </div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-label">${match.teams.away.name}</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
+                                        <div>🛡️ Clean Sheets: ${awayAdvanced.cleanSheets}/${awayMatches.length} (${awayAdvanced.cleanSheetPct}%)</div>
+                                        <div style="margin-top: 5px;">📈 Tendance: ${awayAdvanced.recentTrend} ${awayAdvanced.recentForm}</div>
+                                        <div style="margin-top: 5px;">🔥 Série: ${awayAdvanced.longestStreak}${awayAdvanced.longestStreakType || '?'}</div>
+                                        <div style="margin-top: 5px;">⚽ Efficacité: ${awayAdvanced.efficiency} buts/match</div>
+                                        <div style="margin-top: 5px;">🛡️ Défense: ${awayAdvanced.defensiveRating} encaissés/match</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
