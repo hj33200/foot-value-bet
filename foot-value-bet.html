@@ -753,14 +753,29 @@
                 const isHome = match.teams.home.id === teamId;
                 const opponent = isHome ? match.teams.away : match.teams.home;
                 
-                // Estimate opponent ELO from their rank (simplified)
-                const opponentElo = rankingToElo(50); // Default to rank 50
+                // Utiliser le VRAI rang FIFA de l'adversaire!
+                const opponentRank = getRankingByTeamName(opponent.name);
+                const opponentElo = rankingToElo(opponentRank);
                 totalOpponentElo += opponentElo;
                 count++;
             });
             
             const sosElo = count > 0 ? totalOpponentElo / count : 1600;
-            console.log(`   📊 SOS pour équipe ${teamId}: ${sosElo.toFixed(0)} (${count} matchs max 10)`);
+            console.log(`   📊 SOS pour équipe ${teamId}: ${sosElo.toFixed(0)} (${count} matchs)`);
+            
+            // Log détaillé des adversaires
+            if (count > 0) {
+                const opponents = [];
+                last10.forEach(match => {
+                    const isHome = match.teams.home.id === teamId;
+                    const opponent = isHome ? match.teams.away : match.teams.home;
+                    const rank = getRankingByTeamName(opponent.name);
+                    const elo = rankingToElo(rank);
+                    opponents.push(`${opponent.name}(#${rank}:${elo.toFixed(0)})`);
+                });
+                console.log(`      Adversaires: ${opponents.join(', ')}`);
+            }
+            
             return sosElo;
         }
         
@@ -831,13 +846,13 @@
         }
         async function getTeamLastMatches(teamId, leagueId) {
             try {
-                // Utiliser le PROXY comme pour les matchs! C'était plus simple!
+                // Récupérer les fixtures de l'équipe via le proxy
+                // Augmenter last=20 pour s'assurer d'avoir 10 matchs valides
                 const season = 2026;
                 
-                // Récupérer les fixtures de l'équipe via le proxy
-                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=10`;
+                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=20`;
                 
-                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId}`);
+                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (last=20)`);
                 
                 const response = await fetch(url);
                 
