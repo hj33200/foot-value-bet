@@ -359,7 +359,7 @@
         <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 40px; display: grid; grid-template-columns: 1fr 1fr 120px; gap: 20px; align-items: flex-end;">
             <div>
                 <label style="display: block; margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600;">Championnat</label>
-                <select id="filter-league" style="width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;">
+                <select id="filter-league" style="width: 100%; padding: 12px; background: rgba(30, 30, 30, 0.8); border: 2px solid var(--primary); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;">
                     <option value="all">Tous les championnats</option>
                     <option value="1">🌍 Coupe du Monde 2026</option>
                     <option value="140">Ligue 1 (France)</option>
@@ -375,8 +375,8 @@
             </div>
             <div>
                 <label style="display: block; margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600;">Date</label>
-                <input type="text" id="filter-date" style="width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;" readonly placeholder="Sélectionner une date">
-                <div id="date-picker-container" style="display: none; position: absolute; background: rgba(30, 41, 59, 0.9); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-top: 5px; z-index: 500; min-width: 300px;">
+                <input type="text" id="filter-date" style="width: 100%; padding: 12px; background: rgba(30, 30, 30, 0.8); border: 2px solid var(--primary); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;" readonly placeholder="Sélectionner une date">
+                <div id="date-picker-container" style="display: none; position: absolute; background: rgba(20, 20, 20, 0.95); border: 2px solid var(--primary); border-radius: 8px; padding: 20px; margin-top: 5px; z-index: 500; min-width: 300px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <button id="prev-month" style="background: rgba(212, 175, 55, 0.2); border: 1px solid var(--primary); color: var(--primary); padding: 6px 12px; border-radius: 6px; cursor: pointer;">← Prev</button>
                         <span id="month-year" style="font-weight: 600; color: var(--text-primary);">Avril 2025</span>
@@ -1029,12 +1029,13 @@
                 html += `<button onclick="selectDate('${dateStr}')" style="
                     padding: 8px;
                     border-radius: 6px;
-                    border: 1px solid var(--border);
-                    background: ${isSelected ? 'var(--primary)' : (isToday ? 'rgba(212, 175, 55, 0.2)' : 'rgba(15, 23, 42, 0.3)')};
-                    color: ${isSelected ? 'var(--bg-dark)' : 'var(--text-primary)'};
+                    border: 1px solid var(--primary);
+                    background: ${isSelected ? 'var(--primary)' : (isToday ? 'rgba(212, 175, 55, 0.3)' : 'rgba(60, 60, 60, 0.5)')};
+                    color: ${isSelected ? '#000' : 'var(--text-primary)'};
                     cursor: pointer;
                     font-weight: 600;
                     font-size: 12px;
+                    transition: all 0.2s;
                 ">${day}</button>`;
             }
             
