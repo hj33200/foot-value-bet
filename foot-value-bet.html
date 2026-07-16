@@ -836,66 +836,54 @@
         }
         async function getTeamLastMatches(teamId, leagueId) {
             try {
-                // Utiliser l'endpoint /standings qui inclut la form de chaque équipe
-                const url = `${PROXY_URL}?endpoint=/standings&apikey=${API_KEY}&season=2026&league=${leagueId}`;
+                // Utiliser la VRAIE API directement (pas le proxy) avec plage de dates
+                const apiKey = state.settings.apiKey;
+                const url = `https://v3.football.api-sports.io/fixtures?team=${teamId}&from=2023-01-01&to=2026-06-30`;
                 
-                console.log(`   🔗 /standings pour ligue ${leagueId}, équipe ${teamId}`);
+                console.log(`   🔗 API directe pour équipe ${teamId}`);
                 
-                const response = await fetch(url);
+                const response = await fetch(url, {
+                    headers: {
+                        'x-apisports-key': apiKey
+                    }
+                });
                 
                 if (!response.ok) {
-                    console.warn(`   ⚠️ Erreur HTTP ${response.status} pour standings ligue ${leagueId}`);
+                    console.warn(`   ⚠️ Erreur HTTP ${response.status} pour équipe ${teamId}`);
                     return [];
                 }
                 
                 const data = await response.json();
                 
-                if (!data.response || !Array.isArray(data.response)) {
-                    console.log(`   ⚠️ Aucun standing trouvé pour ligue ${leagueId}`);
+                if (!data.response || data.response.length === 0) {
+                    console.log(`   ⚠️ Aucun match trouvé pour équipe ${teamId}`);
                     return [];
                 }
                 
-                // Chercher l'équipe dans les standings
-                let teamStats = null;
+                // Filtrer: garder SEULEMENT les matchs avec résultats
+                const matchesWithResults = data.response.filter(m => 
+                    m.goals.home !== null && m.goals.away !== null
+                );
                 
-                for (let leagueGroup of data.response) {
-                    // Structure: { league: {...}, standings: [[...]] }
-                    if (leagueGroup.standings) {
-                        // standings peut être un tableau de tableaux [[...]]
-                        const standingsArray = Array.isArray(leagueGroup.standings[0]) 
-                            ? leagueGroup.standings.flat() 
-                            : leagueGroup.standings;
-                        
-                        for (let team of standingsArray) {
-                            if (team && team.team && team.team.id === teamId) {
-                                teamStats = team;
-                                break;
-                            }
-                        }
-                    }
-                    if (teamStats) break;
-                }
-                
-                if (!teamStats) {
-                    console.log(`   ⚠️ Équipe ${teamId} non trouvée dans standings ligue ${leagueId}`);
+                if (matchesWithResults.length === 0) {
+                    console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
                     return [];
                 }
                 
-                // Récupérer la form (ex: "VVVVL" ou "WDVDL")
-                const form = teamStats.form || '';
-                const played = teamStats.all?.played || 0;
-                const gf = teamStats.all?.goals?.for || 0;
-                const ga = teamStats.all?.goals?.against || 0;
+                // Trier par date CROISSANTE (ancien → récent)
+                const sorted = matchesWithResults.sort((a, b) => {
+                    return new Date(a.fixture.date) - new Date(b.fixture.date);
+                });
                 
-                console.log(`   ✅ ${teamStats.team.name} (équipe ${teamId}): Form="${form}" | ${played}M | ${gf}GF ${ga}GA`);
+                // Prendre les 10 DERNIERS (.slice(-10))
+                const last10 = sorted.slice(-10);
                 
-                // Retourner un objet avec les stats
-                return [{
-                    form: form,
-                    stats: { gf, ga, played }
-                }];
+                console.log(`   ✅ Équipe ${teamId}: ${last10.length} derniers matchs (${sorted.length} total avec résultats)`);
+                console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
+                
+                return last10;
             } catch (error) {
-                console.error(`   ❌ Erreur standings équipe ${teamId}:`, error);
+                console.error(`   ❌ Erreur équipe ${teamId}:`, error);
                 return [];
             }
         }
@@ -1134,40 +1122,15 @@ Vérifie:
                 
                 // Get last matches and stats
                 const leagueId = match.league.id;
-                const homeStandingsData = await getTeamLastMatches(homeId, leagueId);
-                const awayStandingsData = await getTeamLastMatches(awayId, leagueId);
+                const homeMatches = await getTeamLastMatches(homeId, leagueId);
+                const awayMatches = await getTeamLastMatches(awayId, leagueId);
                 
-                // Extraire form et stats directement
-                let homeForm = 'N/A';
-                let homeStats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: 0 };
-                let awayForm = 'N/A';
-                let awayStats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: 0 };
+                // Calculer les stats depuis les vrais matchs
+                const homeStats = calculateTeamStats(homeMatches, homeId);
+                const awayStats = calculateTeamStats(awayMatches, awayId);
                 
-                if (homeStandingsData.length > 0) {
-                    const homeData = homeStandingsData[0];
-                    homeForm = homeData.form || 'N/A';
-                    if (homeData.stats) {
-                        homeStats = {
-                            gf: homeData.stats.gf || 0,
-                            ga: homeData.stats.ga || 0,
-                            w: 0, d: 0, l: 0,
-                            matches: homeData.stats.played || 0
-                        };
-                    }
-                }
-                
-                if (awayStandingsData.length > 0) {
-                    const awayData = awayStandingsData[0];
-                    awayForm = awayData.form || 'N/A';
-                    if (awayData.stats) {
-                        awayStats = {
-                            gf: awayData.stats.gf || 0,
-                            ga: awayData.stats.ga || 0,
-                            w: 0, d: 0, l: 0,
-                            matches: awayData.stats.played || 0
-                        };
-                    }
-                }
+                const homeForm = calculateForm(homeMatches, homeId);
+                const awayForm = calculateForm(awayMatches, awayId);
                 
                 console.log(`   📥 ${match.teams.home.name}: Form=${homeForm}`);
                 console.log(`   📥 ${match.teams.away.name}: Form=${awayForm}`);
@@ -1243,45 +1206,16 @@ Vérifie:
             const awayId = match.teams.away.id;
             const leagueId = match.league.id;
             
-            // Get stats from standings
-            const homeStandingsData = await getTeamLastMatches(homeId, leagueId);
-            const awayStandingsData = await getTeamLastMatches(awayId, leagueId);
+            // Get last 10 matches
+            const homeMatches = await getTeamLastMatches(homeId, leagueId);
+            const awayMatches = await getTeamLastMatches(awayId, leagueId);
             
-            // Extraire form et stats directement
-            let homeForm = 'N/A';
-            let homeStats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: 0 };
-            let awayForm = 'N/A';
-            let awayStats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: 0 };
+            // Calculer stats depuis les vrais matchs
+            const homeStats = calculateTeamStats(homeMatches, homeId);
+            const awayStats = calculateTeamStats(awayMatches, awayId);
             
-            if (homeStandingsData.length > 0) {
-                const homeData = homeStandingsData[0];
-                homeForm = homeData.form || 'N/A';
-                if (homeData.stats) {
-                    homeStats = {
-                        gf: homeData.stats.gf || 0,
-                        ga: homeData.stats.ga || 0,
-                        w: 0, d: 0, l: 0,
-                        matches: homeData.stats.played || 0
-                    };
-                }
-            }
-            
-            if (awayStandingsData.length > 0) {
-                const awayData = awayStandingsData[0];
-                awayForm = awayData.form || 'N/A';
-                if (awayData.stats) {
-                    awayStats = {
-                        gf: awayData.stats.gf || 0,
-                        ga: awayData.stats.ga || 0,
-                        w: 0, d: 0, l: 0,
-                        matches: awayData.stats.played || 0
-                    };
-                }
-            }
-            
-            // Calculate Strength of Schedule (simplified - pas de matchs disponibles)
-            const homeSOS = 1600;  // SOS moyen
-            const awaySOS = 1600;
+            const homeForm = calculateForm(homeMatches, homeId);
+            const awayForm = calculateForm(awayMatches, awayId);
             
             // Get real FIFA rankings
             const homeRank = getRankingByTeamName(match.teams.home.name);
