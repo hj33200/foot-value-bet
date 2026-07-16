@@ -1606,34 +1606,27 @@ Vérifie:
                         </div>
                         
                         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-                            <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">📈 Comparaison des Forces</h3>
-                            <div style="background: rgba(30, 30, 30, 0.5); border: 1px solid var(--border); border-radius: 8px; padding: 15px;">
-                                <canvas id="radarChart" style="max-width: 100%; height: 350px;"></canvas>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
                             <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">⚡ Stats Avancées</h3>
                             
                             <div class="info-grid">
                                 <div class="info-card">
                                     <div class="info-label">${match.teams.home.name}</div>
                                     <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
-                                        <div>🛡️ Clean Sheets: ${homeAdvanced.cleanSheets}/${homeMatches.length} (${homeAdvanced.cleanSheetPct}%)</div>
-                                        <div style="margin-top: 5px;">📈 Tendance: ${homeAdvanced.recentTrend} ${homeAdvanced.recentForm}</div>
-                                        <div style="margin-top: 5px;">🔥 Série: ${homeAdvanced.longestStreak}${homeAdvanced.longestStreakType || '?'}</div>
-                                        <div style="margin-top: 5px;">⚽ Efficacité: ${homeAdvanced.efficiency} buts/match</div>
-                                        <div style="margin-top: 5px;">🛡️ Défense: ${homeAdvanced.defensiveRating} encaissés/match</div>
+                                        <div style="color: ${homeAdvanced.cleanSheets > awayAdvanced.cleanSheets ? '#10b981' : homeAdvanced.cleanSheets < awayAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'};">🛡️ Clean Sheets: ${homeAdvanced.cleanSheets}/${homeMatches.length} (${homeAdvanced.cleanSheetPct}%)</div>
+                                        <div style="margin-top: 5px; color: ${homeAdvanced.recentTrend === '↑' ? '#10b981' : homeAdvanced.recentTrend === '↓' ? '#ef4444' : '#f59e0b'};">📈 Tendance: ${homeAdvanced.recentTrend} ${homeAdvanced.recentForm}</div>
+                                        <div style="margin-top: 5px; color: ${homeAdvanced.longestStreak > awayAdvanced.longestStreak ? '#10b981' : homeAdvanced.longestStreak < awayAdvanced.longestStreak ? '#ef4444' : '#f59e0b'};">🔥 Série: ${homeAdvanced.longestStreak}${homeAdvanced.longestStreakType || '?'}</div>
+                                        <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.efficiency) > parseFloat(awayAdvanced.efficiency) ? '#10b981' : parseFloat(homeAdvanced.efficiency) < parseFloat(awayAdvanced.efficiency) ? '#ef4444' : '#f59e0b'};">⚽ Efficacité: ${homeAdvanced.efficiency} buts/match</div>
+                                        <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.defensiveRating) < parseFloat(awayAdvanced.defensiveRating) ? '#10b981' : parseFloat(homeAdvanced.defensiveRating) > parseFloat(awayAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'};">🛡️ Défense: ${homeAdvanced.defensiveRating} encaissés/match</div>
                                     </div>
                                 </div>
                                 <div class="info-card">
                                     <div class="info-label">${match.teams.away.name}</div>
                                     <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
-                                        <div>🛡️ Clean Sheets: ${awayAdvanced.cleanSheets}/${awayMatches.length} (${awayAdvanced.cleanSheetPct}%)</div>
-                                        <div style="margin-top: 5px;">📈 Tendance: ${awayAdvanced.recentTrend} ${awayAdvanced.recentForm}</div>
-                                        <div style="margin-top: 5px;">🔥 Série: ${awayAdvanced.longestStreak}${awayAdvanced.longestStreakType || '?'}</div>
-                                        <div style="margin-top: 5px;">⚽ Efficacité: ${awayAdvanced.efficiency} buts/match</div>
-                                        <div style="margin-top: 5px;">🛡️ Défense: ${awayAdvanced.defensiveRating} encaissés/match</div>
+                                        <div style="color: ${awayAdvanced.cleanSheets > homeAdvanced.cleanSheets ? '#10b981' : awayAdvanced.cleanSheets < homeAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'};">🛡️ Clean Sheets: ${awayAdvanced.cleanSheets}/${awayMatches.length} (${awayAdvanced.cleanSheetPct}%)</div>
+                                        <div style="margin-top: 5px; color: ${awayAdvanced.recentTrend === '↑' ? '#10b981' : awayAdvanced.recentTrend === '↓' ? '#ef4444' : '#f59e0b'};">📈 Tendance: ${awayAdvanced.recentTrend} ${awayAdvanced.recentForm}</div>
+                                        <div style="margin-top: 5px; color: ${awayAdvanced.longestStreak > homeAdvanced.longestStreak ? '#10b981' : awayAdvanced.longestStreak < homeAdvanced.longestStreak ? '#ef4444' : '#f59e0b'};">🔥 Série: ${awayAdvanced.longestStreak}${awayAdvanced.longestStreakType || '?'}</div>
+                                        <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.efficiency) > parseFloat(homeAdvanced.efficiency) ? '#10b981' : parseFloat(awayAdvanced.efficiency) < parseFloat(homeAdvanced.efficiency) ? '#ef4444' : '#f59e0b'};">⚽ Efficacité: ${awayAdvanced.efficiency} buts/match</div>
+                                        <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.defensiveRating) < parseFloat(homeAdvanced.defensiveRating) ? '#10b981' : parseFloat(awayAdvanced.defensiveRating) > parseFloat(homeAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'};">🛡️ Défense: ${awayAdvanced.defensiveRating} encaissés/match</div>
                                     </div>
                                 </div>
                             </div>
@@ -1705,10 +1698,6 @@ Vérifie:
             `;
             
             document.getElementById('match-detail-content').innerHTML = html;
-            
-            // Initialize radar chart
-            initRadarChart(match.teams.home.name, match.teams.away.name, homeStats, awayStats, homeElo, awayElo);
-            
             switchPage('detail');
         }
         
