@@ -923,10 +923,6 @@
                 return {
                     cleanSheets: 0,
                     cleanSheetPct: 0,
-                    recentForm: 'N/A',
-                    recentTrend: 'N/A',
-                    longestStreak: 0,
-                    longestStreakType: '',
                     efficiency: 0,
                     defensiveRating: 0
                 };
@@ -941,76 +937,7 @@
             });
             const cleanSheetPct = (cleanSheets / matches.length * 100).toFixed(1);
             
-            // 2. Tendance: comparer form récente vs avant
-            let recentForm = '';
-            let olderForm = '';
-            
-            matches.forEach((m, idx) => {
-                const isHome = m.teams.home.id === teamId;
-                const goalsFor = isHome ? m.goals.home : m.goals.away;
-                const goalsAgainst = isHome ? m.goals.away : m.goals.home;
-                
-                let result = '?';
-                if (goalsFor > goalsAgainst) result = 'V';
-                else if (goalsFor === goalsAgainst) result = 'D';
-                else result = 'L';
-                
-                if (idx >= matches.length - 5) {
-                    recentForm += result;
-                } else if (idx < matches.length - 10) {
-                    olderForm += result;
-                }
-            });
-            
-            // Calculer la tendance
-            const recentWins = (recentForm.match(/V/g) || []).length;
-            const olderWins = (olderForm.match(/V/g) || []).length;
-            let recentTrend = '→';
-            if (recentWins > olderWins) recentTrend = '↑';
-            else if (recentWins < olderWins) recentTrend = '↓';
-            
-            // 3. Série: plus long streak de victoires consécutives
-            let longestStreak = 0;
-            let currentStreak = 0;
-            let longestStreakType = '';
-            let currentStreakType = '';
-            
-            matches.forEach(m => {
-                const isHome = m.teams.home.id === teamId;
-                const goalsFor = isHome ? m.goals.home : m.goals.away;
-                const goalsAgainst = isHome ? m.goals.away : m.goals.home;
-                
-                let result = '?';
-                if (goalsFor > goalsAgainst) result = 'V';
-                else if (goalsFor === goalsAgainst) result = 'D';
-                else result = 'L';
-                
-                if (result === 'V') {
-                    if (currentStreakType !== 'V') {
-                        currentStreak = 1;
-                        currentStreakType = 'V';
-                    } else {
-                        currentStreak++;
-                    }
-                } else if (result === 'D') {
-                    if (currentStreakType !== 'D') {
-                        currentStreak = 1;
-                        currentStreakType = 'D';
-                    } else {
-                        currentStreak++;
-                    }
-                } else {
-                    currentStreak = 0;
-                    currentStreakType = '';
-                }
-                
-                if (currentStreak > longestStreak) {
-                    longestStreak = currentStreak;
-                    longestStreakType = currentStreakType;
-                }
-            });
-            
-            // 4. Efficacité: buts par match
+            // 2. Efficacité: buts par match
             let totalGF = 0;
             let totalGA = 0;
             
@@ -1028,10 +955,6 @@
             return {
                 cleanSheets,
                 cleanSheetPct,
-                recentForm,
-                recentTrend,
-                longestStreak,
-                longestStreakType,
                 efficiency,
                 defensiveRating
             };
@@ -1603,37 +1526,9 @@ Vérifie:
                                 <div class="info-label">Forme ${match.teams.away.name.substring(0,3)}</div>
                                 <div class="info-value" style="font-size: 14px; letter-spacing: 2px;">${formatFormWithColors(awayForm)}</div>
                             </div>
-                        </div>
                         
                         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-                            <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">⚡ Stats Avancées</h3>
-                            
-                            <div class="info-grid">
-                                <div class="info-card">
-                                    <div class="info-label">${match.teams.home.name}</div>
-                                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
-                                        <div style="color: ${homeAdvanced.cleanSheets > awayAdvanced.cleanSheets ? '#10b981' : homeAdvanced.cleanSheets < awayAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'};">🛡️ Clean Sheets: ${homeAdvanced.cleanSheets}/${homeMatches.length} (${homeAdvanced.cleanSheetPct}%)</div>
-                                        <div style="margin-top: 5px; color: ${homeAdvanced.recentTrend === '↑' ? '#10b981' : homeAdvanced.recentTrend === '↓' ? '#ef4444' : '#f59e0b'};">📈 Tendance: ${homeAdvanced.recentTrend} ${homeAdvanced.recentForm}</div>
-                                        <div style="margin-top: 5px; color: ${homeAdvanced.longestStreak > awayAdvanced.longestStreak ? '#10b981' : homeAdvanced.longestStreak < awayAdvanced.longestStreak ? '#ef4444' : '#f59e0b'};">🔥 Série: ${homeAdvanced.longestStreak}${homeAdvanced.longestStreakType || '?'}</div>
-                                        <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.efficiency) > parseFloat(awayAdvanced.efficiency) ? '#10b981' : parseFloat(homeAdvanced.efficiency) < parseFloat(awayAdvanced.efficiency) ? '#ef4444' : '#f59e0b'};">⚽ Efficacité: ${homeAdvanced.efficiency} buts/match</div>
-                                        <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.defensiveRating) < parseFloat(awayAdvanced.defensiveRating) ? '#10b981' : parseFloat(homeAdvanced.defensiveRating) > parseFloat(awayAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'};">🛡️ Défense: ${homeAdvanced.defensiveRating} encaissés/match</div>
-                                    </div>
-                                </div>
-                                <div class="info-card">
-                                    <div class="info-label">${match.teams.away.name}</div>
-                                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
-                                        <div style="color: ${awayAdvanced.cleanSheets > homeAdvanced.cleanSheets ? '#10b981' : awayAdvanced.cleanSheets < homeAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'};">🛡️ Clean Sheets: ${awayAdvanced.cleanSheets}/${awayMatches.length} (${awayAdvanced.cleanSheetPct}%)</div>
-                                        <div style="margin-top: 5px; color: ${awayAdvanced.recentTrend === '↑' ? '#10b981' : awayAdvanced.recentTrend === '↓' ? '#ef4444' : '#f59e0b'};">📈 Tendance: ${awayAdvanced.recentTrend} ${awayAdvanced.recentForm}</div>
-                                        <div style="margin-top: 5px; color: ${awayAdvanced.longestStreak > homeAdvanced.longestStreak ? '#10b981' : awayAdvanced.longestStreak < homeAdvanced.longestStreak ? '#ef4444' : '#f59e0b'};">🔥 Série: ${awayAdvanced.longestStreak}${awayAdvanced.longestStreakType || '?'}</div>
-                                        <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.efficiency) > parseFloat(homeAdvanced.efficiency) ? '#10b981' : parseFloat(awayAdvanced.efficiency) < parseFloat(homeAdvanced.efficiency) ? '#ef4444' : '#f59e0b'};">⚽ Efficacité: ${awayAdvanced.efficiency} buts/match</div>
-                                        <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.defensiveRating) < parseFloat(homeAdvanced.defensiveRating) ? '#10b981' : parseFloat(awayAdvanced.defensiveRating) > parseFloat(homeAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'};">🛡️ Défense: ${awayAdvanced.defensiveRating} encaissés/match</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-                            <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">📊 Statistiques sur les 10 derniers matchs</h3>
+                            <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">📊 Statistiques</h3>
                             
                             <div class="info-grid">
                                 <div class="info-card">
@@ -1642,6 +1537,10 @@ Vérifie:
                                         <div>Buts: ${homeStats.gf} marqués, ${homeStats.ga} encaissés</div>
                                         <div style="margin-top: 5px;">${homeStats.w}V - ${homeStats.d}D - ${homeStats.l}L</div>
                                         <div style="color: var(--primary); font-weight: 600; margin-top: 5px;">Moy: ${(homeStats.gf / homeStats.matches).toFixed(2)} buts/match</div>
+                                        <hr style="border: none; border-top: 1px solid rgba(212, 175, 55, 0.2); margin: 8px 0;">
+                                        <div style="color: ${homeAdvanced.cleanSheets > awayAdvanced.cleanSheets ? '#10b981' : homeAdvanced.cleanSheets < awayAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${homeAdvanced.cleanSheets}/${homeMatches.length} (${homeAdvanced.cleanSheetPct}%)</div>
+                                        <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.efficiency) > parseFloat(awayAdvanced.efficiency) ? '#10b981' : parseFloat(homeAdvanced.efficiency) < parseFloat(awayAdvanced.efficiency) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">⚽ Efficacité: ${homeAdvanced.efficiency} buts/match</div>
+                                        <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.defensiveRating) < parseFloat(awayAdvanced.defensiveRating) ? '#10b981' : parseFloat(homeAdvanced.defensiveRating) > parseFloat(awayAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Défense: ${homeAdvanced.defensiveRating} encaissés/match</div>
                                     </div>
                                 </div>
                                 <div class="info-card">
@@ -1649,7 +1548,11 @@ Vérifie:
                                     <div style="font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
                                         <div>Buts: ${awayStats.gf} marqués, ${awayStats.ga} encaissés</div>
                                         <div style="margin-top: 5px;">${awayStats.w}V - ${awayStats.d}D - ${awayStats.l}L</div>
-                                        <div style="color: var(--secondary); font-weight: 600; margin-top: 5px;">Moy: ${(awayStats.gf / awayStats.matches).toFixed(2)} buts/match</div>
+                                        <div style="color: var(--primary); font-weight: 600; margin-top: 5px;">Moy: ${(awayStats.gf / awayStats.matches).toFixed(2)} buts/match</div>
+                                        <hr style="border: none; border-top: 1px solid rgba(212, 175, 55, 0.2); margin: 8px 0;">
+                                        <div style="color: ${awayAdvanced.cleanSheets > homeAdvanced.cleanSheets ? '#10b981' : awayAdvanced.cleanSheets < homeAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${awayAdvanced.cleanSheets}/${awayMatches.length} (${awayAdvanced.cleanSheetPct}%)</div>
+                                        <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.efficiency) > parseFloat(homeAdvanced.efficiency) ? '#10b981' : parseFloat(awayAdvanced.efficiency) < parseFloat(homeAdvanced.efficiency) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">⚽ Efficacité: ${awayAdvanced.efficiency} buts/match</div>
+                                        <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.defensiveRating) < parseFloat(homeAdvanced.defensiveRating) ? '#10b981' : parseFloat(awayAdvanced.defensiveRating) > parseFloat(homeAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Défense: ${awayAdvanced.defensiveRating} encaissés/match</div>
                                     </div>
                                 </div>
                             </div>
