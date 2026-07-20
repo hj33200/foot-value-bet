@@ -922,9 +922,14 @@
             try {
                 const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&h2h=${homeId}-${awayId}&last=10`;
                 
-                console.log(`   🔗 H2H pour équipes ${homeId} vs ${awayId}`);
+                console.log(`\n🔍 === H2H RECHERCHE ===`);
+                console.log(`   Équipe 1 (ID): ${homeId}`);
+                console.log(`   Équipe 2 (ID): ${awayId}`);
+                console.log(`   📍 URL complète: ${url}`);
                 
                 const response = await fetch(url);
+                
+                console.log(`   ✅ Réponse HTTP: ${response.status}`);
                 
                 if (!response.ok) {
                     console.warn(`   ⚠️ Erreur HTTP ${response.status}`);
@@ -932,9 +937,18 @@
                 }
                 
                 const data = await response.json();
+                console.log(`   📦 Réponse JSON reçue:`, data);
+                
                 const matches = data.response || [];
                 
-                console.log(`   📊 H2H matches trouvés: ${matches.length}`);
+                console.log(`   📊 Matchs bruts trouvés: ${matches.length}`);
+                
+                if (matches.length > 0) {
+                    console.log(`      Dates des matchs bruts:`);
+                    matches.forEach((m, i) => {
+                        console.log(`        ${i+1}. ${m.fixture.date} - ${m.teams.home.name} ${m.goals.home}:${m.goals.away} ${m.teams.away.name}`);
+                    });
+                }
                 
                 if (matches.length === 0) {
                     console.log(`   ⚠️ Aucun H2H match entre équipes ${homeId} et ${awayId}`);
@@ -946,6 +960,8 @@
                     m.goals.home !== null && m.goals.away !== null
                 );
                 
+                console.log(`   ✔️ Matchs avec résultats: ${matchesWithResults.length}`);
+                
                 if (matchesWithResults.length === 0) {
                     console.log(`   ⚠️ Aucun H2H match avec résultat`);
                     return [];
@@ -956,8 +972,10 @@
                     return new Date(a.fixture.date) - new Date(b.fixture.date);
                 });
                 
-                console.log(`   ✅ H2H: ${sorted.length} matchs trouvés`);
-                console.log(`      Dates: ${sorted.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
+                console.log(`   ✅ H2H FINAL: ${sorted.length} matchs trouvés`);
+                sorted.forEach((m, i) => {
+                    console.log(`      ${i+1}. ${m.fixture.date} - ${m.teams.home.name} ${m.goals.home}:${m.goals.away} ${m.teams.away.name}`);
+                });
                 
                 return sorted;
             } catch (error) {
@@ -1011,7 +1029,11 @@
         
         // Calculer le H2H (5 dernières confrontations directes)
         function calculateH2H(h2hMatches, teamId) {
+            console.log(`\n📊 === CALCUL H2H (Team ${teamId}) ===`);
+            console.log(`   Matchs reçus: ${h2hMatches.length}`);
+            
             if (!h2hMatches || h2hMatches.length === 0) {
+                console.log(`   ⚠️ Aucun match H2H à traiter`);
                 return { 
                     h2hMatches: [],
                     wins: 0,
@@ -1025,7 +1047,7 @@
             let wins = 0, draws = 0, losses = 0;
             
             // Traiter chaque match H2H
-            h2hMatches.forEach(m => {
+            h2hMatches.forEach((m, idx) => {
                 const isHome = m.teams.home.id === teamId;
                 const goalsFor = isHome ? m.goals.home : m.goals.away;
                 const goalsAgainst = isHome ? m.goals.away : m.goals.home;
@@ -1042,6 +1064,8 @@
                     losses++;
                 }
                 
+                console.log(`   ${idx+1}. ${m.fixture.date} - ${goalsFor}:${goalsAgainst} (${matchResult})`);
+                
                 result.push({
                     date: m.fixture.date,
                     score: `${goalsFor}:${goalsAgainst}`,
@@ -1051,6 +1075,9 @@
             
             // Garder les 5 derniers
             const last5 = result.slice(-5);
+            
+            console.log(`   ✅ Record total: ${wins}V-${draws}D-${losses}L (${result.length} matchs)`);
+            console.log(`   📌 5 derniers: ${last5.length} matchs\n`);
             
             return {
                 h2hMatches: last5,
