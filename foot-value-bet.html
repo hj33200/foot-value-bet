@@ -363,11 +363,11 @@
                 <select id="filter-league" style="width: 100%; padding: 12px; background: rgba(30, 30, 30, 0.8); border: 2px solid var(--primary); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;">
                     <option value="all">Tous les championnats</option>
                     <option value="1">🌍 Coupe du Monde 2026</option>
-                    <option value="140">Ligue 1 (France)</option>
-                    <option value="61">Premier League (Angleterre)</option>
+                    <option value="61">Ligue 1 (France)</option>
+                    <option value="39">Premier League (Angleterre)</option>
                     <option value="135">Serie A (Italie)</option>
                     <option value="78">Bundesliga (Allemagne)</option>
-                    <option value="39">La Liga (Espagne)</option>
+                    <option value="140">La Liga (Espagne)</option>
                     <option value="2">UEFA Champions League</option>
                     <option value="48">Coupe de France</option>
                     <option value="50">Coupe d'Angleterre (FA Cup)</option>
@@ -590,11 +590,11 @@
         const LEAGUES = {
             'all': { id: null, name: 'Tous les championnats' },
             '1': { id: 1, name: 'Coupe du Monde 2026' },
-            '140': { id: 140, name: 'Ligue 1 (France)' },
-            '61': { id: 61, name: 'Premier League (Angleterre)' },
+            '61': { id: 61, name: 'Ligue 1 (France)' },
+            '39': { id: 39, name: 'Premier League (Angleterre)' },
             '135': { id: 135, name: 'Serie A (Italie)' },
             '78': { id: 78, name: 'Bundesliga (Allemagne)' },
-            '39': { id: 39, name: 'La Liga (Espagne)' },
+            '140': { id: 140, name: 'La Liga (Espagne)' },
             '2': { id: 2, name: 'UEFA Champions League' },
             '48': { id: 48, name: 'Coupe de France' },
             '50': { id: 50, name: 'Coupe d\'Angleterre (FA Cup)' },
@@ -868,9 +868,9 @@
                 // Augmenter last=20 pour s'assurer d'avoir 10 matchs valides
                 const season = 2026;
                 
-                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=20`;
+                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=100`;
                 
-                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (last=20)`);
+                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (last=100 - 3-5 saisons)`);
                 
                 const response = await fetch(url);
                 
@@ -904,82 +904,92 @@
                     return new Date(a.fixture.date) - new Date(b.fixture.date);
                 });
                 
-                // Prendre les 10 derniers
+                // Afficher les 10 derniers
                 const last10 = sorted.slice(-10);
                 
-                console.log(`   ✅ Équipe ${teamId}: ${last10.length} derniers matchs`);
+                console.log(`   ✅ Équipe ${teamId}: ${sorted.length} matchs total, affichage des 10 derniers`);
                 console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
                 
-                return last10;
+                return sorted; // Retourner TOUS les matchs (besoin pour H2H)
             } catch (error) {
                 console.error(`   ❌ Erreur équipe ${teamId}:`, error);
                 return [];
             }
         }
         
-        // Get H2H matches (head to head) between two teams
-        async function getH2HMatches(homeId, awayId) {
+        // Get H2H matches by searching multiple seasons
+        async function getH2HBySeasons(homeId, awayId, leagueId) {
             try {
-                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&h2h=${homeId}-${awayId}&last=10`;
-                
-                console.log(`\n🔍 === H2H RECHERCHE ===`);
+                console.log(`\n🔍 === H2H PAR SAISONS ===`);
                 console.log(`   Équipe 1 (ID): ${homeId}`);
                 console.log(`   Équipe 2 (ID): ${awayId}`);
-                console.log(`   📍 URL complète: ${url}`);
+                console.log(`   Ligue (ID): ${leagueId}`);
                 
-                const response = await fetch(url);
+                let allMatches = [];
+                const seasons = [2026, 2025, 2024];
                 
-                console.log(`   ✅ Réponse HTTP: ${response.status}`);
-                
-                if (!response.ok) {
-                    console.warn(`   ⚠️ Erreur HTTP ${response.status}`);
-                    return [];
+                // Récupérer les matchs pour chaque saison
+                for (const season of seasons) {
+                    const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${homeId}&season=${season}&league=${leagueId}&last=50`;
+                    
+                    console.log(`   📍 Saison ${season}: ${url}`);
+                    
+                    try {
+                        const response = await fetch(url);
+                        
+                        if (!response.ok) {
+                            console.warn(`      ⚠️ HTTP ${response.status}`);
+                            continue;
+                        }
+                        
+                        const data = await response.json();
+                        const matches = data.response || [];
+                        
+                        console.log(`      📊 Matchs trouvés: ${matches.length}`);
+                        
+                        if (matches.length > 0) {
+                            allMatches = allMatches.concat(matches);
+                        }
+                    } catch (error) {
+                        console.error(`      ❌ Erreur saison ${season}:`, error);
+                    }
                 }
                 
-                const data = await response.json();
-                console.log(`   📦 Réponse JSON reçue:`, data);
+                console.log(`   📦 Total matchs (3 saisons): ${allMatches.length}`);
                 
-                const matches = data.response || [];
+                // Filtrer les matchs H2H (contre l'adversaire)
+                let h2hMatches = [];
                 
-                console.log(`   📊 Matchs bruts trouvés: ${matches.length}`);
+                allMatches.forEach(m => {
+                    const opponentId = m.teams.home.id === homeId ? m.teams.away.id : m.teams.home.id;
+                    
+                    if (opponentId === awayId) {
+                        // Vérifier pas de doublon
+                        const alreadyFound = h2hMatches.some(existing => 
+                            existing.fixture.id === m.fixture.id
+                        );
+                        if (!alreadyFound) {
+                            h2hMatches.push(m);
+                        }
+                    }
+                });
                 
-                if (matches.length > 0) {
-                    console.log(`      Dates des matchs bruts:`);
-                    matches.forEach((m, i) => {
-                        console.log(`        ${i+1}. ${m.fixture.date} - ${m.teams.home.name} ${m.goals.home}:${m.goals.away} ${m.teams.away.name}`);
+                console.log(`   ✅ H2H trouvés: ${h2hMatches.length}`);
+                
+                if (h2hMatches.length > 0) {
+                    h2hMatches.forEach((m, i) => {
+                        console.log(`      ${i+1}. ${m.fixture.date} - ${m.teams.home.name} ${m.goals.home}:${m.goals.away} ${m.teams.away.name}`);
                     });
+                } else {
+                    console.log(`   ⚠️ Aucun H2H trouvé sur 3 saisons`);
                 }
                 
-                if (matches.length === 0) {
-                    console.log(`   ⚠️ Aucun H2H match entre équipes ${homeId} et ${awayId}`);
-                    return [];
-                }
+                // Trier par date
+                h2hMatches.sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
                 
-                // Filtrer: garder seulement les matchs avec résultats
-                const matchesWithResults = matches.filter(m => 
-                    m.goals.home !== null && m.goals.away !== null
-                );
-                
-                console.log(`   ✔️ Matchs avec résultats: ${matchesWithResults.length}`);
-                
-                if (matchesWithResults.length === 0) {
-                    console.log(`   ⚠️ Aucun H2H match avec résultat`);
-                    return [];
-                }
-                
-                // Trier par date croissante (ancien → récent)
-                const sorted = matchesWithResults.sort((a, b) => {
-                    return new Date(a.fixture.date) - new Date(b.fixture.date);
-                });
-                
-                console.log(`   ✅ H2H FINAL: ${sorted.length} matchs trouvés`);
-                sorted.forEach((m, i) => {
-                    console.log(`      ${i+1}. ${m.fixture.date} - ${m.teams.home.name} ${m.goals.home}:${m.goals.away} ${m.teams.away.name}`);
-                });
-                
-                return sorted;
+                return h2hMatches;
             } catch (error) {
-                console.error(`   ❌ Erreur H2H:`, error);
+                console.error(`   ❌ Erreur générale:`, error);
                 return [];
             }
         }
@@ -1597,8 +1607,17 @@ Vérifie:
             const homeAdvanced = calculateAdvancedStats(homeMatches, homeId);
             const awayAdvanced = calculateAdvancedStats(awayMatches, awayId);
             
-            // Calculate H2H (head to head) - fetch directly from API
-            const h2hMatches = await getH2HMatches(homeId, awayId);
+            // Calculate H2H - differently for leagues vs Cup
+            let h2hMatches = [];
+            const isWorldCup = match.league.id === 1; // League 1 = Coupe du Monde
+            
+            if (!isWorldCup) {
+                // Pour les championnats: chercher H2H via saisons multiples
+                h2hMatches = await getH2HBySeasons(homeId, awayId, match.league.id);
+            } else {
+                console.log(`\n📌 Coupe du Monde détectée - H2H non applicable`);
+            }
+            
             const homeH2H = calculateH2H(h2hMatches, homeId);
             const awayH2H = calculateH2H(h2hMatches, awayId);
             
@@ -1747,7 +1766,7 @@ Vérifie:
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            ${formatMatches(homeMatches, homeId)}
+                                            ${formatMatches(homeMatches.slice(-10), homeId)}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1763,7 +1782,7 @@ Vérifie:
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            ${formatMatches(awayMatches, awayId)}
+                                            ${formatMatches(awayMatches.slice(-10), awayId)}
                                         </tbody>
                                     </table>
                                 </div>
