@@ -898,18 +898,12 @@
                     return [];
                 }
                 
-                // Filtrer: garder seulement les matchs TERMINÉS avec résultats
-                const matchesWithResults = allMatches.filter(m => {
-                    // Vérifier que les buts ne sont pas null
-                    if (m.goals.home === null || m.goals.away === null) return false;
-                    
-                    // Vérifier que le match est terminé (status = "FT" = Full Time)
-                    if (m.fixture.status !== "FT") return false;
-                    
-                    return true;
-                });
+                // Filtrer: garder seulement les matchs avec résultats (goals remplies)
+                const matchesWithResults = allMatches.filter(m => 
+                    m.goals.home !== null && m.goals.away !== null
+                );
                 
-                console.log(`   ✔️ Matchs avec résultats (FT): ${matchesWithResults.length}`);
+                console.log(`   ✔️ Matchs avec résultats: ${matchesWithResults.length}`);
                 
                 if (matchesWithResults.length === 0) {
                     console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
