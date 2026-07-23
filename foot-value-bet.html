@@ -864,35 +864,52 @@
         }
         async function getTeamLastMatches(teamId, leagueId) {
             try {
-                // Récupérer les fixtures de l'équipe via le proxy
-                // Augmenter last=20 pour s'assurer d'avoir 10 matchs valides
-                const season = 2026;
+                let allMatches = [];
+                const seasons = [2026, 2025, 2024];
                 
-                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=100`;
+                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (3 saisons: 2024-2026)`);
                 
-                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (last=100 - 3-5 saisons)`);
-                
-                const response = await fetch(url);
-                
-                if (!response.ok) {
-                    console.warn(`   ⚠️ Erreur HTTP ${response.status}`);
-                    return [];
+                // Récupérer les matchs de 3 saisons
+                for (const season of seasons) {
+                    const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=50`;
+                    
+                    try {
+                        const response = await fetch(url);
+                        
+                        if (!response.ok) {
+                            console.warn(`      ⚠️ Erreur HTTP ${response.status} pour saison ${season}`);
+                            continue;
+                        }
+                        
+                        const data = await response.json();
+                        const matches = data.response || [];
+                        
+                        console.log(`      Saison ${season}: ${matches.length} matchs`);
+                        allMatches = allMatches.concat(matches);
+                    } catch (e) {
+                        console.error(`      ❌ Erreur saison ${season}:`, e);
+                    }
                 }
                 
-                const data = await response.json();
-                const matches = data.response || [];
+                console.log(`   📊 Matchs trouvés (total 3 saisons): ${allMatches.length}`);
                 
-                console.log(`   📊 Matches trouvés: ${matches.length}`);
-                
-                if (matches.length === 0) {
+                if (allMatches.length === 0) {
                     console.log(`   ⚠️ Aucun match pour équipe ${teamId}`);
                     return [];
                 }
                 
-                // Filtrer: garder seulement les matchs avec résultats
-                const matchesWithResults = matches.filter(m => 
-                    m.goals.home !== null && m.goals.away !== null
-                );
+                // Filtrer: garder seulement les matchs TERMINÉS avec résultats
+                const matchesWithResults = allMatches.filter(m => {
+                    // Vérifier que les buts ne sont pas null
+                    if (m.goals.home === null || m.goals.away === null) return false;
+                    
+                    // Vérifier que le match est terminé (status = "FT" = Full Time)
+                    if (m.fixture.status !== "FT") return false;
+                    
+                    return true;
+                });
+                
+                console.log(`   ✔️ Matchs avec résultats (FT): ${matchesWithResults.length}`);
                 
                 if (matchesWithResults.length === 0) {
                     console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
