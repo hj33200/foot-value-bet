@@ -865,9 +865,9 @@
         async function getTeamLastMatches(teamId, leagueId) {
             try {
                 let allMatches = [];
-                const seasons = [2026, 2025, 2024];
+                const seasons = [2026, 2025, 2024]; // Chercher en arrière (récent d'abord)
                 
-                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (3 saisons: 2024-2026)`);
+                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (3 saisons: 2026-2024)`);
                 
                 // Récupérer les matchs de 3 saisons
                 for (const season of seasons) {
@@ -915,13 +915,16 @@
                     return new Date(a.fixture.date) - new Date(b.fixture.date);
                 });
                 
-                // Afficher les 10 derniers
-                const last10 = sorted.slice(-10);
+                console.log(`   ✅ Équipe ${teamId}: ${sorted.length} matchs total (tous avec résultats)`);
                 
-                console.log(`   ✅ Équipe ${teamId}: ${sorted.length} matchs total, affichage des 10 derniers`);
-                console.log(`      Dates: ${last10.map(m => m.fixture.date.split('T')[0]).join(' | ')}`);
+                // Afficher les dates min/max
+                const dateMin = sorted[0].fixture.date.split('T')[0];
+                const dateMax = sorted[sorted.length - 1].fixture.date.split('T')[0];
+                console.log(`      Dates: ${dateMin} à ${dateMax}`);
                 
-                return sorted; // Retourner TOUS les matchs (besoin pour H2H)
+                // Retourner TOUS les matchs (besoin pour H2H et stats)
+                // La fonction appelante gardera les 10 derniers si nécessaire
+                return sorted;
             } catch (error) {
                 console.error(`   ❌ Erreur équipe ${teamId}:`, error);
                 return [];
