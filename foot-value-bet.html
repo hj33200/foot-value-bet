@@ -884,7 +884,12 @@
                         const data = await response.json();
                         const matches = data.response || [];
                         
-                        console.log(`      Saison ${season}: ${matches.length} matchs`);
+                        // Compter les matchs avec résultats dans cette saison
+                        const matchesWithResultsInSeason = matches.filter(m => 
+                            m.goals.home !== null && m.goals.away !== null
+                        );
+                        
+                        console.log(`      Saison ${season}: ${matches.length} matchs (${matchesWithResultsInSeason.length} avec résultats)`);
                         allMatches = allMatches.concat(matches);
                     } catch (e) {
                         console.error(`      ❌ Erreur saison ${season}:`, e);
@@ -903,10 +908,11 @@
                     m.goals.home !== null && m.goals.away !== null
                 );
                 
-                console.log(`   ✔️ Matchs avec résultats: ${matchesWithResults.length}`);
+                console.log(`   ✔️ Matchs avec résultats (au total): ${matchesWithResults.length}`);
                 
                 if (matchesWithResults.length === 0) {
                     console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
+                    console.log(`   💡 Conseil: Les matchs de 2026 ne sont peut-être pas encore joués!`);
                     return [];
                 }
                 
@@ -921,6 +927,10 @@
                 const dateMin = sorted[0].fixture.date.split('T')[0];
                 const dateMax = sorted[sorted.length - 1].fixture.date.split('T')[0];
                 console.log(`      Dates: ${dateMin} à ${dateMax}`);
+                
+                // Afficher les 10 derniers aussi
+                const last10dates = sorted.slice(-10).map(m => m.fixture.date.split('T')[0]);
+                console.log(`      10 derniers: ${last10dates.join(' | ')}`);
                 
                 // Retourner TOUS les matchs (besoin pour H2H et stats)
                 // La fonction appelante gardera les 10 derniers si nécessaire
