@@ -362,7 +362,6 @@
                 <label style="display: block; margin-bottom: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600;">Championnat</label>
                 <select id="filter-league" style="width: 100%; padding: 12px; background: rgba(30, 30, 30, 0.8); border: 2px solid var(--primary); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;">
                     <option value="all">Tous les championnats</option>
-                    <option value="1">🌍 Coupe du Monde 2026</option>
                     <option value="61">Ligue 1 (France)</option>
                     <option value="39">Premier League (Angleterre)</option>
                     <option value="135">Serie A (Italie)</option>
@@ -589,7 +588,6 @@
         // League mapping
         const LEAGUES = {
             'all': { id: null, name: 'Tous les championnats' },
-            '1': { id: 1, name: 'Coupe du Monde 2026' },
             '61': { id: 61, name: 'Ligue 1 (France)' },
             '39': { id: 39, name: 'Premier League (Angleterre)' },
             '135': { id: 135, name: 'Serie A (Italie)' },
@@ -655,6 +653,141 @@
             'Wales': 19, 'Ukraine': 25, 'Austria': 24, 'Switzerland': 19
         };
         
+        // Club rankings (UEFA ranking for European clubs)
+        const CLUB_RANKINGS = {
+            // Ligue 1 (France)
+            'Paris Saint-Germain': 2,
+            'PSG': 2,
+            'Marseille': 5,
+            'AS Monaco': 8,
+            'Monaco': 8,
+            'Olympique Lyonnais': 12,
+            'Lyon': 12,
+            'LOSC Lille': 15,
+            'Lille': 15,
+            'RC Lens': 18,
+            'Lens': 18,
+            'FC Lorient': 25,
+            'Lorient': 25,
+            'Toulouse FC': 30,
+            'Toulouse': 30,
+            'OGC Nice': 35,
+            'Nice': 35,
+            'Stade Rennais': 40,
+            'Rennes': 40,
+            'AS Saint-Étienne': 50,
+            'Saint-Étienne': 50,
+            'Nantes': 45,
+            'FC Nantes': 45,
+            'Auxerre': 60,
+            'AJ Auxerre': 60,
+            'Strasbourg': 55,
+            'RC Strasbourg': 55,
+            'Le Havre': 65,
+            'Metz': 70,
+            'FC Metz': 70,
+            'Montpellier': 75,
+            'Montpellier HSC': 75,
+            
+            // Premier League (England)
+            'Manchester City': 1,
+            'Liverpool': 3,
+            'Arsenal': 4,
+            'Manchester United': 6,
+            'Chelsea': 7,
+            'Tottenham': 10,
+            'Brighton': 14,
+            'Newcastle': 16,
+            'Aston Villa': 17,
+            'West Ham': 20,
+            'Bournemouth': 22,
+            'Fulham': 24,
+            'Brentford': 26,
+            'Crystal Palace': 28,
+            'Everton': 32,
+            'Ipswich': 38,
+            'Nottingham': 42,
+            'Forest': 42,
+            'Wolverhampton': 48,
+            'Wolves': 48,
+            'Leicester': 52,
+            'Southampton': 58,
+            
+            // Serie A (Italy)
+            'Inter Milan': 9,
+            'Inter': 9,
+            'Juventus': 11,
+            'AC Milan': 13,
+            'Milan': 13,
+            'AS Roma': 19,
+            'Roma': 19,
+            'Lazio': 21,
+            'SS Lazio': 21,
+            'Fiorentina': 23,
+            'Napoli': 27,
+            'Atalanta': 29,
+            'Bologna': 31,
+            'Torino': 33,
+            'Sassuolo': 36,
+            'Monza': 39,
+            'Cagliari': 43,
+            'Verona': 47,
+            'Como': 51,
+            'Lecce': 54,
+            'Parma': 56,
+            'Empoli': 61,
+            'Genoa': 62,
+            
+            // Bundesliga (Germany)
+            'FC Bayern Munich': 5,
+            'Bayern': 5,
+            'Bayer Leverkusen': 37,
+            'Leverkusen': 37,
+            'Borussia Dortmund': 41,
+            'Dortmund': 41,
+            'RB Leipzig': 44,
+            'Leipzig': 44,
+            'Stuttgart': 49,
+            'VfB Stuttgart': 49,
+            'Frankfurt': 53,
+            'Eintracht Frankfurt': 53,
+            'Hoffenheim': 57,
+            'TSG Hoffenheim': 57,
+            'Werder Bremen': 59,
+            'Bremen': 59,
+            'Schalke 04': 63,
+            'Schalke': 63,
+            'Union Berlin': 66,
+            'Bochum': 68,
+            'Mainz': 71,
+            'Cologne': 72,
+            'Augsburg': 73,
+            'Wolfsburg': 76,
+            
+            // La Liga (Spain)
+            'Real Madrid': 67,
+            'Barcelona': 69,
+            'Atlético Madrid': 74,
+            'Atlético': 74,
+            'Real Sociedad': 77,
+            'Sociedad': 77,
+            'Sevilla': 79,
+            'Villarreal': 80,
+            'Athletic Bilbao': 81,
+            'Bilbao': 81,
+            'Real Betis': 82,
+            'Betis': 82,
+            'Valencia': 83,
+            'Vallecano': 84,
+            'Rayo Vallecano': 84,
+            'Girona': 85,
+            'Las Palmas': 86,
+            'Osasuna': 87,
+            'Getafe': 88,
+            'Leganes': 89,
+            'Alaves': 90
+        };
+        
         // Team name aliases for matching variations
         const TEAM_NAME_ALIASES = {
             'DR Congo': 'Congo DR',
@@ -673,29 +806,53 @@
             'Cabo Verde': 'Cape Verde'
         };
         
-        // Get FIFA ranking by team name
+        // Get FIFA ranking by team name (clubs first, then national teams)
         function getRankingByTeamName(teamName) {
             if (!teamName) return 50;
             
-            // Exact match
+            // Try club ranking first
+            if (CLUB_RANKINGS[teamName]) {
+                console.log(`   🏆 Club trouvé: ${teamName} → Rang ${CLUB_RANKINGS[teamName]}`);
+                return CLUB_RANKINGS[teamName];
+            }
+            
+            // Try national team ranking
             if (FIFA_RANKINGS[teamName]) {
+                console.log(`   🌍 Équipe nationale trouvée: ${teamName} → Rang ${FIFA_RANKINGS[teamName]}`);
                 return FIFA_RANKINGS[teamName];
             }
             
             // Try alias
             const aliased = TEAM_NAME_ALIASES[teamName];
-            if (aliased && FIFA_RANKINGS[aliased]) {
-                return FIFA_RANKINGS[aliased];
+            if (aliased) {
+                if (CLUB_RANKINGS[aliased]) {
+                    console.log(`   🏆 Club (via alias): ${teamName} → ${aliased} → Rang ${CLUB_RANKINGS[aliased]}`);
+                    return CLUB_RANKINGS[aliased];
+                }
+                if (FIFA_RANKINGS[aliased]) {
+                    console.log(`   🌍 Équipe (via alias): ${teamName} → ${aliased} → Rang ${FIFA_RANKINGS[aliased]}`);
+                    return FIFA_RANKINGS[aliased];
+                }
             }
             
-            // Try partial match
+            // Try partial match in clubs first
+            for (let key in CLUB_RANKINGS) {
+                if (key.toLowerCase().includes(teamName.toLowerCase()) || teamName.toLowerCase().includes(key.toLowerCase())) {
+                    console.log(`   🏆 Club (match partiel): ${teamName} → ${key} → Rang ${CLUB_RANKINGS[key]}`);
+                    return CLUB_RANKINGS[key];
+                }
+            }
+            
+            // Try partial match in nationals
             for (let key in FIFA_RANKINGS) {
-                if (key.toLowerCase().includes(teamName.toLowerCase())) {
+                if (key.toLowerCase().includes(teamName.toLowerCase()) || teamName.toLowerCase().includes(key.toLowerCase())) {
+                    console.log(`   🌍 Équipe (match partiel): ${teamName} → ${key} → Rang ${FIFA_RANKINGS[key]}`);
                     return FIFA_RANKINGS[key];
                 }
             }
             
             // Default
+            console.log(`   ⚠️ Équipe non trouvée: ${teamName} → Rang défaut 50`);
             return 50;
         }
         
@@ -1092,8 +1249,14 @@
             let result = [];
             let wins = 0, draws = 0, losses = 0;
             
-            // Traiter chaque match H2H
+            // Traiter chaque match H2H - SEULEMENT CEUX AVEC RÉSULTATS
             h2hMatches.forEach((m, idx) => {
+                // Filtrer: garder seulement les matchs avec résultats (goals remplies)
+                if (m.goals.home === null || m.goals.away === null) {
+                    console.log(`   ${idx+1}. ${m.fixture.date} - FUTUR (ignoré)`);
+                    return; // Skip les matchs futurs
+                }
+                
                 const isHome = m.teams.home.id === teamId;
                 const goalsFor = isHome ? m.goals.home : m.goals.away;
                 const goalsAgainst = isHome ? m.goals.away : m.goals.home;
@@ -1122,7 +1285,7 @@
             // Garder les 5 derniers
             const last5 = result.slice(-5);
             
-            console.log(`   ✅ Record total: ${wins}V-${draws}D-${losses}L (${result.length} matchs)`);
+            console.log(`   ✅ Record total: ${wins}V-${draws}D-${losses}L (${result.length} matchs avec résultats)`);
             console.log(`   📌 5 derniers: ${last5.length} matchs\n`);
             
             return {
@@ -1650,16 +1813,8 @@ Vérifie:
             const awayAdvanced = calculateAdvancedStats(awayMatchesWithResults, awayId);
             
             // Calculate H2H - differently for leagues vs Cup
-            let h2hMatches = [];
-            const isWorldCup = match.league.id === 1; // League 1 = Coupe du Monde
-            
-            if (!isWorldCup) {
-                // Pour les championnats: chercher H2H via saisons multiples
-                h2hMatches = await getH2HBySeasons(homeId, awayId, match.league.id);
-            } else {
-                console.log(`\n📌 Coupe du Monde détectée - H2H non applicable`);
-            }
-            
+            // Calculate H2H (head to head) - chercher via saisons multiples
+            const h2hMatches = await getH2HBySeasons(homeId, awayId, match.league.id);
             const homeH2H = calculateH2H(h2hMatches, homeId);
             const awayH2H = calculateH2H(h2hMatches, awayId);
             
