@@ -1099,6 +1099,200 @@
         }
         
         // Get H2H matches by searching multiple seasons
+        // Calculate expected goals based on team stats
+        function calculateExpectedGoals(homeStats, awayStats, homeRank, awayRank) {
+            console.log(`\n⚽ === EXPECTED GOALS ===`);
+            
+            // Base: moyenne de buts marqués
+            const homeAvgGF = homeStats.gf / Math.max(homeStats.matches, 1);
+            const awayAvgGF = awayStats.gf / Math.max(awayStats.matches, 1);
+            
+            // Ajustement: force défensive (buts encaissés moyenne)
+            const homeDefense = awayStats.ga / Math.max(awayStats.matches, 1); // Défense adversaire
+            const awayDefense = homeStats.ga / Math.max(homeStats.matches, 1); // Défense adversaire
+            
+            // Ajustement: rang UEFA (meilleure équipe = plus de buts)
+            const rankAdjustmentHome = Math.max(0.8, Math.min(1.2, (100 - homeRank) / 100));
+            const rankAdjustmentAway = Math.max(0.8, Math.min(1.2, (100 - awayRank) / 100));
+            
+            // xG = (moyenne attaque + moyenne défense adverse) / 2 * ajustement rang
+            const homeXG = ((homeAvgGF + homeDefense) / 2) * rankAdjustmentHome;
+            const awayXG = ((awayAvgGF + awayDefense) / 2) * rankAdjustmentAway;
+            
+            console.log(`   Home: ${homeAvgGF.toFixed(2)} (atk) + ${homeDefense.toFixed(2)} (def) × ${rankAdjustmentHome.toFixed(2)} = ${homeXG.toFixed(2)} xG`);
+            console.log(`   Away: ${awayAvgGF.toFixed(2)} (atk) + ${awayDefense.toFixed(2)} (def) × ${rankAdjustmentAway.toFixed(2)} = ${awayXG.toFixed(2)} xG`);
+            
+            return {
+                homeXG: homeXG,
+                awayXG: awayXG
+            };
+        }
+        async function getOdds(fixtureId) {
+            try {
+                console.log(`\n💰 === RÉCUPÉRATION DES COTES ===`);
+                console.log(`   Fixture ID: ${fixtureId}`);
+                
+                // Bookmakers: Unibet (16), Bet365 (1), 1xBET (7)
+                const bookmakers = [
+                    { id: 16, name: 'Unibet', priority: 1 },
+                    { id: 1, name: 'Bet365', priority: 2 },
+                    { id: 7, name: '1xBET', priority: 3 }
+                ];
+                
+                for (const bm of bookmakers) {
+                    try {
+                        const url = `${PROXY_URL}?endpoint=/odds&apikey=${API_KEY}&fixture=${fixtureId}&bookmaker=${bm.id}`;
+                        
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            console.log(`      ⚠️ ${bm.name} (${bm.id}): Erreur HTTP ${response.status}`);
+                            continue;
+                        }
+                        
+                        const data = await response.json();
+                        const odds = data.response;
+                        
+                        if (!odds || odds.length === 0) {
+                            console.log(`      ⚠️ ${bm.name}: Pas de données`);
+                            continue;
+                        }
+                        
+                        // Chercher le marché 1N2 (Match Winner)
+                        const matchWinner = odds.find(o => o.name === 'Match Winner');
+                        if (!matchWinner || !matchWinner.values) {
+                            console.log(`      ⚠️ ${bm.name}: Pas de 1N2`);
+                            continue;
+                        }
+                        
+                        const win1 = matchWinner.values.find(v => v.value === '1');
+                        const draw = matchWinner.values.find(v => v.value === 'X');
+                        const win2 = matchWinner.values.find(v => v.value === '2');
+                        
+                        if (!win1 || !draw || !win2) {
+                            console.log(`      ⚠️ ${bm.name}: Données incomplètes`);
+                            continue;
+                        }
+                        
+                        console.log(`      ✅ ${bm.name}: 1=${win1.odd}, N=${draw.odd}, 2=${win2.odd}`);
+                        
+                        return {
+                            bookmaker: bm.name,
+                            bookmakerPriority: bm.priority,
+                            odds: {
+                                '1': parseFloat(win1.odd),
+                                'X': parseFloat(draw.odd),
+                                '2': parseFloat(win2.odd)
+                            }
+                        };
+                    } catch (e) {
+                        console.error(`      ❌ ${bm.name}: Erreur`, e.message);
+                    }
+                }
+                
+                console.log(`   ⚠️ Aucune cote trouvée`);
+                return null;
+            } catch (error) {
+                console.error(`   ❌ Erreur récupération cotes:`, error);
+                return null;
+            }
+        }
+        
+        // Calculate implied probability from odds
+        function calculateImpliedProba(odds) {
+            if (!odds || odds['1'] === undefined || odds.X === undefined || odds['2'] === undefined) {
+                return null;
+            }
+            
+            // Proba implicite = 1 / cote
+            const probaImplicite1 = 1 / odds['1'];
+            const probaImpliciteX = 1 / odds.X;
+            const probaImplicite2 = 1 / odds['2'];
+            
+            // Normaliser (probabilités doivent sommer à 100%)
+            const total = probaImplicite1 + probaImpliciteX + probaImplicite2;
+            
+            return {
+                '1': (probaImplicite1 / total * 100).toFixed(1),
+                'X': (probaImpliciteX / total * 100).toFixed(1),
+                '2': (probaImplicite2 / total * 100).toFixed(1)
+            };
+        }
+        
+        // Calculate Poisson probabilities
+        function calculatePoissonProba(expectedHome, expectedAway, homeName = 'Home', awayName = 'Away') {
+            console.log(`\n📊 === PROBABILITÉS POISSON ===`);
+            console.log(`   Buts attendus: ${homeName}=${expectedHome.toFixed(2)}, ${awayName}=${expectedAway.toFixed(2)}`);
+            
+            // Poisson: P(X=k) = (λ^k * e^-λ) / k!
+            const factorial = (n) => {
+                if (n <= 1) return 1;
+                let result = 1;
+                for (let i = 2; i <= n; i++) {
+                    result *= i;
+                }
+                return result;
+            };
+            
+            const poisson = (lambda, k) => {
+                return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+            };
+            
+            // Calculer probabilités pour scores jusqu'à 6 buts
+            let proba1 = 0, probaX = 0, proba2 = 0;
+            
+            for (let i = 0; i <= 6; i++) {
+                for (let j = 0; j <= 6; j++) {
+                    const p = poisson(expectedHome, i) * poisson(expectedAway, j);
+                    
+                    if (i > j) proba1 += p;
+                    else if (i === j) probaX += p;
+                    else proba2 += p;
+                }
+            }
+            
+            return {
+                '1': (proba1 * 100).toFixed(1),
+                'X': (probaX * 100).toFixed(1),
+                '2': (proba2 * 100).toFixed(1)
+            };
+        }
+        
+        // Analyze 1N2 betting value
+        function analyze1N2Value(odds, impliedProba, calculatedProba) {
+            if (!odds || !impliedProba || !calculatedProba) {
+                return null;
+            }
+            
+            return {
+                '1': {
+                    cote: odds['1'],
+                    implied: impliedProba['1'],
+                    calculated: calculatedProba['1'],
+                    value: (calculatedProba['1'] - impliedProba['1']).toFixed(1)
+                },
+                'X': {
+                    cote: odds.X,
+                    implied: impliedProba.X,
+                    calculated: calculatedProba.X,
+                    value: (calculatedProba.X - impliedProba.X).toFixed(1)
+                },
+                '2': {
+                    cote: odds['2'],
+                    implied: impliedProba['2'],
+                    calculated: calculatedProba['2'],
+                    value: (calculatedProba['2'] - impliedProba['2']).toFixed(1)
+                }
+            };
+        }
+        
+        // Get color based on value
+        function getValueColor(value) {
+            const val = parseFloat(value);
+            if (val > 5) return '#10b981'; // Green - good value
+            if (val > 2) return '#f59e0b'; // Yellow - neutral
+            return '#ef4444'; // Red - bad value
+        }
+        
         async function getH2HBySeasons(homeId, awayId, leagueId) {
             try {
                 console.log(`\n🔍 === H2H PAR SAISONS ===`);
@@ -1842,6 +2036,35 @@ Vérifie:
                 }).join('');
             };
             
+            // Récupérer les cotes et calculer les probabilités 1N2
+            let odds1N2 = null;
+            let impliedProba = null;
+            let calculatedProba = null;
+            let betting1N2 = null;
+            
+            try {
+                // Récupérer cotes
+                odds1N2 = await getOdds(match.fixture.id);
+                
+                if (odds1N2) {
+                    console.log(`   ✅ Cotes trouvées: ${odds1N2.bookmaker}`);
+                    impliedProba = calculateImpliedProba(odds1N2.odds);
+                    
+                    // Calculer expected goals
+                    const xg = calculateExpectedGoals(homeStats, awayStats, homeRank, awayRank);
+                    
+                    // Calculer probabilités Poisson
+                    calculatedProba = calculatePoissonProba(xg.homeXG, xg.awayXG, match.teams.home.name, match.teams.away.name);
+                    
+                    // Analyser la valeur
+                    betting1N2 = analyze1N2Value(odds1N2.odds, impliedProba, calculatedProba);
+                } else {
+                    console.log(`   ⚠️ Aucune cote disponible`);
+                }
+            } catch (e) {
+                console.error(`   ❌ Erreur calcul paris:`, e);
+            }
+            
             const html = `
                 <div class="matches-grid">
                     <div class="match-card" style="grid-column: 1/-1;">
@@ -1945,6 +2168,74 @@ Vérifie:
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    
+                    <!-- BLOC 2b: PARIS 1N2 -->
+                    <div class="match-card" style="grid-column: 1/-1; margin-top: 20px;">
+                        <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">💰 Paris 1N2</h3>
+                        
+                        ${odds1N2 ? `
+                            <div style="background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                                <div style="font-size: 11px; color: var(--primary); font-weight: 600; margin-bottom: 8px;">📊 ${odds1N2.bookmaker}</div>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                    <!-- Victoire 1 -->
+                                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 12px; text-align: center;">
+                                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Victoire ${match.teams.home.name.substring(0,3)}</div>
+                                        <div style="font-size: 14px; color: var(--primary); font-weight: 600; margin-bottom: 5px;">${odds1N2.odds['1'].toFixed(2)}</div>
+                                        <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 3px;">Proba implicite: ${impliedProba['1']}%</div>
+                                        <div style="font-size: 10px; padding: 4px 6px; background: ${getValueColor(betting1N2['1'].value)}20; color: ${getValueColor(betting1N2['1'].value)}; border-radius: 4px;">
+                                            Notre proba: ${calculatedProba['1']}%
+                                        </div>
+                                        ${Math.abs(parseFloat(betting1N2['1'].value)) >= 2 ? `
+                                            <div style="font-size: 9px; margin-top: 5px; padding: 3px 6px; background: ${getValueColor(betting1N2['1'].value)}40; color: ${getValueColor(betting1N2['1'].value)}; border-radius: 3px; font-weight: 600;">
+                                                ${betting1N2['1'].value > 0 ? '✅ Valeur +' : '❌ Valeur'}${Math.abs(betting1N2['1'].value)}%
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                    
+                                    <!-- Nul -->
+                                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 12px; text-align: center;">
+                                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Match Nul</div>
+                                        <div style="font-size: 14px; color: var(--primary); font-weight: 600; margin-bottom: 5px;">${odds1N2.odds.X.toFixed(2)}</div>
+                                        <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 3px;">Proba implicite: ${impliedProba.X}%</div>
+                                        <div style="font-size: 10px; padding: 4px 6px; background: ${getValueColor(betting1N2.X.value)}20; color: ${getValueColor(betting1N2.X.value)}; border-radius: 4px;">
+                                            Notre proba: ${calculatedProba.X}%
+                                        </div>
+                                        ${Math.abs(parseFloat(betting1N2.X.value)) >= 2 ? `
+                                            <div style="font-size: 9px; margin-top: 5px; padding: 3px 6px; background: ${getValueColor(betting1N2.X.value)}40; color: ${getValueColor(betting1N2.X.value)}; border-radius: 3px; font-weight: 600;">
+                                                ${betting1N2.X.value > 0 ? '✅ Valeur +' : '❌ Valeur'}${Math.abs(betting1N2.X.value)}%
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                    
+                                    <!-- Victoire 2 -->
+                                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 12px; text-align: center;">
+                                        <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Victoire ${match.teams.away.name.substring(0,3)}</div>
+                                        <div style="font-size: 14px; color: var(--primary); font-weight: 600; margin-bottom: 5px;">${odds1N2.odds['2'].toFixed(2)}</div>
+                                        <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 3px;">Proba implicite: ${impliedProba['2']}%</div>
+                                        <div style="font-size: 10px; padding: 4px 6px; background: ${getValueColor(betting1N2['2'].value)}20; color: ${getValueColor(betting1N2['2'].value)}; border-radius: 4px;">
+                                            Notre proba: ${calculatedProba['2']}%
+                                        </div>
+                                        ${Math.abs(parseFloat(betting1N2['2'].value)) >= 2 ? `
+                                            <div style="font-size: 9px; margin-top: 5px; padding: 3px 6px; background: ${getValueColor(betting1N2['2'].value)}40; color: ${getValueColor(betting1N2['2'].value)}; border-radius: 3px; font-weight: 600;">
+                                                ${betting1N2['2'].value > 0 ? '✅ Valeur +' : '❌ Valeur'}${Math.abs(betting1N2['2'].value)}%
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : `
+                            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">⚠️ Aucune cote disponible pour le moment</div>
+                                <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">Entrer manuellement les cotes:</div>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                                    <input type="number" id="cote-1" placeholder="Cote 1" step="0.01" min="1" style="padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; color: var(--text-primary); font-size: 12px;">
+                                    <input type="number" id="cote-x" placeholder="Cote N" step="0.01" min="1" style="padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; color: var(--text-primary); font-size: 12px;">
+                                    <input type="number" id="cote-2" placeholder="Cote 2" step="0.01" min="1" style="padding: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 4px; color: var(--text-primary); font-size: 12px;">
+                                </div>
+                                <button onclick="console.log('Cotes manuelles entrées')" style="margin-top: 10px; padding: 8px 12px; background: var(--primary); color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px; width: 100%;">Calculer</button>
+                            </div>
+                        `}
                     </div>
                     
                     <!-- BLOC 3: 10 DERNIERS MATCHS -->
