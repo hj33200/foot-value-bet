@@ -1147,9 +1147,15 @@
                 }
                 
                 const data = await response.json();
-                const oddsData = data.response || [];
+                console.log(`   📦 Réponse complète:`, data);
+                console.log(`   Keys:`, Object.keys(data));
                 
-                if (oddsData.length === 0) {
+                const oddsData = data.response || data.data || data;
+                
+                console.log(`   oddsData:`, oddsData);
+                console.log(`   oddsData.length:`, Array.isArray(oddsData) ? oddsData.length : 'not array');
+                
+                if (!oddsData || (Array.isArray(oddsData) && oddsData.length === 0)) {
                     console.log(`   ⚠️ Aucune donnée de cotes`);
                     return null;
                 }
