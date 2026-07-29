@@ -1036,20 +1036,23 @@
                 };
             }
             
+            // Limiter à 10 derniers matchs (cohérent avec Forme et Stats)
+            const last10 = matches.slice(-10);
+            
             // 1. Clean Sheets (matchs sans encaisser)
             let cleanSheets = 0;
-            matches.forEach(m => {
+            last10.forEach(m => {
                 const isHome = m.teams.home.id === teamId;
                 const goalsAgainst = isHome ? m.goals.away : m.goals.home;
                 if (goalsAgainst === 0) cleanSheets++;
             });
-            const cleanSheetPct = (cleanSheets / matches.length * 100).toFixed(1);
+            const cleanSheetPct = (cleanSheets / last10.length * 100).toFixed(1);
             
             // 2. Efficacité: buts par match
             let totalGF = 0;
             let totalGA = 0;
             
-            matches.forEach(m => {
+            last10.forEach(m => {
                 const isHome = m.teams.home.id === teamId;
                 const goalsFor = isHome ? m.goals.home : m.goals.away;
                 const goalsAgainst = isHome ? m.goals.away : m.goals.home;
@@ -1057,8 +1060,8 @@
                 totalGA += goalsAgainst;
             });
             
-            const efficiency = (totalGF / matches.length).toFixed(2);
-            const defensiveRating = (totalGA / matches.length).toFixed(2);
+            const efficiency = (totalGF / last10.length).toFixed(2);
+            const defensiveRating = (totalGA / last10.length).toFixed(2);
             
             return {
                 cleanSheets,
@@ -1767,7 +1770,7 @@ Vérifie:
                                     <div style="margin-top: 5px;">${homeStats.w}V - ${homeStats.d}D - ${homeStats.l}L</div>
                                     <div style="color: var(--primary); font-weight: 600; margin-top: 5px;">Moy: ${(homeStats.gf / homeStats.matches).toFixed(2)} buts/match</div>
                                     <hr style="border: none; border-top: 1px solid rgba(212, 175, 55, 0.2); margin: 8px 0;">
-                                    <div style="color: ${homeAdvanced.cleanSheets > awayAdvanced.cleanSheets ? '#10b981' : homeAdvanced.cleanSheets < awayAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${homeAdvanced.cleanSheets}/${homeMatches.length} (${homeAdvanced.cleanSheetPct}%)</div>
+                                    <div style="color: ${homeAdvanced.cleanSheets > awayAdvanced.cleanSheets ? '#10b981' : homeAdvanced.cleanSheets < awayAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${homeAdvanced.cleanSheets}/${homeMatchesWithResults.length} (${homeAdvanced.cleanSheetPct}%)</div>
                                     <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.efficiency) > parseFloat(awayAdvanced.efficiency) ? '#10b981' : parseFloat(homeAdvanced.efficiency) < parseFloat(awayAdvanced.efficiency) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">⚽ Efficacité: ${homeAdvanced.efficiency} buts/match</div>
                                     <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.defensiveRating) < parseFloat(awayAdvanced.defensiveRating) ? '#10b981' : parseFloat(homeAdvanced.defensiveRating) > parseFloat(awayAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Défense: ${homeAdvanced.defensiveRating} encaissés/match</div>
                                 </div>
@@ -1779,7 +1782,7 @@ Vérifie:
                                     <div style="margin-top: 5px;">${awayStats.w}V - ${awayStats.d}D - ${awayStats.l}L</div>
                                     <div style="color: var(--primary); font-weight: 600; margin-top: 5px;">Moy: ${(awayStats.gf / awayStats.matches).toFixed(2)} buts/match</div>
                                     <hr style="border: none; border-top: 1px solid rgba(212, 175, 55, 0.2); margin: 8px 0;">
-                                    <div style="color: ${awayAdvanced.cleanSheets > homeAdvanced.cleanSheets ? '#10b981' : awayAdvanced.cleanSheets < homeAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${awayAdvanced.cleanSheets}/${awayMatches.length} (${awayAdvanced.cleanSheetPct}%)</div>
+                                    <div style="color: ${awayAdvanced.cleanSheets > homeAdvanced.cleanSheets ? '#10b981' : awayAdvanced.cleanSheets < homeAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${awayAdvanced.cleanSheets}/${awayMatchesWithResults.length} (${awayAdvanced.cleanSheetPct}%)</div>
                                     <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.efficiency) > parseFloat(homeAdvanced.efficiency) ? '#10b981' : parseFloat(awayAdvanced.efficiency) < parseFloat(homeAdvanced.efficiency) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">⚽ Efficacité: ${awayAdvanced.efficiency} buts/match</div>
                                     <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.defensiveRating) < parseFloat(homeAdvanced.defensiveRating) ? '#10b981' : parseFloat(awayAdvanced.defensiveRating) > parseFloat(homeAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Défense: ${awayAdvanced.defensiveRating} encaissés/match</div>
                                 </div>
