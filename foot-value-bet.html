@@ -1132,10 +1132,14 @@
                 console.log(`\n💰 === RÉCUPÉRATION DES COTES ===`);
                 console.log(`   Fixture ID: ${fixtureId}`);
                 
-                // Utiliser le proxy directement (comme l'ancien site)
-                const url = `${PROXY_URL}?endpoint=/odds&fixture=${fixtureId}&apikey=${API_KEY}`;
+                // Utiliser exactement le même format que l'ancien site (sans slash, sans apikey)
+                const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=odds&fixture=${fixtureId}`;
+                
+                console.log(`   URL: ${url}`);
                 
                 const response = await fetch(url);
+                
+                console.log(`   Status: ${response.status}`);
                 
                 if (!response.ok) {
                     console.log(`   ⚠️ HTTP ${response.status}`);
@@ -1154,8 +1158,10 @@
                 const fixtureOdds = oddsData[0];
                 const bookmakers = fixtureOdds?.bookmakers || [];
                 
+                console.log(`   📊 ${bookmakers.length} bookmakers trouvés`);
+                
                 // Chercher les bookmakers prioritaires
-                const bookmarkersPriority = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+                const bookmakersPriority = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
                 
                 for (const bmPriority of bookmarkersPriority) {
                     const bookmaker = bookmakers.find(b => b.name === bmPriority);
