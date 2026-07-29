@@ -1018,6 +1018,13 @@
             }
         }
         
+        // Filter matches to keep only those with results
+        function getMatchesWithResults(matches) {
+            return matches.filter(m => 
+                m.goals.home !== null && m.goals.away !== null
+            );
+        }
+        
         // Calculer les stats avancées
         function calculateAdvancedStats(matches, teamId) {
             if (!matches || matches.length === 0) {
@@ -1608,16 +1615,22 @@ Vérifie:
             const homeMatches = await getTeamLastMatches(homeId, leagueId);
             const awayMatches = await getTeamLastMatches(awayId, leagueId);
             
-            // Calculer les stats depuis les VRAIS matchs
-            const homeStats = calculateTeamStats(homeMatches, homeId);
-            const awayStats = calculateTeamStats(awayMatches, awayId);
+            // Filter to keep only matches with results
+            const homeMatchesWithResults = getMatchesWithResults(homeMatches);
+            const awayMatchesWithResults = getMatchesWithResults(awayMatches);
             
-            const homeForm = calculateForm(homeMatches, homeId);
-            const awayForm = calculateForm(awayMatches, awayId);
+            console.log(`   📊 Matchs avec résultats: Équipe 1=${homeMatchesWithResults.length}, Équipe 2=${awayMatchesWithResults.length}`);
+            
+            // Calculer les stats depuis les VRAIS matchs (avec résultats)
+            const homeStats = calculateTeamStats(homeMatchesWithResults, homeId);
+            const awayStats = calculateTeamStats(awayMatchesWithResults, awayId);
+            
+            const homeForm = calculateForm(homeMatchesWithResults, homeId);
+            const awayForm = calculateForm(awayMatchesWithResults, awayId);
             
             // Calculate Strength of Schedule
-            const homeSOS = calculateSOS(homeMatches, homeId);
-            const awaySOS = calculateSOS(awayMatches, awayId);
+            const homeSOS = calculateSOS(homeMatchesWithResults, homeId);
+            const awaySOS = calculateSOS(awayMatchesWithResults, awayId);
             
             // Get real FIFA rankings
             const homeRank = getRankingByTeamName(match.teams.home.name);
@@ -1628,8 +1641,8 @@ Vérifie:
             const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, awayRank, awaySOS);
             
             // Calculate advanced stats
-            const homeAdvanced = calculateAdvancedStats(homeMatches, homeId);
-            const awayAdvanced = calculateAdvancedStats(awayMatches, awayId);
+            const homeAdvanced = calculateAdvancedStats(homeMatchesWithResults, homeId);
+            const awayAdvanced = calculateAdvancedStats(awayMatchesWithResults, awayId);
             
             // Calculate H2H - differently for leagues vs Cup
             let h2hMatches = [];
@@ -1779,7 +1792,7 @@ Vérifie:
                         <h3 style="color: var(--primary); margin-bottom: 15px; font-size: 14px;">📋 10 Derniers Matchs</h3>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                                 <div>
-                                    <h4 style="color: var(--primary); margin-bottom: 10px; font-size: 12px;">${match.teams.home.name} (${homeMatches.length} matchs)</h4>
+                                    <h4 style="color: var(--primary); margin-bottom: 10px; font-size: 12px;">${match.teams.home.name} (${homeMatchesWithResults.length} matchs)</h4>
                                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                                         <thead style="background: rgba(212, 175, 55, 0.1);">
                                             <tr>
@@ -1790,12 +1803,12 @@ Vérifie:
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            ${formatMatches(homeMatches.slice(-10), homeId)}
+                                            ${formatMatches(homeMatchesWithResults.slice(-10), homeId)}
                                         </tbody>
                                     </table>
                                 </div>
                                 <div>
-                                    <h4 style="color: var(--secondary); margin-bottom: 10px; font-size: 12px;">${match.teams.away.name} (${awayMatches.length} matchs)</h4>
+                                    <h4 style="color: var(--secondary); margin-bottom: 10px; font-size: 12px;">${match.teams.away.name} (${awayMatchesWithResults.length} matchs)</h4>
                                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                                         <thead style="background: rgba(240, 215, 78, 0.1);">
                                             <tr>
@@ -1806,7 +1819,7 @@ Vérifie:
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            ${formatMatches(awayMatches.slice(-10), awayId)}
+                                            ${formatMatches(awayMatchesWithResults.slice(-10), awayId)}
                                         </tbody>
                                     </table>
                                 </div>
