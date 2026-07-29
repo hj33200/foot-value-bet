@@ -1132,67 +1132,75 @@
                 console.log(`\n💰 === RÉCUPÉRATION DES COTES ===`);
                 console.log(`   Fixture ID: ${fixtureId}`);
                 
-                // Bookmakers: Unibet (16), Bet365 (1), 1xBET (7)
-                const bookmakers = [
-                    { id: 16, name: 'Unibet', priority: 1 },
-                    { id: 1, name: 'Bet365', priority: 2 },
-                    { id: 7, name: '1xBET', priority: 3 }
-                ];
+                // Utiliser le proxy directement (comme l'ancien site)
+                const url = `${PROXY_URL}?endpoint=/odds&fixture=${fixtureId}&apikey=${API_KEY}`;
                 
-                for (const bm of bookmakers) {
-                    try {
-                        const url = `${PROXY_URL}?endpoint=/odds&apikey=${API_KEY}&fixture=${fixtureId}&bookmaker=${bm.id}`;
-                        
-                        const response = await fetch(url);
-                        if (!response.ok) {
-                            console.log(`      ⚠️ ${bm.name} (${bm.id}): Erreur HTTP ${response.status}`);
-                            continue;
-                        }
-                        
-                        const data = await response.json();
-                        const odds = data.response;
-                        
-                        if (!odds || odds.length === 0) {
-                            console.log(`      ⚠️ ${bm.name}: Pas de données`);
-                            continue;
-                        }
-                        
-                        // Chercher le marché 1N2 (Match Winner)
-                        const matchWinner = odds.find(o => o.name === 'Match Winner');
-                        if (!matchWinner || !matchWinner.values) {
-                            console.log(`      ⚠️ ${bm.name}: Pas de 1N2`);
-                            continue;
-                        }
-                        
-                        const win1 = matchWinner.values.find(v => v.value === '1');
-                        const draw = matchWinner.values.find(v => v.value === 'X');
-                        const win2 = matchWinner.values.find(v => v.value === '2');
-                        
-                        if (!win1 || !draw || !win2) {
-                            console.log(`      ⚠️ ${bm.name}: Données incomplètes`);
-                            continue;
-                        }
-                        
-                        console.log(`      ✅ ${bm.name}: 1=${win1.odd}, N=${draw.odd}, 2=${win2.odd}`);
-                        
-                        return {
-                            bookmaker: bm.name,
-                            bookmakerPriority: bm.priority,
-                            odds: {
-                                '1': parseFloat(win1.odd),
-                                'X': parseFloat(draw.odd),
-                                '2': parseFloat(win2.odd)
-                            }
-                        };
-                    } catch (e) {
-                        console.error(`      ❌ ${bm.name}: Erreur`, e.message);
-                    }
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    console.log(`   ⚠️ HTTP ${response.status}`);
+                    return null;
                 }
                 
-                console.log(`   ⚠️ Aucune cote trouvée`);
+                const data = await response.json();
+                const oddsData = data.response || [];
+                
+                if (oddsData.length === 0) {
+                    console.log(`   ⚠️ Aucune donnée de cotes`);
+                    return null;
+                }
+                
+                // Structure: oddsData[0].bookmakers[].bets[]
+                const fixtureOdds = oddsData[0];
+                const bookmakers = fixtureOdds?.bookmakers || [];
+                
+                // Chercher les bookmakers prioritaires
+                const bookmarkersPriority = ['Unibet', 'Bet365', '1xBet', 'William Hill'];
+                
+                for (const bmPriority of bookmarkersPriority) {
+                    const bookmaker = bookmakers.find(b => b.name === bmPriority);
+                    
+                    if (!bookmaker) {
+                        console.log(`   ⚠️ ${bmPriority}: Non trouvé`);
+                        continue;
+                    }
+                    
+                    // Chercher le marché "Match Winner" (1N2)
+                    const bets = bookmaker.bets || [];
+                    const matchWinner = bets.find(b => b.name === 'Match Winner');
+                    
+                    if (!matchWinner) {
+                        console.log(`   ⚠️ ${bmPriority}: Pas de Match Winner`);
+                        continue;
+                    }
+                    
+                    // Extraire 1, X, 2
+                    const values = matchWinner.values || [];
+                    const win1 = values.find(v => v.value === '1');
+                    const draw = values.find(v => v.value === 'X');
+                    const win2 = values.find(v => v.value === '2');
+                    
+                    if (!win1 || !draw || !win2) {
+                        console.log(`   ⚠️ ${bmPriority}: Données incomplètes`);
+                        continue;
+                    }
+                    
+                    console.log(`   ✅ ${bmPriority}: 1=${win1.odd}, N=${draw.odd}, 2=${win2.odd}`);
+                    
+                    return {
+                        bookmaker: bmPriority,
+                        odds: {
+                            '1': parseFloat(win1.odd),
+                            'X': parseFloat(draw.odd),
+                            '2': parseFloat(win2.odd)
+                        }
+                    };
+                }
+                
+                console.log(`   ⚠️ Aucun bookmaker prioritaire trouvé`);
                 return null;
             } catch (error) {
-                console.error(`   ❌ Erreur récupération cotes:`, error);
+                console.error(`   ❌ Erreur:`, error);
                 return null;
             }
         }
