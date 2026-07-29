@@ -745,8 +745,8 @@
         function calculateSOS(matches, teamId) {
             if (!matches || matches.length === 0) return 1600;
             
-            // Limiter à 10 matchs
-            const last10 = matches.slice(0, 10);
+            // Limiter à 10 matchs (les 10 DERNIERS)
+            const last10 = matches.slice(-10);
             let totalOpponentElo = 0;
             let count = 0;
             
@@ -1282,8 +1282,8 @@
         function calculateForm(matches, teamId) {
             if (!matches || matches.length === 0) return 'N/A';
             
-            // Limiter à 10 matchs
-            const last10 = matches.slice(0, 10);
+            // Limiter à 10 matchs (les 10 DERNIERS)
+            const last10 = matches.slice(-10);
             let form = '';
             let details = [];
             
@@ -1317,8 +1317,8 @@
         
         // Calculate basic stats from last 10 matches
         function calculateTeamStats(matches, teamId) {
-            // Limiter à 10 matchs
-            const last10 = matches.slice(0, 10);
+            // Limiter à 10 matchs (les 10 DERNIERS)
+            const last10 = matches.slice(-10);
             let stats = { gf: 0, ga: 0, w: 0, d: 0, l: 0, matches: last10.length };
             
             last10.forEach(match => {
