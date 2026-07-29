@@ -1029,6 +1029,7 @@
         function calculateAdvancedStats(matches, teamId) {
             if (!matches || matches.length === 0) {
                 return {
+                    matchCount: 0,
                     cleanSheets: 0,
                     cleanSheetPct: 0,
                     efficiency: 0,
@@ -1064,6 +1065,7 @@
             const defensiveRating = (totalGA / last10.length).toFixed(2);
             
             return {
+                matchCount: last10.length,  // ← Retourner aussi le nombre de matchs
                 cleanSheets,
                 cleanSheetPct,
                 efficiency,
@@ -1770,7 +1772,7 @@ Vérifie:
                                     <div style="margin-top: 5px;">${homeStats.w}V - ${homeStats.d}D - ${homeStats.l}L</div>
                                     <div style="color: var(--primary); font-weight: 600; margin-top: 5px;">Moy: ${(homeStats.gf / homeStats.matches).toFixed(2)} buts/match</div>
                                     <hr style="border: none; border-top: 1px solid rgba(212, 175, 55, 0.2); margin: 8px 0;">
-                                    <div style="color: ${homeAdvanced.cleanSheets > awayAdvanced.cleanSheets ? '#10b981' : homeAdvanced.cleanSheets < awayAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${homeAdvanced.cleanSheets}/${homeMatchesWithResults.length} (${homeAdvanced.cleanSheetPct}%)</div>
+                                    <div style="color: ${homeAdvanced.cleanSheets > awayAdvanced.cleanSheets ? '#10b981' : homeAdvanced.cleanSheets < awayAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${homeAdvanced.cleanSheets}/${homeAdvanced.matchCount} (${homeAdvanced.cleanSheetPct}%)</div>
                                     <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.efficiency) > parseFloat(awayAdvanced.efficiency) ? '#10b981' : parseFloat(homeAdvanced.efficiency) < parseFloat(awayAdvanced.efficiency) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">⚽ Efficacité: ${homeAdvanced.efficiency} buts/match</div>
                                     <div style="margin-top: 5px; color: ${parseFloat(homeAdvanced.defensiveRating) < parseFloat(awayAdvanced.defensiveRating) ? '#10b981' : parseFloat(homeAdvanced.defensiveRating) > parseFloat(awayAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Défense: ${homeAdvanced.defensiveRating} encaissés/match</div>
                                 </div>
@@ -1782,7 +1784,7 @@ Vérifie:
                                     <div style="margin-top: 5px;">${awayStats.w}V - ${awayStats.d}D - ${awayStats.l}L</div>
                                     <div style="color: var(--primary); font-weight: 600; margin-top: 5px;">Moy: ${(awayStats.gf / awayStats.matches).toFixed(2)} buts/match</div>
                                     <hr style="border: none; border-top: 1px solid rgba(212, 175, 55, 0.2); margin: 8px 0;">
-                                    <div style="color: ${awayAdvanced.cleanSheets > homeAdvanced.cleanSheets ? '#10b981' : awayAdvanced.cleanSheets < homeAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${awayAdvanced.cleanSheets}/${awayMatchesWithResults.length} (${awayAdvanced.cleanSheetPct}%)</div>
+                                    <div style="color: ${awayAdvanced.cleanSheets > homeAdvanced.cleanSheets ? '#10b981' : awayAdvanced.cleanSheets < homeAdvanced.cleanSheets ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Clean Sheets: ${awayAdvanced.cleanSheets}/${awayAdvanced.matchCount} (${awayAdvanced.cleanSheetPct}%)</div>
                                     <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.efficiency) > parseFloat(homeAdvanced.efficiency) ? '#10b981' : parseFloat(awayAdvanced.efficiency) < parseFloat(homeAdvanced.efficiency) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">⚽ Efficacité: ${awayAdvanced.efficiency} buts/match</div>
                                     <div style="margin-top: 5px; color: ${parseFloat(awayAdvanced.defensiveRating) < parseFloat(homeAdvanced.defensiveRating) ? '#10b981' : parseFloat(awayAdvanced.defensiveRating) > parseFloat(homeAdvanced.defensiveRating) ? '#ef4444' : '#f59e0b'}; font-weight: 600;">🛡️ Défense: ${awayAdvanced.defensiveRating} encaissés/match</div>
                                 </div>
