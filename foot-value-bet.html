@@ -1065,31 +1065,116 @@
         
         // Get H2H matches by searching multiple seasons
         // Calculate expected goals based on team stats
-        function calculateExpectedGoals(homeStats, awayStats, homeRank, awayRank) {
-            console.log(`\n⚽ === EXPECTED GOALS ===`);
+        // Calculate form factor weighted by opponent ELO (NEW v2)
+        function calcFormFactor_Weighted(form, matches, teamId, baseElo) {
+            console.log(`\n📈 === FORM FACTOR (ELO-Weighted) ===`);
             
-            // Base: moyenne de buts marqués
+            if (!form || form.length === 0 || !matches || matches.length === 0) {
+                console.log(`   ⚠️ No form/matches data, using default 1.0`);
+                return 1.0;
+            }
+            
+            // Take last 5 matches
+            const last5 = Math.min(5, matches.length);
+            const last5Matches = matches.slice(-last5);
+            
+            let weightedPoints = 0;
+            let totalWeight = 0;
+            
+            for (let i = 0; i < last5; i++) {
+                const match = last5Matches[i];
+                if (!match || !match.goals || match.goals.home === null) continue;
+                
+                // Get opponent
+                const isHome = match.teams.home.id === teamId;
+                const opponent = isHome ? match.teams.away : match.teams.home;
+                
+                // Get result (W/D/L)
+                const goalsFor = isHome ? match.goals.home : match.goals.away;
+                const goalsAgainst = isHome ? match.goals.away : match.goals.home;
+                
+                let result = 'L';
+                if (goalsFor > goalsAgainst) result = 'W';
+                else if (goalsFor === goalsAgainst) result = 'D';
+                
+                // Calculate opponent ELO (cached if possible)
+                let opponentElo = 1600;  // default
+                if (opponent.name) {
+                    opponentElo = rankingToElo(getRankingByTeamName(opponent.name));
+                }
+                
+                // Weight = opponent strength (normalized to 1600)
+                const weight = opponentElo / 1600;
+                
+                // Points weighted by opponent strength
+                let points = 0;
+                if (result === 'W') points = 3 * weight;
+                else if (result === 'D') points = 1 * weight;
+                // Loss = 0 points (no penalty scaling)
+                
+                weightedPoints += points;
+                totalWeight += weight;
+                
+                console.log(`   Match ${i+1}: ${result} vs ${opponent.name} (ELO ${opponentElo.toFixed(0)}) → weight ${weight.toFixed(2)} → points ${points.toFixed(1)}`);
+            }
+            
+            // Normalize: max possible = 5 matches × 3 points × weight 1.0
+            const maxPoints = 5 * 3 * 1.0;
+            const ratio = weightedPoints / maxPoints;
+            
+            // Adjustment: 0.85 to 1.15 (±15%)
+            const formAdjustment = clamp(0.85 + (ratio * 0.30), 0.85, 1.15);
+            
+            console.log(`   Weighted points: ${weightedPoints.toFixed(1)} / ${maxPoints} → ratio ${ratio.toFixed(2)} → adjustment ${formAdjustment.toFixed(2)}`);
+            
+            return formAdjustment;
+        }
+        
+        function calculateExpectedGoals(homeStats, awayStats, homeRank, awayRank, 
+                                        homeMatches, awayMatches, homeId, awayId, homeElo, awayElo, homeForm, awayForm) {
+            console.log(`\n⚽ === EXPECTED GOALS (v2: ELO-based + Form-weighted + Home Advantage) ===`);
+            
+            // 1️⃣ BASE: Moyenne de buts marqués et encaissés
             const homeAvgGF = homeStats.gf / Math.max(homeStats.matches, 1);
             const awayAvgGF = awayStats.gf / Math.max(awayStats.matches, 1);
+            const homeDefense = awayStats.ga / Math.max(awayStats.matches, 1);
+            const awayDefense = homeStats.ga / Math.max(homeStats.matches, 1);
             
-            // Ajustement: force défensive (buts encaissés moyenne)
-            const homeDefense = awayStats.ga / Math.max(awayStats.matches, 1); // Défense adversaire
-            const awayDefense = homeStats.ga / Math.max(homeStats.matches, 1); // Défense adversaire
+            console.log(`   Base attacking: Home ${homeAvgGF.toFixed(2)}, Away ${awayAvgGF.toFixed(2)}`);
+            console.log(`   Base defending: Home allows ${homeDefense.toFixed(2)}, Away allows ${awayDefense.toFixed(2)}`);
             
-            // Ajustement: rang UEFA (meilleure équipe = plus de buts)
-            const rankAdjustmentHome = Math.max(0.8, Math.min(1.2, (100 - homeRank) / 100));
-            const rankAdjustmentAway = Math.max(0.8, Math.min(1.2, (100 - awayRank) / 100));
+            // 2️⃣ ELO ADJUSTMENT (NOT rank-based) - MORE SCIENTIFIC
+            const rankAdjustmentHome = homeElo / 1600;  // Direct ELO mapping
+            const rankAdjustmentAway = awayElo / 1600;  // Direct ELO mapping
             
-            // xG = (moyenne attaque + moyenne défense adverse) / 2 * ajustement rang
-            const homeXG = ((homeAvgGF + homeDefense) / 2) * rankAdjustmentHome;
-            const awayXG = ((awayAvgGF + awayDefense) / 2) * rankAdjustmentAway;
+            console.log(`   ELO adjustment: Home ${rankAdjustmentHome.toFixed(3)} (ELO ${homeElo.toFixed(0)}), Away ${rankAdjustmentAway.toFixed(3)} (ELO ${awayElo.toFixed(0)})`);
             
-            console.log(`   Home: ${homeAvgGF.toFixed(2)} (atk) + ${homeDefense.toFixed(2)} (def) × ${rankAdjustmentHome.toFixed(2)} = ${homeXG.toFixed(2)} xG`);
-            console.log(`   Away: ${awayAvgGF.toFixed(2)} (atk) + ${awayDefense.toFixed(2)} (def) × ${rankAdjustmentAway.toFixed(2)} = ${awayXG.toFixed(2)} xG`);
+            // 3️⃣ FORM FACTOR (weighted by opponent ELO)
+            const formAdjustmentHome = calcFormFactor_Weighted(homeForm, homeMatches, homeId, homeElo);
+            const formAdjustmentAway = calcFormFactor_Weighted(awayForm, awayMatches, awayId, awayElo);
+            
+            console.log(`   Form adjustment: Home ${formAdjustmentHome.toFixed(2)}, Away ${formAdjustmentAway.toFixed(2)}`);
+            
+            // 4️⃣ BASE xG (attack + defense average)
+            const homeXG_base = (homeAvgGF + homeDefense) / 2;
+            const awayXG_base = (awayAvgGF + awayDefense) / 2;
+            
+            // 5️⃣ HOME ADVANTAGE (empirical +0.45 goals)
+            const HOME_ADVANTAGE_BONUS = 0.45;
+            
+            // 6️⃣ FINAL xG with all adjustments
+            const homeXG = homeXG_base * rankAdjustmentHome * formAdjustmentHome + HOME_ADVANTAGE_BONUS;
+            const awayXG = awayXG_base * rankAdjustmentAway * formAdjustmentAway;
+            
+            console.log(`\n   FINAL xG:`);
+            console.log(`   Home: ${homeXG_base.toFixed(2)} (base) × ${rankAdjustmentHome.toFixed(3)} (ELO) × ${formAdjustmentHome.toFixed(2)} (form) + ${HOME_ADVANTAGE_BONUS} (dom) = ${homeXG.toFixed(2)} xG`);
+            console.log(`   Away: ${awayXG_base.toFixed(2)} (base) × ${rankAdjustmentAway.toFixed(3)} (ELO) × ${formAdjustmentAway.toFixed(2)} (form) = ${awayXG.toFixed(2)} xG`);
             
             return {
                 homeXG: homeXG,
-                awayXG: awayXG
+                awayXG: awayXG,
+                formAdjustmentHome: formAdjustmentHome,
+                formAdjustmentAway: formAdjustmentAway
             };
         }
         async function getOdds(fixtureId) {
@@ -2023,8 +2108,15 @@ Vérifie:
                     console.log(`   ✅ Cotes trouvées: ${odds1N2.bookmaker}`);
                     impliedProba = calculateImpliedProba(odds1N2.odds);
                     
-                    // Calculer expected goals
-                    const xg = calculateExpectedGoals(homeStats, awayStats, homeRank, awayRank);
+                    // Calculer expected goals avec form pondérée par ELO
+                    const xg = calculateExpectedGoals(
+                        homeStats, awayStats, 
+                        homeRank, awayRank,
+                        homeMatchesWithResults, awayMatchesWithResults,
+                        homeId, awayId,
+                        homeElo, awayElo,
+                        homeForm, awayForm
+                    );
                     
                     // Calculer probabilités Poisson
                     calculatedProba = calculatePoissonProba(xg.homeXG, xg.awayXG, match.teams.home.name, match.teams.away.name);
