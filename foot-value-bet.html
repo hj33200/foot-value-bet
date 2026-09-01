@@ -1953,19 +1953,23 @@
         // Load matches from API
         async function loadMatches() {
             try {
-                const leagueId = filters.league === 'all' ? 140 : filters.league;
+                const leagueId = LEAGUES[filters.league].id;  // ✅ Use correct mapping
                 
                 // Extraire l'année de la date sélectionnée pour la saison
                 const selectedYear = filters.date.split('-')[0];
                 const season = selectedYear;
                 
-                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&season=${season}&date=${filters.date}&league=${leagueId}`;
+                // Build URL with league parameter only if not 'all'
+                let url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&season=${season}&date=${filters.date}`;
+                if (leagueId !== null) {
+                    url += `&league=${leagueId}`;
+                }
                 
                 document.getElementById('matches-list').innerHTML = '<div class="loading">⏳ Chargement des matchs et calcul ELO...</div>';
                 
                 console.log('\n🚀 === NOUVELLE RECHERCHE ===');
                 console.log('🔗 URL API:', url);
-                console.log('📅 Date:', filters.date, '| Saison:', season, '| Ligue:', leagueId);
+                console.log('📅 Date:', filters.date, '| Saison:', season, '| Ligue:', LEAGUES[filters.league].name, '(ID:', leagueId, ')');
                 
                 const response = await fetch(url);
                 console.log('📊 Réponse status:', response.status);
@@ -1993,7 +1997,7 @@
                         ❌ Erreur: ${error.message}
                         
 Vérifie:
-1. La date sélectionnée
+1. La date sélectionnée (pas trop loin dans le futur)
 2. Le championnat choisi
 3. La connexion internet
 4. Le proxy API
