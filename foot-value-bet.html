@@ -991,30 +991,40 @@
                 
                 console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (3 saisons: 2026-2024)`);
                 
-                // Récupérer les matchs de 3 saisons
-                for (const season of seasons) {
+                // ✅ PARALLÉLISER: Fetch les 3 saisons EN MÊME TEMPS (vs séquentiellement avant)
+                const fetchPromises = seasons.map(season => {
                     const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=50`;
                     
-                    try {
-                        const response = await fetch(url);
-                        
-                        if (!response.ok) {
-                            console.warn(`      ⚠️ Erreur HTTP ${response.status} pour saison ${season}`);
-                            continue;
-                        }
-                        
-                        const data = await response.json();
-                        const matches = data.response || [];
-                        
-                        // Compter les matchs avec résultats dans cette saison
-                        const matchesWithResultsInSeason = matches.filter(m => 
+                    return fetch(url)
+                        .then(response => {
+                            if (!response.ok) {
+                                console.warn(`      ⚠️ Erreur HTTP ${response.status} pour saison ${season}`);
+                                return { season, data: [], error: true };
+                            }
+                            return response.json()
+                                .then(data => ({
+                                    season,
+                                    data: data.response || [],
+                                    error: false
+                                }));
+                        })
+                        .catch(e => {
+                            console.error(`      ❌ Erreur saison ${season}:`, e);
+                            return { season, data: [], error: true };
+                        });
+                });
+                
+                // Attendre TOUS les résultats en parallèle
+                const results = await Promise.all(fetchPromises);
+                
+                // Traiter les résultats
+                for (const result of results) {
+                    if (!result.error) {
+                        const matchesWithResultsInSeason = result.data.filter(m => 
                             m.goals.home !== null && m.goals.away !== null
                         );
-                        
-                        console.log(`      Saison ${season}: ${matches.length} matchs (${matchesWithResultsInSeason.length} avec résultats)`);
-                        allMatches = allMatches.concat(matches);
-                    } catch (e) {
-                        console.error(`      ❌ Erreur saison ${season}:`, e);
+                        console.log(`      Saison ${result.season}: ${result.data.length} matchs (${matchesWithResultsInSeason.length} avec résultats)`);
+                        allMatches = allMatches.concat(result.data);
                     }
                 }
                 
@@ -1983,7 +1993,7 @@
                 
                 if (data.response && data.response.length > 0) {
                     matchesData = data.response.slice(0, 15);
-                    console.log('✅ Début du calcul ELO pour chaque match...\n');
+                    console.log('✅ Matchs chargés! Affichage rapide (ELO calculés au clic)\n');
                     displayMatches();
                     updateAnalytics();
                 } else {
@@ -2009,49 +2019,18 @@ Vérifie:
         // Display matches
         async function displayMatches() {
             const container = document.getElementById('matches-list');
-            container.innerHTML = '<div class="loading">📊 Chargement des statistiques des équipes...</div>';
+            container.innerHTML = '<div class="loading">📊 Affichage des matchs...</div>';
             
             let html = '';
             
             for (let idx = 0; idx < matchesData.length; idx++) {
                 const match = matchesData[idx];
-                const homeId = match.teams.home.id;
-                const awayId = match.teams.away.id;
                 
                 console.log(`\n⚽ === MATCH ${idx + 1}: ${match.teams.home.name} vs ${match.teams.away.name} ===`);
-                
-                // Get last matches and stats
-                const leagueId = match.league.id;
-                const homeMatches = await getTeamLastMatches(homeId, leagueId);
-                const awayMatches = await getTeamLastMatches(awayId, leagueId);
-                
-                // Calculer les stats depuis les VRAIS matchs
-                const homeStats = calculateTeamStats(homeMatches, homeId);
-                const awayStats = calculateTeamStats(awayMatches, awayId);
-                
-                const homeForm = calculateForm(homeMatches, homeId);
-                const awayForm = calculateForm(awayMatches, awayId);
-                
-                console.log(`   📊 ${match.teams.home.name}: ${homeStats.gf}BM, ${homeStats.ga}BE, Form: ${homeForm}`);
-                console.log(`   📊 ${match.teams.away.name}: ${awayStats.gf}BM, ${awayStats.ga}BE, Form: ${awayForm}`);
-                
-                // Calculate Strength of Schedule
-                const homeSOS = calculateSOS(homeMatches, homeId);
-                const awaySOS = calculateSOS(awayMatches, awayId);
-                
-                // Get real FIFA rankings
-                const homeRank = getRankingByTeamName(match.teams.home.name);
-                const awayRank = getRankingByTeamName(match.teams.away.name);
-                console.log(`   🏆 FIFA Rank: ${match.teams.home.name}=#${homeRank}, ${match.teams.away.name}=#${awayRank}`);
-                
-                // Calculate ELO with SOS adjustment (using real FIFA ranks)
-                const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, homeRank, homeSOS);
-                const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, awayRank, awaySOS);
-                
-                console.log(`   ✅ Résultat: ${match.teams.home.name} ELO ${homeElo.toFixed(0)} vs ${match.teams.away.name} ELO ${awayElo.toFixed(0)}\n`);
+                console.log(`   📅 ${match.fixture.date} | Clic pour voir détail + ELO`);
                 
                 html += `
-                    <div class="match-card" onclick="showMatchDetail(${idx})">
+                    <div class="match-card" onclick="showMatchDetail(${idx})" style="cursor: pointer;">
                         <div class="match-header">
                             <div class="match-date">📅 ${new Date(match.fixture.date).toLocaleDateString('fr-FR')} ${match.fixture.date.split('T')[1].substring(0, 5)}</div>
                             <div class="match-cotes">
@@ -2062,56 +2041,51 @@ Vérifie:
                         <div class="teams">
                             <div class="team">
                                 <span>${match.teams.home.name}</span>
-                                <span class="team-elo">ELO ${Math.round(homeElo)}</span>
+                                <span class="team-elo" style="color: #888; font-size: 12px;">ELO: en calcul...</span>
                             </div>
                             <div class="team">
                                 <span>${match.teams.away.name}</span>
-                                <span class="team-elo">ELO ${Math.round(awayElo)}</span>
+                                <span class="team-elo" style="color: #888; font-size: 12px;">ELO: en calcul...</span>
                             </div>
                         </div>
                         <div class="stats">
                             <div class="stat-badge">
-                                <div class="stat-label">Forme ${match.teams.home.name.substring(0,3)}</div>
-                                <div class="stat-value">${homeForm}</div>
-                            </div>
-                            <div class="stat-badge">
-                                <div class="stat-label">Forme ${match.teams.away.name.substring(0,3)}</div>
-                                <div class="stat-value">${awayForm}</div>
-                            </div>
-                            <div class="stat-badge">
-                                <div class="stat-label">BM/BE ${match.teams.home.name.substring(0,3)}</div>
-                                <div class="stat-value">${homeStats.gf}/${homeStats.ga}</div>
-                            </div>
-                            <div class="stat-badge">
-                                <div class="stat-label">BM/BE ${match.teams.away.name.substring(0,3)}</div>
-                                <div class="stat-value">${awayStats.gf}/${awayStats.ga}</div>
+                                <div class="stat-label">Clic pour détails</div>
+                                <div class="stat-value">→</div>
                             </div>
                         </div>
-                        <button class="btn-detail">Voir détail →</button>
+                        <button class="btn-detail">Voir détail & ELO →</button>
                     </div>
                 `;
             }
             
             container.innerHTML = html || '<div class="loading">Aucun match trouvé</div>';
-            console.log('\n✅ === FIN DU CALCUL ELO ===\n');
+            console.log('\n✅ === MATCHS AFFICHÉS RAPIDEMENT (ELO calculés au clic) ===\n');
         }
         
         // Show match detail
         async function showMatchDetail(idx) {
-            const match = matchesData[idx];
-            const homeId = match.teams.home.id;
-            const awayId = match.teams.away.id;
-            const leagueId = match.league.id;
+            // Show loading indicator
+            const container = document.getElementById('matches-list');
+            container.innerHTML = '<div class="loading">⏳ Calcul ELO et statistiques en cours... (peut prendre 3-5 secondes)</div>';
             
-            // Get last 10 matches
-            const homeMatches = await getTeamLastMatches(homeId, leagueId);
-            const awayMatches = await getTeamLastMatches(awayId, leagueId);
-            
-            // Filter to keep only matches with results
-            const homeMatchesWithResults = getMatchesWithResults(homeMatches);
-            const awayMatchesWithResults = getMatchesWithResults(awayMatches);
-            
-            console.log(`   📊 Matchs avec résultats: Équipe 1=${homeMatchesWithResults.length}, Équipe 2=${awayMatchesWithResults.length}`);
+            try {
+                const match = matchesData[idx];
+                const homeId = match.teams.home.id;
+                const awayId = match.teams.away.id;
+                const leagueId = match.league.id;
+                
+                console.log(`\n🔄 === CALCULATING DETAIL FOR MATCH: ${match.teams.home.name} vs ${match.teams.away.name} ===`);
+                
+                // Get last 10 matches
+                const homeMatches = await getTeamLastMatches(homeId, leagueId);
+                const awayMatches = await getTeamLastMatches(awayId, leagueId);
+                
+                // Filter to keep only matches with results
+                const homeMatchesWithResults = getMatchesWithResults(homeMatches);
+                const awayMatchesWithResults = getMatchesWithResults(awayMatches);
+                
+                console.log(`   📊 Matchs avec résultats: Équipe 1=${homeMatchesWithResults.length}, Équipe 2=${awayMatchesWithResults.length}`);
             
             // Calculer les stats depuis les VRAIS matchs (avec résultats)
             const homeStats = calculateTeamStats(homeMatchesWithResults, homeId);
@@ -2426,6 +2400,18 @@ Vérifie:
             
             document.getElementById('match-detail-content').innerHTML = html;
             switchPage('detail');
+            } catch (error) {
+                console.error('❌ Erreur lors du calcul:', error);
+                document.getElementById('matches-list').innerHTML = `
+                    <div class="loading" style="color: #ff6b6b;">
+                        ❌ Erreur lors du calcul des statistiques: ${error.message}
+                        <br><br>
+                        <button onclick="document.getElementById('matches-list').innerHTML = ''; loadMatches();" style="margin-top: 20px; padding: 10px; background: var(--primary); color: #000; border: none; border-radius: 6px; cursor: pointer;">
+                            Réessayer
+                        </button>
+                    </div>
+                `;
+            }
         }
         
         // Update analytics
