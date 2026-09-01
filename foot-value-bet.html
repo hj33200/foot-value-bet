@@ -1066,7 +1066,8 @@
         // Get H2H matches by searching multiple seasons
         // Calculate expected goals based on team stats
         // Calculate form factor weighted by opponent ELO (NEW v2)
-        function calcFormFactor_Weighted(form, matches, teamId, baseElo) {
+        // opponentEloMap = { teamId: elo } pour éviter recalculs
+        function calcFormFactor_Weighted(form, matches, teamId, baseElo, opponentEloMap = {}) {
             console.log(`\n📈 === FORM FACTOR (ELO-Weighted) ===`);
             
             if (!form || form.length === 0 || !matches || matches.length === 0) {
@@ -1097,10 +1098,12 @@
                 if (goalsFor > goalsAgainst) result = 'W';
                 else if (goalsFor === goalsAgainst) result = 'D';
                 
-                // Calculate opponent ELO (cached if possible)
-                let opponentElo = 1600;  // default
-                if (opponent.name) {
+                // Get opponent ELO from cache (pre-calculated with full performance data)
+                // Fallback to simple rank if not in cache
+                let opponentElo = opponentEloMap[opponent.id] || 1600;
+                if (!opponentEloMap[opponent.id] && opponent.name) {
                     opponentElo = rankingToElo(getRankingByTeamName(opponent.name));
+                    console.log(`   ⚠️ Opponent ${opponent.name} not in cache, using rank-based ELO ${opponentElo.toFixed(0)}`);
                 }
                 
                 // Weight = opponent strength (normalized to 1600)
@@ -1130,8 +1133,73 @@
             return formAdjustment;
         }
         
+        // Pre-calculate ELO for all opponents in a matches array (with full performance data)
+        // Returns { teamId: elo } cache object
+        async function buildOpponentEloCache(matches, leagueId) {
+            console.log(`\n🔄 === Building Opponent ELO Cache (${matches.length} matches) ===`);
+            const eloMap = {};
+            const uniqueOpponents = {};
+            
+            // Extract unique opponents
+            for (const match of matches) {
+                if (!match || !match.teams) continue;
+                
+                // Add home team
+                if (match.teams.home && match.teams.home.id) {
+                    uniqueOpponents[match.teams.home.id] = match.teams.home;
+                }
+                // Add away team
+                if (match.teams.away && match.teams.away.id) {
+                    uniqueOpponents[match.teams.away.id] = match.teams.away;
+                }
+            }
+            
+            console.log(`   Found ${Object.keys(uniqueOpponents).length} unique opponent(s)`);
+            
+            // Calculate ELO for each unique opponent
+            for (const opponentId in uniqueOpponents) {
+                const opponent = uniqueOpponents[opponentId];
+                
+                try {
+                    // Fetch opponent's recent matches
+                    const opponentMatches = await getTeamLastMatches(parseInt(opponentId), leagueId);
+                    const opponentMatchesFiltered = getMatchesWithResults(opponentMatches);
+                    
+                    if (opponentMatchesFiltered.length === 0) {
+                        // Fallback: use rank-based ELO
+                        const rank = getRankingByTeamName(opponent.name);
+                        eloMap[opponentId] = rankingToElo(rank);
+                        console.log(`   ${opponent.name}: No matches found, using rank ${rank} → ELO ${eloMap[opponentId].toFixed(0)}`);
+                        continue;
+                    }
+                    
+                    // Calculate stats
+                    const opponentStats = calculateTeamStats(opponentMatchesFiltered, parseInt(opponentId));
+                    const opponentForm = calculateForm(opponentMatchesFiltered, parseInt(opponentId));
+                    const opponentRank = getRankingByTeamName(opponent.name);
+                    const opponentSOS = calculateSOS(opponentMatchesFiltered, parseInt(opponentId));
+                    
+                    // Get full ELO with performance
+                    const opponentElo = getEloWithSOS(parseInt(opponentId), opponent.name, opponentForm, opponentStats.gf, opponentStats.ga, opponentStats.matches, opponentRank, opponentSOS);
+                    
+                    eloMap[opponentId] = opponentElo;
+                    console.log(`   ${opponent.name}: ${opponentMatchesFiltered.length} matches, ELO ${opponentElo.toFixed(0)}`);
+                    
+                } catch (e) {
+                    // Fallback on error
+                    const rank = getRankingByTeamName(opponent.name);
+                    eloMap[opponentId] = rankingToElo(rank);
+                    console.log(`   ${opponent.name}: Error fetching, fallback to rank ELO ${eloMap[opponentId].toFixed(0)}`);
+                }
+            }
+            
+            console.log(`   Cache ready: ${Object.keys(eloMap).length} opponents calculated ✅`);
+            return eloMap;
+        }
+        
         function calculateExpectedGoals(homeStats, awayStats, homeRank, awayRank, 
-                                        homeMatches, awayMatches, homeId, awayId, homeElo, awayElo, homeForm, awayForm) {
+                                        homeMatches, awayMatches, homeId, awayId, homeElo, awayElo, homeForm, awayForm,
+                                        homeOpponentEloMap = {}, awayOpponentEloMap = {}) {
             console.log(`\n⚽ === EXPECTED GOALS (v2: ELO-based + Form-weighted + Home Advantage) ===`);
             
             // 1️⃣ BASE: Moyenne de buts marqués et encaissés
@@ -1150,8 +1218,8 @@
             console.log(`   ELO adjustment: Home ${rankAdjustmentHome.toFixed(3)} (ELO ${homeElo.toFixed(0)}), Away ${rankAdjustmentAway.toFixed(3)} (ELO ${awayElo.toFixed(0)})`);
             
             // 3️⃣ FORM FACTOR (weighted by opponent ELO)
-            const formAdjustmentHome = calcFormFactor_Weighted(homeForm, homeMatches, homeId, homeElo);
-            const formAdjustmentAway = calcFormFactor_Weighted(awayForm, awayMatches, awayId, awayElo);
+            const formAdjustmentHome = calcFormFactor_Weighted(homeForm, homeMatches, homeId, homeElo, homeOpponentEloMap);
+            const formAdjustmentAway = calcFormFactor_Weighted(awayForm, awayMatches, awayId, awayElo, awayOpponentEloMap);
             
             console.log(`   Form adjustment: Home ${formAdjustmentHome.toFixed(2)}, Away ${formAdjustmentAway.toFixed(2)}`);
             
@@ -2070,6 +2138,11 @@ Vérifie:
             const homeH2H = calculateH2H(h2hMatches, homeId);
             const awayH2H = calculateH2H(h2hMatches, awayId);
             
+            // Pre-calculate opponent ELO caches (with full performance data)
+            console.log(`\n🔄 Pre-calculating opponent ELO caches...`);
+            const homeOpponentEloMap = await buildOpponentEloCache(homeMatchesWithResults, match.league.id);
+            const awayOpponentEloMap = await buildOpponentEloCache(awayMatchesWithResults, match.league.id);
+            
             // Format last matches
             const formatMatches = (matches, teamId) => {
                 if (!matches || matches.length === 0) return '<tr><td colspan="5">Aucun match</td></tr>';
@@ -2108,14 +2181,16 @@ Vérifie:
                     console.log(`   ✅ Cotes trouvées: ${odds1N2.bookmaker}`);
                     impliedProba = calculateImpliedProba(odds1N2.odds);
                     
-                    // Calculer expected goals avec form pondérée par ELO
+                    // Calculer expected goals avec form pondérée par ELO adversaire (avec cache)
                     const xg = calculateExpectedGoals(
                         homeStats, awayStats, 
                         homeRank, awayRank,
                         homeMatchesWithResults, awayMatchesWithResults,
                         homeId, awayId,
                         homeElo, awayElo,
-                        homeForm, awayForm
+                        homeForm, awayForm,
+                        homeOpponentEloMap,  // ✨ NEW: Opponent ELO cache (with full performance)
+                        awayOpponentEloMap   // ✨ NEW: Opponent ELO cache (with full performance)
                     );
                     
                     // Calculer probabilités Poisson
