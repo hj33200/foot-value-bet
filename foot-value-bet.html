@@ -653,140 +653,88 @@
             'Wales': 19, 'Ukraine': 25, 'Austria': 24, 'Switzerland': 19
         };
         
-        // Club rankings (UEFA ranking for European clubs)
-        const CLUB_RANKINGS = {
+        // UEFA Club Coefficients 2025-2026 (Real ranking)
+        const UEFA_CLUB_COEFFICIENTS = {
             // Ligue 1 (France)
-            'Paris Saint-Germain': 2,
-            'PSG': 2,
-            'Marseille': 5,
-            'AS Monaco': 8,
-            'Monaco': 8,
-            'Olympique Lyonnais': 12,
-            'Lyon': 12,
-            'LOSC Lille': 15,
-            'Lille': 15,
-            'RC Lens': 18,
-            'Lens': 18,
-            'FC Lorient': 25,
-            'Lorient': 25,
-            'Toulouse FC': 30,
-            'Toulouse': 30,
-            'OGC Nice': 35,
-            'Nice': 35,
-            'Stade Rennais': 40,
-            'Rennes': 40,
-            'AS Saint-Étienne': 50,
-            'Saint-Étienne': 50,
-            'Nantes': 45,
-            'FC Nantes': 45,
-            'Auxerre': 60,
-            'AJ Auxerre': 60,
-            'Strasbourg': 55,
-            'RC Strasbourg': 55,
-            'Le Havre': 65,
-            'Metz': 70,
-            'FC Metz': 70,
-            'Montpellier': 75,
-            'Montpellier HSC': 75,
+            'Paris Saint-Germain': 131.0, 'PSG': 131.0, 'Paris': 131.0,
+            'LOSC Lille': 68.750, 'Lille': 68.750, 'LOSC': 68.750,
+            'Olympique Lyonnais': 65.750, 'Lyon': 65.750, 'OL': 65.750,
+            'Olympique Marseille': 54.0, 'Marseille': 54.0, 'OM': 54.0,
+            'AS Monaco': 56.0, 'Monaco': 56.0,
+            'Stade Rennais FC': 35.0, 'Rennes': 35.0, 'Stade Rennais': 35.0,
+            'RC Strasbourg': 21.500, 'Strasbourg': 21.500,
+            'Stade Brest': 16.750, 'Brest': 16.750,
+            'OGC Nice': 20.0, 'Nice': 20.0, 'OGCN': 20.0,
             
             // Premier League (England)
-            'Manchester City': 1,
-            'Liverpool': 3,
-            'Arsenal': 4,
-            'Manchester United': 6,
-            'Chelsea': 7,
-            'Tottenham': 10,
-            'Brighton': 14,
-            'Newcastle': 16,
-            'Aston Villa': 17,
-            'West Ham': 20,
-            'Bournemouth': 22,
-            'Fulham': 24,
-            'Brentford': 26,
-            'Crystal Palace': 28,
-            'Everton': 32,
-            'Ipswich': 38,
-            'Nottingham': 42,
-            'Forest': 42,
-            'Wolverhampton': 48,
-            'Wolves': 48,
-            'Leicester': 52,
-            'Southampton': 58,
+            'Manchester City': 131.0, 'Man City': 131.0, 'City': 131.0,
+            'Arsenal': 124.0, 'Arsenal FC': 124.0,
+            'Liverpool': 110.0, 'Liverpool FC': 110.0, 'LFC': 110.0,
+            'Manchester United': 95.0, 'Man United': 95.0, 'United': 95.0,
+            'Aston Villa': 87.0, 'Villa': 87.0,
+            'Chelsea': 85.0, 'Chelsea FC': 85.0,
+            'Newcastle United': 71.0, 'Newcastle': 71.0,
+            'Tottenham Hotspur': 70.25, 'Spurs': 70.25, 'Tottenham': 70.25,
             
             // Serie A (Italy)
-            'Inter Milan': 9,
-            'Inter': 9,
-            'Juventus': 11,
-            'AC Milan': 13,
-            'Milan': 13,
-            'AS Roma': 19,
-            'Roma': 19,
-            'Lazio': 21,
-            'SS Lazio': 21,
-            'Fiorentina': 23,
-            'Napoli': 27,
-            'Atalanta': 29,
-            'Bologna': 31,
-            'Torino': 33,
-            'Sassuolo': 36,
-            'Monza': 39,
-            'Cagliari': 43,
-            'Verona': 47,
-            'Como': 51,
-            'Lecce': 54,
-            'Parma': 56,
-            'Empoli': 61,
-            'Genoa': 62,
+            'Internazionale Milano': 116.25, 'Inter': 116.25, 'Inter Milan': 116.25,
+            'AS Roma': 104.50, 'Roma': 104.50,
+            'Atalanta BC': 82.0, 'Atalanta': 82.0,
+            'AC Milan': 75.0, 'Milan': 75.0, 'AC Milan': 75.0,
+            'Juventus': 74.25, 'Juventus FC': 74.25, 'Juve': 74.25,
+            'Napoli': 70.0, 'Napoli SSC': 70.0,
+            'Fiorentina': 45.0, 'ACF Fiorentina': 45.0,
+            'Bologna FC': 19.45, 'Bologna': 19.45,
             
             // Bundesliga (Germany)
-            'FC Bayern Munich': 5,
-            'Bayern': 5,
-            'Bayer Leverkusen': 37,
-            'Leverkusen': 37,
-            'Borussia Dortmund': 41,
-            'Dortmund': 41,
-            'RB Leipzig': 44,
-            'Leipzig': 44,
-            'Stuttgart': 49,
-            'VfB Stuttgart': 49,
-            'Frankfurt': 53,
-            'Eintracht Frankfurt': 53,
-            'Hoffenheim': 57,
-            'TSG Hoffenheim': 57,
-            'Werder Bremen': 59,
-            'Bremen': 59,
-            'Schalke 04': 63,
-            'Schalke': 63,
-            'Union Berlin': 66,
-            'Bochum': 68,
-            'Mainz': 71,
-            'Cologne': 72,
-            'Augsburg': 73,
-            'Wolfsburg': 76,
+            'Bayern München': 135.25, 'Bayern': 135.25, 'Bayern Munich': 135.25, 'FC Bayern Munich': 135.25,
+            'Borussia Dortmund': 106.75, 'Dortmund': 106.75, 'BVB': 106.75,
+            'Bayer Leverkusen': 95.25, 'Leverkusen': 95.25,
+            'RB Leipzig': 78.0, 'Leipzig': 78.0,
+            'Eintracht Frankfurt': 74.0, 'Frankfurt': 74.0,
+            'VfB Stuttgart': 52.0, 'Stuttgart': 52.0,
+            'SC Freiburg': 28.0, 'Freiburg': 28.0,
+            'TSG Hoffenheim': 25.0, 'Hoffenheim': 25.0,
             
             // La Liga (Spain)
-            'Real Madrid': 67,
-            'Barcelona': 69,
-            'Atlético Madrid': 74,
-            'Atlético': 74,
-            'Real Sociedad': 77,
-            'Sociedad': 77,
-            'Sevilla': 79,
-            'Villarreal': 80,
-            'Athletic Bilbao': 81,
-            'Bilbao': 81,
-            'Real Betis': 82,
-            'Betis': 82,
-            'Valencia': 83,
-            'Vallecano': 84,
-            'Rayo Vallecano': 84,
-            'Girona': 85,
-            'Las Palmas': 86,
-            'Osasuna': 87,
-            'Getafe': 88,
-            'Leganes': 89,
-            'Alaves': 90
+            'FC Barcelona': 130.0, 'Barcelona': 130.0, 'Barça': 130.0,
+            'Real Madrid CF': 125.0, 'Real Madrid': 125.0,
+            'Atlético Madrid': 110.0, 'Atletico': 110.0, 'Atleti': 110.0,
+            'Villarreal CF': 82.0, 'Villarreal': 82.0,
+            'Real Sociedad': 72.0, 'La Real': 72.0, 'Sociedad': 72.0,
+            'Athletic Bilbao': 50.0, 'Athletic': 50.0, 'Bilbao': 50.0,
+            'Real Betis': 48.0, 'Betis': 48.0,
+            'Celta de Vigo': 42.0, 'Celta Vigo': 42.0, 'Celta': 42.0
         };
+        
+        // Build ranking from coefficients: sort by coefficient (high to low), assign rank
+        function buildUEFARankings() {
+            const uniqueClubs = {};
+            for (const [name, coeff] of Object.entries(UEFA_CLUB_COEFFICIENTS)) {
+                const found = Object.values(uniqueClubs).find(c => c.coefficient === coeff);
+                if (!found) {
+                    const clubName = Object.entries(UEFA_CLUB_COEFFICIENTS)
+                        .find(([_, c]) => c === coeff)[0];
+                    uniqueClubs[clubName] = { coefficient: coeff };
+                }
+            }
+            
+            const sorted = Object.entries(uniqueClubs)
+                .sort((a, b) => b[1].coefficient - a[1].coefficient)
+                .map(([name, data], index) => ({
+                    name,
+                    coefficient: data.coefficient,
+                    rank: index + 1,
+                    eloBase: 1600 + (100 / Math.sqrt(index + 1))
+                }));
+            
+            return sorted;
+        }
+        
+        const CLUB_RANKINGS = buildUEFARankings().reduce((acc, club) => {
+            acc[club.name] = club;
+            return acc;
+        }, {});
         
         // Team name aliases for matching variations
         const TEAM_NAME_ALIASES = {
@@ -806,48 +754,65 @@
             'Cabo Verde': 'Cape Verde'
         };
         
-        // Get FIFA ranking by team name (clubs first, then national teams)
+        // Get ranking from UEFA coefficients (returns rank, which rankingToElo will convert to ELO)
         function getRankingByTeamName(teamName) {
             if (!teamName) return 50;
             
-            // Try club ranking first
-            if (CLUB_RANKINGS[teamName]) {
-                console.log(`   🏆 Club trouvé: ${teamName} → Rang ${CLUB_RANKINGS[teamName]}`);
-                return CLUB_RANKINGS[teamName];
+            // Try direct coefficient lookup
+            if (UEFA_CLUB_COEFFICIENTS[teamName]) {
+                const coeff = UEFA_CLUB_COEFFICIENTS[teamName];
+                // Find rank from coefficient
+                const allClubs = Object.values(CLUB_RANKINGS);
+                const club = allClubs.find(c => Math.abs(c.coefficient - coeff) < 0.01);
+                if (club) {
+                    console.log(`   🏆 Club trouvé: ${teamName} (coeff: ${coeff.toFixed(2)}) → Rang UEFA ${club.rank} (ELO base: ${club.eloBase.toFixed(0)})`);
+                    return club.rank;
+                }
             }
             
-            // Try national team ranking
+            // Try national team ranking (fallback)
             if (FIFA_RANKINGS[teamName]) {
-                console.log(`   🌍 Équipe nationale trouvée: ${teamName} → Rang ${FIFA_RANKINGS[teamName]}`);
-                return FIFA_RANKINGS[teamName];
+                const rank = FIFA_RANKINGS[teamName];
+                console.log(`   🌍 Équipe nationale trouvée: ${teamName} → Rang FIFA ${rank}`);
+                return rank;
             }
             
             // Try alias
             const aliased = TEAM_NAME_ALIASES[teamName];
             if (aliased) {
-                if (CLUB_RANKINGS[aliased]) {
-                    console.log(`   🏆 Club (via alias): ${teamName} → ${aliased} → Rang ${CLUB_RANKINGS[aliased]}`);
-                    return CLUB_RANKINGS[aliased];
+                if (UEFA_CLUB_COEFFICIENTS[aliased]) {
+                    const coeff = UEFA_CLUB_COEFFICIENTS[aliased];
+                    const club = Object.values(CLUB_RANKINGS).find(c => Math.abs(c.coefficient - coeff) < 0.01);
+                    if (club) {
+                        console.log(`   🏆 Club (via alias): ${teamName} → ${aliased} → Rang UEFA ${club.rank}`);
+                        return club.rank;
+                    }
                 }
                 if (FIFA_RANKINGS[aliased]) {
-                    console.log(`   🌍 Équipe (via alias): ${teamName} → ${aliased} → Rang ${FIFA_RANKINGS[aliased]}`);
-                    return FIFA_RANKINGS[aliased];
+                    const rank = FIFA_RANKINGS[aliased];
+                    console.log(`   🌍 Équipe (via alias): ${teamName} → ${aliased} → Rang FIFA ${rank}`);
+                    return rank;
                 }
             }
             
             // Try partial match in clubs first
-            for (let key in CLUB_RANKINGS) {
+            for (let key in UEFA_CLUB_COEFFICIENTS) {
                 if (key.toLowerCase().includes(teamName.toLowerCase()) || teamName.toLowerCase().includes(key.toLowerCase())) {
-                    console.log(`   🏆 Club (match partiel): ${teamName} → ${key} → Rang ${CLUB_RANKINGS[key]}`);
-                    return CLUB_RANKINGS[key];
+                    const coeff = UEFA_CLUB_COEFFICIENTS[key];
+                    const club = Object.values(CLUB_RANKINGS).find(c => Math.abs(c.coefficient - coeff) < 0.01);
+                    if (club) {
+                        console.log(`   🏆 Club (match partiel): ${teamName} → ${key} → Rang UEFA ${club.rank}`);
+                        return club.rank;
+                    }
                 }
             }
             
             // Try partial match in nationals
             for (let key in FIFA_RANKINGS) {
                 if (key.toLowerCase().includes(teamName.toLowerCase()) || teamName.toLowerCase().includes(key.toLowerCase())) {
-                    console.log(`   🌍 Équipe (match partiel): ${teamName} → ${key} → Rang ${FIFA_RANKINGS[key]}`);
-                    return FIFA_RANKINGS[key];
+                    const rank = FIFA_RANKINGS[key];
+                    console.log(`   🌍 Équipe (match partiel): ${teamName} → ${key} → Rang FIFA ${rank}`);
+                    return rank;
                 }
             }
             
