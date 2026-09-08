@@ -2069,6 +2069,16 @@ Vérifie:
             const container = document.getElementById('matches-list');
             container.innerHTML = '<div class="loading">⏳ Calcul ELO et statistiques en cours... (peut prendre 3-5 secondes)</div>';
             
+            // ✅ Pre-declare variables to avoid scope issues
+            let homeElo = 1600;
+            let awayElo = 1600;
+            let homeForm = '';
+            let awayForm = '';
+            let homeStats = { gf: 0, ga: 0, matches: 1 };
+            let awayStats = { gf: 0, ga: 0, matches: 1 };
+            let homeOpponentEloMap = {};
+            let awayOpponentEloMap = {};
+            
             try {
                 const match = matchesData[idx];
                 const homeId = match.teams.home.id;
@@ -2087,24 +2097,24 @@ Vérifie:
                 
                 console.log(`   📊 Matchs avec résultats: Équipe 1=${homeMatchesWithResults.length}, Équipe 2=${awayMatchesWithResults.length}`);
             
-            // Calculer les stats depuis les VRAIS matchs (avec résultats)
-            const homeStats = calculateTeamStats(homeMatchesWithResults, homeId);
-            const awayStats = calculateTeamStats(awayMatchesWithResults, awayId);
-            
-            const homeForm = calculateForm(homeMatchesWithResults, homeId);
-            const awayForm = calculateForm(awayMatchesWithResults, awayId);
-            
-            // Calculate Strength of Schedule
-            const homeSOS = calculateSOS(homeMatchesWithResults, homeId);
-            const awaySOS = calculateSOS(awayMatchesWithResults, awayId);
-            
-            // Get real FIFA rankings
-            const homeRank = getRankingByTeamName(match.teams.home.name);
-            const awayRank = getRankingByTeamName(match.teams.away.name);
-            
-            // Calculate ELO with SOS adjustment (using real FIFA ranks)
-            const homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, homeRank, homeSOS);
-            const awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, awayRank, awaySOS);
+                // Calculer les stats depuis les VRAIS matchs (avec résultats)
+                homeStats = calculateTeamStats(homeMatchesWithResults, homeId);
+                awayStats = calculateTeamStats(awayMatchesWithResults, awayId);
+                
+                homeForm = calculateForm(homeMatchesWithResults, homeId);
+                awayForm = calculateForm(awayMatchesWithResults, awayId);
+                
+                // Calculate Strength of Schedule
+                const homeSOS = calculateSOS(homeMatchesWithResults, homeId);
+                const awaySOS = calculateSOS(awayMatchesWithResults, awayId);
+                
+                // Get real FIFA rankings
+                const homeRank = getRankingByTeamName(match.teams.home.name);
+                const awayRank = getRankingByTeamName(match.teams.away.name);
+                
+                // Calculate ELO with SOS adjustment (using real FIFA ranks)
+                homeElo = getEloWithSOS(homeId, match.teams.home.name, homeForm, homeStats.gf, homeStats.ga, homeStats.matches, homeRank, homeSOS);
+                awayElo = getEloWithSOS(awayId, match.teams.away.name, awayForm, awayStats.gf, awayStats.ga, awayStats.matches, awayRank, awaySOS);
             
             // Calculate advanced stats
             const homeAdvanced = calculateAdvancedStats(homeMatchesWithResults, homeId);
@@ -2118,8 +2128,8 @@ Vérifie:
             
             // Pre-calculate opponent ELO caches (with full performance data)
             console.log(`\n🔄 Pre-calculating opponent ELO caches...`);
-            const homeOpponentEloMap = await buildOpponentEloCache(homeMatchesWithResults, match.league.id);
-            const awayOpponentEloMap = await buildOpponentEloCache(awayMatchesWithResults, match.league.id);
+            homeOpponentEloMap = await buildOpponentEloCache(homeMatchesWithResults, match.league.id);
+            awayOpponentEloMap = await buildOpponentEloCache(awayMatchesWithResults, match.league.id);
             
             // Format last matches
             const formatMatches = (matches, teamId) => {
@@ -2147,9 +2157,14 @@ Vérifie:
             
             // Récupérer les cotes et calculer les probabilités 1N2
             let odds1N2 = null;
-            let impliedProba = null;
-            let calculatedProba = null;
-            let betting1N2 = null;
+            let impliedProba = { '1': 0, 'X': 0, '2': 0 };  // ✅ Valeur par défaut
+            let calculatedProba = { '1': 0, 'X': 0, '2': 0 };  // ✅ Valeur par défaut
+            let betting1N2 = {  // ✅ Valeur par défaut
+                '1': { value: 0 },
+                'X': { value: 0 },
+                '2': { value: 0 }
+            };
+            let xg = { homeXG: 0, awayXG: 0 };  // ✅ Valeur par défaut
             
             try {
                 // Récupérer cotes
@@ -2160,7 +2175,7 @@ Vérifie:
                     impliedProba = calculateImpliedProba(odds1N2.odds);
                     
                     // Calculer expected goals avec form pondérée par ELO adversaire (avec cache)
-                    const xg = calculateExpectedGoals(
+                    xg = calculateExpectedGoals(
                         homeStats, awayStats, 
                         homeRank, awayRank,
                         homeMatchesWithResults, awayMatchesWithResults,
