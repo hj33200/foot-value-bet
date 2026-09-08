@@ -2297,7 +2297,8 @@ Vérifie:
                                 <div style="font-size: 11px; color: var(--primary); font-weight: 600; margin-bottom: 8px;">📊 ${odds1N2.bookmaker}</div>
                                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
                                     <!-- Victoire 1 -->
-                                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 12px; text-align: center;">
+                                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 12px; text-align: center; cursor: pointer; transition: all 0.3s;" 
+                                         onclick="show1N2Modal('1', '${match.teams.home.name}', ${odds1N2.odds['1']}, ${impliedProba['1']}, ${calculatedProba['1']}, ${homeElo}, ${awayElo}, ${xg.homeXG}, ${xg.awayXG})">
                                         <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Victoire ${match.teams.home.name.substring(0,3)}</div>
                                         <div style="font-size: 14px; color: var(--primary); font-weight: 600; margin-bottom: 5px;">${odds1N2.odds['1'].toFixed(2)}</div>
                                         <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 3px;">Proba implicite: ${impliedProba['1']}%</div>
@@ -2309,10 +2310,12 @@ Vérifie:
                                                 ${betting1N2['1'].value > 0 ? '✅ Valeur +' : '❌ Valeur'}${Math.abs(betting1N2['1'].value)}%
                                             </div>
                                         ` : ''}
+                                        <div style="font-size: 8px; margin-top: 8px; color: var(--primary); opacity: 0.7;">👆 Clic pour détails</div>
                                     </div>
                                     
                                     <!-- Nul -->
-                                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 12px; text-align: center;">
+                                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 12px; text-align: center; cursor: pointer; transition: all 0.3s;" 
+                                         onclick="show1N2Modal('X', 'Match Nul', ${odds1N2.odds.X}, ${impliedProba.X}, ${calculatedProba.X}, ${homeElo}, ${awayElo}, ${xg.homeXG}, ${xg.awayXG})">
                                         <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Match Nul</div>
                                         <div style="font-size: 14px; color: var(--primary); font-weight: 600; margin-bottom: 5px;">${odds1N2.odds.X.toFixed(2)}</div>
                                         <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 3px;">Proba implicite: ${impliedProba.X}%</div>
@@ -2324,10 +2327,12 @@ Vérifie:
                                                 ${betting1N2.X.value > 0 ? '✅ Valeur +' : '❌ Valeur'}${Math.abs(betting1N2.X.value)}%
                                             </div>
                                         ` : ''}
+                                        <div style="font-size: 8px; margin-top: 8px; color: var(--primary); opacity: 0.7;">👆 Clic pour détails</div>
                                     </div>
                                     
                                     <!-- Victoire 2 -->
-                                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 12px; text-align: center;">
+                                    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 12px; text-align: center; cursor: pointer; transition: all 0.3s;" 
+                                         onclick="show1N2Modal('2', '${match.teams.away.name}', ${odds1N2.odds['2']}, ${impliedProba['2']}, ${calculatedProba['2']}, ${homeElo}, ${awayElo}, ${xg.homeXG}, ${xg.awayXG})">
                                         <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 5px;">Victoire ${match.teams.away.name.substring(0,3)}</div>
                                         <div style="font-size: 14px; color: var(--primary); font-weight: 600; margin-bottom: 5px;">${odds1N2.odds['2'].toFixed(2)}</div>
                                         <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 3px;">Proba implicite: ${impliedProba['2']}%</div>
@@ -2339,6 +2344,7 @@ Vérifie:
                                                 ${betting1N2['2'].value > 0 ? '✅ Valeur +' : '❌ Valeur'}${Math.abs(betting1N2['2'].value)}%
                                             </div>
                                         ` : ''}
+                                        <div style="font-size: 8px; margin-top: 8px; color: var(--primary); opacity: 0.7;">👆 Clic pour détails</div>
                                     </div>
                                 </div>
                             </div>
@@ -2504,6 +2510,123 @@ Vérifie:
             }
         }
         
+        // 🎯 FONCTION: Afficher modale avec détails 1N2
+        function show1N2Modal(resultType, teamName, odds, impliedProba, calculatedProba, homeElo, awayElo, homeXG, awayXG) {
+            const modal = document.getElementById('modal-1n2-details');
+            const resultLabel = resultType === '1' ? 'Victoire (Domicile)' : resultType === 'X' ? 'Match Nul' : 'Victoire (Extérieur)';
+            const resultEmoji = resultType === '1' ? '🔴' : resultType === 'X' ? '⚪' : '🔵';
+            
+            // Calcul du value betting
+            const valueDiff = calculatedProba - impliedProba;
+            const valueColor = valueDiff > 0 ? '#22c55e' : '#ef4444';
+            
+            // Explications
+            let explicationImplied = '';
+            let explicationCalculee = '';
+            
+            if (resultType === '1') {
+                explicationImplied = `La cote ${odds.toFixed(2)} × 100 = ${impliedProba}% signifie que le bookmaker pense qu'il y a ${impliedProba}% de chance que le domicile gagne.`;
+                explicationCalculee = `Basée sur les Expected Goals (xG), on calcule ${homeXG.toFixed(2)} buts domicile vs ${awayXG.toFixed(2)} extérieur. Avec Poisson, on obtient ${calculatedProba}% de chance de victoire.`;
+            } else if (resultType === 'X') {
+                explicationImplied = `La cote ${odds.toFixed(2)} × 100 = ${impliedProba}% signifie que le bookmaker pense qu'il y a ${impliedProba}% de chance d'un nul.`;
+                explicationCalculee = `Avec les xG calculés (${homeXG.toFixed(2)} vs ${awayXG.toFixed(2)}), la distribution Poisson donne ${calculatedProba}% de probabilité de nul.`;
+            } else {
+                explicationImplied = `La cote ${odds.toFixed(2)} × 100 = ${impliedProba}% signifie que le bookmaker pense qu'il y a ${impliedProba}% de chance que l'extérieur gagne.`;
+                explicationCalculee = `Basée sur ${homeXG.toFixed(2)} buts domicile vs ${awayXG.toFixed(2)} extérieur en xG, on obtient ${calculatedProba}% de chance de victoire extérieure.`;
+            }
+            
+            modal.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000;" onclick="closeModal1N2()">
+                    <div style="background: var(--bg-dark); border: 2px solid var(--primary); border-radius: 12px; padding: 24px; max-width: 600px; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.5);" onclick="event.stopPropagation()">
+                        <!-- Header -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <div>
+                                <div style="font-size: 24px; margin-bottom: 5px;">${resultEmoji} ${resultLabel}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${teamName}</div>
+                            </div>
+                            <button onclick="closeModal1N2()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary);">✕</button>
+                        </div>
+                        
+                        <!-- Cotes -->
+                        <div style="background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">💰 COTE BOOKMAKER</div>
+                            <div style="font-size: 32px; color: var(--primary); font-weight: 700; margin-bottom: 10px;">${odds.toFixed(2)}</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.6;">
+                                Cote de ${odds.toFixed(2)} veut dire: si tu paries 100€ et tu gagnes, tu touches 100€ × ${odds.toFixed(2)} = ${(100 * odds).toFixed(0)}€
+                            </div>
+                        </div>
+                        
+                        <!-- Proba Implicite -->
+                        <div style="background: rgba(100, 116, 139, 0.1); border: 1px solid rgba(100, 116, 139, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">📊 PROBABILITÉ IMPLICITE (du bookmaker)</div>
+                            <div style="font-size: 28px; color: var(--primary); font-weight: 700; margin-bottom: 10px;">${impliedProba}%</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.6; background: rgba(15, 23, 42, 0.6); padding: 10px; border-radius: 6px; margin-top: 10px;">
+                                <strong>Comment c'est calculé:</strong><br>
+                                Proba = (1 ÷ cote) × 100<br>
+                                = (1 ÷ ${odds.toFixed(2)}) × 100<br>
+                                = <strong>${impliedProba}%</strong>
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.6; margin-top: 10px;">
+                                <strong>Interprétation:</strong> ${explicationImplied}
+                            </div>
+                        </div>
+                        
+                        <!-- Notre Proba -->
+                        <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">🧮 NOTRE PROBABILITÉ CALCULÉE</div>
+                            <div style="font-size: 28px; color: #22c55e; font-weight: 700; margin-bottom: 10px;">${calculatedProba}%</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.6; background: rgba(15, 23, 42, 0.6); padding: 10px; border-radius: 6px; margin-top: 10px;">
+                                <strong>Basée sur:</strong><br>
+                                • ELO Domicile: ${homeElo.toFixed(0)} | ELO Extérieur: ${awayElo.toFixed(0)}<br>
+                                • xG Domicile: ${homeXG.toFixed(2)} | xG Extérieur: ${awayXG.toFixed(2)}<br>
+                                • Formule: Distribution de Poisson sur les xG
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.6; margin-top: 10px;">
+                                <strong>Interprétation:</strong> ${explicationCalculee}
+                            </div>
+                        </div>
+                        
+                        <!-- Value Betting -->
+                        <div style="background: ${valueColor}15; border: 2px solid ${valueColor}; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">💡 VALUE BETTING</div>
+                            <div style="font-size: 20px; color: ${valueColor}; font-weight: 700; margin-bottom: 10px;">
+                                ${valueDiff > 0 ? '✅ BON' : valueDiff < -2 ? '❌ MAUVAIS' : '⚠️ NEUTRE'}
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.6;">
+                                <strong>Différence:</strong> ${calculatedProba}% (nous) - ${impliedProba}% (bookmaker) = <strong style="color: ${valueColor}; font-size: 12px;">${valueDiff > 0 ? '+' : ''}${valueDiff.toFixed(1)}%</strong>
+                                <br><br>
+                                ${valueDiff > 0 ? 
+                                    `✅ <strong>Nous pensons que c'est plus probable que ce que le bookmaker croit!</strong> Si on parie au long terme à cette cote, on fait du profit.` : 
+                                    valueDiff < -2 ? 
+                                    `❌ <strong>Nous pensons que c'est moins probable que ce que le bookmaker croit.</strong> Pas intéressant de parier.` :
+                                    `⚠️ <strong>Très proche.</strong> Cote acceptable mais pas forcément attractive.`
+                                }
+                            </div>
+                        </div>
+                        
+                        <!-- Stats Used -->
+                        <div style="background: rgba(107, 114, 128, 0.1); border: 1px solid rgba(107, 114, 128, 0.2); border-radius: 8px; padding: 15px;">
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">📈 STATISTIQUES UTILISÉES</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.8;">
+                                <strong>ELO</strong>: Évaluation force équipes (1600 = référence)<br>
+                                <strong>xG</strong>: Nombre de buts "attendus" basé sur chances crées<br>
+                                <strong>Poisson</strong>: Distribution mathématique pour buts au football<br>
+                                <strong>Home advantage</strong>: +0.45 buts pour domicile (empirique)
+                            </div>
+                        </div>
+                        
+                        <button onclick="closeModal1N2()" style="width: 100%; margin-top: 20px; padding: 12px; background: var(--primary); color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">Fermer</button>
+                    </div>
+                </div>
+            `;
+            modal.style.display = 'flex';
+        }
+        
+        function closeModal1N2() {
+            const modal = document.getElementById('modal-1n2-details');
+            if (modal) modal.innerHTML = '';
+        }
+        
         // Initialize when DOM is ready
         console.log('📝 Adding DOMContentLoaded listener...');
         document.addEventListener('DOMContentLoaded', () => {
@@ -2512,5 +2635,8 @@ Vérifie:
         });
         console.log('✅ DOMContentLoaded listener registered');
     </script>
+    
+    <!-- Modal pour détails 1N2 -->
+    <div id="modal-1n2-details" style="display: none;"></div>
 </body>
 </html>
