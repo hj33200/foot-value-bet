@@ -599,6 +599,16 @@
             '82': { id: 82, name: 'Coppa Italia' }
         };
         
+        // ✅ Dates de début de chaque championnat 2026-2027 (pour Regression to Mean)
+        // On ne récupère que les matchs DEPUIS ces dates (pas 3 saisons mélangées)
+        const LEAGUE_START_DATES = {
+            '61': new Date('2026-08-21'),    // Ligue 1: 21 août 2026
+            '39': new Date('2026-08-21'),    // Premier League: 21 août 2026
+            '135': new Date('2026-08-22'),   // Serie A: 22 août 2026
+            '78': new Date('2026-08-28'),    // Bundesliga: 28 août 2026
+            '140': new Date('2026-08-15'),   // La Liga: 15 août 2026
+        };
+        
         // Load settings from localStorage
         function loadSettings() {
             const saved = localStorage.getItem('footValueBetSettings');
@@ -991,51 +1001,31 @@
         function getEloWithSOS(teamId, teamName, form, gf, ga, matches, rank, sosElo) {
             return calculateEloFromResultsWithSOS(teamName, form, gf, ga, matches, rank, sosElo);
         }
-        async function getTeamLastMatches(teamId, leagueId) {
+        async function getTeamLastMatches(teamId, leagueId, maxMatches = 10) {
             try {
                 let allMatches = [];
-                const seasons = [2026, 2025, 2024]; // Chercher en arrière (récent d'abord)
                 
-                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (3 saisons: 2026-2024)`);
+                // ✅ NOUVELLE APPROCHE: Récupérer SEULEMENT saison 2026, filtrer par date début championnat
+                const season = 2026;
                 
-                // ✅ PARALLÉLISER: Fetch les 3 saisons EN MÊME TEMPS (vs séquentiellement avant)
-                const fetchPromises = seasons.map(season => {
-                    const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=50`;
-                    
-                    return fetch(url)
-                        .then(response => {
-                            if (!response.ok) {
-                                console.warn(`      ⚠️ Erreur HTTP ${response.status} pour saison ${season}`);
-                                return { season, data: [], error: true };
-                            }
-                            return response.json()
-                                .then(data => ({
-                                    season,
-                                    data: data.response || [],
-                                    error: false
-                                }));
-                        })
-                        .catch(e => {
-                            console.error(`      ❌ Erreur saison ${season}:`, e);
-                            return { season, data: [], error: true };
-                        });
-                });
+                // Obtenir la date de début du championnat (sinon default 2026-08-15)
+                const leagueStartDate = LEAGUE_START_DATES[leagueId] || new Date('2026-08-15');
                 
-                // Attendre TOUS les résultats en parallèle
-                const results = await Promise.all(fetchPromises);
+                console.log(`   🔗 Proxy pour équipe ${teamId}, ligue ${leagueId} (saison ${season}, depuis ${leagueStartDate.toISOString().split('T')[0]})`);
                 
-                // Traiter les résultats
-                for (const result of results) {
-                    if (!result.error) {
-                        const matchesWithResultsInSeason = result.data.filter(m => 
-                            m.goals.home !== null && m.goals.away !== null
-                        );
-                        console.log(`      Saison ${result.season}: ${result.data.length} matchs (${matchesWithResultsInSeason.length} avec résultats)`);
-                        allMatches = allMatches.concat(result.data);
-                    }
+                // Fetch uniquement saison 2026
+                const url = `${PROXY_URL}?endpoint=/fixtures&apikey=${API_KEY}&team=${teamId}&season=${season}&league=${leagueId}&last=50`;
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    console.warn(`      ⚠️ Erreur HTTP ${response.status} pour saison ${season}`);
+                    return [];
                 }
                 
-                console.log(`   📊 Matchs trouvés (total 3 saisons): ${allMatches.length}`);
+                const data = await response.json();
+                allMatches = data.response || [];
+                
+                console.log(`      Saison ${season}: ${allMatches.length} matchs trouvés`);
                 
                 if (allMatches.length === 0) {
                     console.log(`   ⚠️ Aucun match pour équipe ${teamId}`);
@@ -1047,33 +1037,39 @@
                     m.goals.home !== null && m.goals.away !== null
                 );
                 
-                console.log(`   ✔️ Matchs avec résultats (au total): ${matchesWithResults.length}`);
+                console.log(`   ✔️ Matchs avec résultats: ${matchesWithResults.length}`);
                 
                 if (matchesWithResults.length === 0) {
                     console.log(`   ⚠️ Aucun match avec résultat pour équipe ${teamId}`);
-                    console.log(`   💡 Conseil: Les matchs de 2026 ne sont peut-être pas encore joués!`);
                     return [];
                 }
                 
+                // ✅ FILTER by championship start date (new approach!)
+                // Ne garder que les matchs depuis la date de début du championnat
+                const matchesSinceStart = matchesWithResults.filter(m => {
+                    const matchDate = new Date(m.fixture.date);
+                    return matchDate >= leagueStartDate;
+                });
+                
+                console.log(`   ✅ Matchs depuis début championnat (${leagueStartDate.toISOString().split('T')[0]}): ${matchesSinceStart.length}`);
+                
                 // Trier par date croissante (ancien → récent)
-                const sorted = matchesWithResults.sort((a, b) => {
+                const sorted = matchesSinceStart.sort((a, b) => {
                     return new Date(a.fixture.date) - new Date(b.fixture.date);
                 });
                 
-                console.log(`   ✅ Équipe ${teamId}: ${sorted.length} matchs total (tous avec résultats)`);
-                
                 // Afficher les dates min/max
-                const dateMin = sorted[0].fixture.date.split('T')[0];
-                const dateMax = sorted[sorted.length - 1].fixture.date.split('T')[0];
-                console.log(`      Dates: ${dateMin} à ${dateMax}`);
+                if (sorted.length > 0) {
+                    const dateMin = sorted[0].fixture.date.split('T')[0];
+                    const dateMax = sorted[sorted.length - 1].fixture.date.split('T')[0];
+                    console.log(`      Dates: ${dateMin} à ${dateMax}`);
+                }
                 
-                // Afficher les 10 derniers aussi
-                const last10dates = sorted.slice(-10).map(m => m.fixture.date.split('T')[0]);
-                console.log(`      10 derniers: ${last10dates.join(' | ')}`);
+                // ✅ RETOURNER LES maxMatches DERNIERS (par défaut 10)
+                const lastMatches = sorted.slice(-maxMatches);
+                console.log(`      📌 Retourner les ${lastMatches.length} derniers matchs (max ${maxMatches}) depuis début saison`);
                 
-                // Retourner TOUS les matchs (besoin pour H2H et stats)
-                // La fonction appelante gardera les 10 derniers si nécessaire
-                return sorted;
+                return lastMatches;
             } catch (error) {
                 console.error(`   ❌ Erreur équipe ${teamId}:`, error);
                 return [];
@@ -1178,8 +1174,8 @@
                 const opponent = uniqueOpponents[opponentId];
                 
                 try {
-                    // Fetch opponent's recent matches
-                    const opponentMatches = await getTeamLastMatches(parseInt(opponentId), leagueId);
+                    // Fetch opponent's recent matches (10 matches for better precision)
+                    const opponentMatches = await getTeamLastMatches(parseInt(opponentId), leagueId, 10);
                     const opponentMatchesFiltered = getMatchesWithResults(opponentMatches);
                     
                     if (opponentMatchesFiltered.length === 0) {
@@ -1217,7 +1213,7 @@
         function calculateExpectedGoals(homeStats, awayStats, homeRank, awayRank, 
                                         homeMatches, awayMatches, homeId, awayId, homeElo, awayElo, homeForm, awayForm,
                                         homeOpponentEloMap = {}, awayOpponentEloMap = {}, homeSOS = 1600, awaySOS = 1600) {
-            console.log(`\n⚽ === EXPECTED GOALS (v3: ELO-based + Form-weighted + SOS-adjusted + Home Advantage) ===`);
+            console.log(`\n⚽ === EXPECTED GOALS (v4: ELO-based + Form-weighted + SOS-adjusted + Regression-to-Mean + Home Advantage) ===`);
             
             // 1️⃣ BASE (BRUT): Moyenne de buts marqués et encaissés
             const homeAvgGF_raw = homeStats.gf / Math.max(homeStats.matches, 1);
@@ -1228,17 +1224,39 @@
             console.log(`   📊 Base attacking (raw): Home ${homeAvgGF_raw.toFixed(2)}, Away ${awayAvgGF_raw.toFixed(2)}`);
             console.log(`   📊 Base defending (raw): Home allows ${homeDefense_raw.toFixed(2)}, Away allows ${awayDefense_raw.toFixed(2)}`);
             
+            // 1.5️⃣ REGRESSION TO MEAN: Mélanger observations avec attentes théoriques (basées sur ELO)
+            // Plus de matchs = plus de confiance aux observations, moins à la théorie
+            const prior_strength = 25;  // Force du "prior" théorique
+            const alpha_home = homeStats.matches / (homeStats.matches + prior_strength);
+            const alpha_away = awayStats.matches / (awayStats.matches + prior_strength);
+            
+            // xG théoriques basées sur ELO (1.85 = coefficient empirique pour conversion ELO→xG)
+            const homeAvgGF_expected = (homeElo / 1600) * 1.85;
+            const awayAvgGF_expected = (awayElo / 1600) * 1.85;
+            const homeDefense_expected = (awayElo / 1600) * 1.85;  // Défense ~ inverse attaque
+            const awayDefense_expected = (homeElo / 1600) * 1.85;
+            
+            // Mélanger: alpha% observé + (1-alpha)% théorique
+            const homeAvgGF_regressed = (alpha_home * homeAvgGF_raw) + ((1 - alpha_home) * homeAvgGF_expected);
+            const awayAvgGF_regressed = (alpha_away * awayAvgGF_raw) + ((1 - alpha_away) * awayAvgGF_expected);
+            const homeDefense_regressed = (alpha_home * homeDefense_raw) + ((1 - alpha_home) * homeDefense_expected);
+            const awayDefense_regressed = (alpha_away * awayDefense_raw) + ((1 - alpha_away) * awayDefense_expected);
+            
+            console.log(`\n   📈 Regression to Mean (adaptatif - ${homeStats.matches}/${awayStats.matches} matchs):`);
+            console.log(`   Home: α=${alpha_home.toFixed(2)} → ${homeAvgGF_raw.toFixed(2)} (obs) × ${alpha_home.toFixed(2)} + ${homeAvgGF_expected.toFixed(2)} (exp) × ${(1-alpha_home).toFixed(2)} = ${homeAvgGF_regressed.toFixed(2)}`);
+            console.log(`   Away: α=${alpha_away.toFixed(2)} → ${awayAvgGF_raw.toFixed(2)} (obs) × ${alpha_away.toFixed(2)} + ${awayAvgGF_expected.toFixed(2)} (exp) × ${(1-alpha_away).toFixed(2)} = ${awayAvgGF_regressed.toFixed(2)}`);
+            
             // 2️⃣ SOS ADJUSTMENT: Pondérer par la force des adversaires affrontés
-            const homeAvgGF = homeAvgGF_raw * (homeSOS / 1600);           // ✅ Ajusté attaque
-            const awayAvgGF = awayAvgGF_raw * (awaySOS / 1600);           // ✅ Ajusté attaque
-            const homeDefense = homeDefense_raw * (awaySOS / 1600);       // ✅ Ajusté défense (par away SOS!)
-            const awayDefense = awayDefense_raw * (homeSOS / 1600);       // ✅ Ajusté défense (par home SOS!)
+            const homeAvgGF = homeAvgGF_regressed * (homeSOS / 1600);           // ✅ Ajusté attaque
+            const awayAvgGF = awayAvgGF_regressed * (awaySOS / 1600);           // ✅ Ajusté attaque
+            const homeDefense = homeDefense_regressed * (awaySOS / 1600);       // ✅ Ajusté défense (par away SOS!)
+            const awayDefense = awayDefense_regressed * (homeSOS / 1600);       // ✅ Ajusté défense (par home SOS!)
             
             console.log(`\n   📈 SOS Adjustment (strength of opponents):`);
-            console.log(`   Home attack: ${homeAvgGF_raw.toFixed(2)} × (${homeSOS.toFixed(0)}/1600) = ${homeAvgGF.toFixed(2)}`);
-            console.log(`   Away attack: ${awayAvgGF_raw.toFixed(2)} × (${awaySOS.toFixed(0)}/1600) = ${awayAvgGF.toFixed(2)}`);
-            console.log(`   Home defense: ${homeDefense_raw.toFixed(2)} × (${awaySOS.toFixed(0)}/1600) = ${homeDefense.toFixed(2)} (Away SOS)`);
-            console.log(`   Away defense: ${awayDefense_raw.toFixed(2)} × (${homeSOS.toFixed(0)}/1600) = ${awayDefense.toFixed(2)} (Home SOS)`);
+            console.log(`   Home attack: ${homeAvgGF_regressed.toFixed(2)} × (${homeSOS.toFixed(0)}/1600) = ${homeAvgGF.toFixed(2)}`);
+            console.log(`   Away attack: ${awayAvgGF_regressed.toFixed(2)} × (${awaySOS.toFixed(0)}/1600) = ${awayAvgGF.toFixed(2)}`);
+            console.log(`   Home defense: ${homeDefense_regressed.toFixed(2)} × (${awaySOS.toFixed(0)}/1600) = ${homeDefense.toFixed(2)} (Away SOS)`);
+            console.log(`   Away defense: ${awayDefense_regressed.toFixed(2)} × (${homeSOS.toFixed(0)}/1600) = ${awayDefense.toFixed(2)} (Home SOS)`);
             
             // 3️⃣ ELO ADJUSTMENT (NOT rank-based) - MORE SCIENTIFIC
             const rankAdjustmentHome = homeElo / 1600;  // Direct ELO mapping
@@ -1252,7 +1270,7 @@
             
             console.log(`   📉 Form adjustment: Home ${formAdjustmentHome.toFixed(2)}, Away ${formAdjustmentAway.toFixed(2)}`);
             
-            // 5️⃣ BASE xG (attack + defense average) - NOW SOS-ADJUSTED
+            // 5️⃣ BASE xG (attack + defense average) - NOW SOS-ADJUSTED + REGRESSED
             const homeXG_base = (homeAvgGF + homeDefense) / 2;
             const awayXG_base = (awayAvgGF + awayDefense) / 2;
             
@@ -1263,9 +1281,9 @@
             const homeXG = homeXG_base * rankAdjustmentHome * formAdjustmentHome + HOME_ADVANTAGE_BONUS;
             const awayXG = awayXG_base * rankAdjustmentAway * formAdjustmentAway;
             
-            console.log(`\n   ⚽ FINAL xG (SOS-adjusted + ELO + Form + Home Advantage):`);
-            console.log(`   Home: ${homeXG_base.toFixed(2)} (base SOS-adj) × ${rankAdjustmentHome.toFixed(3)} (ELO) × ${formAdjustmentHome.toFixed(2)} (form) + ${HOME_ADVANTAGE_BONUS} (dom) = ${homeXG.toFixed(2)} xG`);
-            console.log(`   Away: ${awayXG_base.toFixed(2)} (base SOS-adj) × ${rankAdjustmentAway.toFixed(3)} (ELO) × ${formAdjustmentAway.toFixed(2)} (form) = ${awayXG.toFixed(2)} xG`);
+            console.log(`\n   ⚽ FINAL xG (Regressed + SOS-adjusted + ELO + Form + Home Advantage):`);
+            console.log(`   Home: ${homeXG_base.toFixed(2)} (base) × ${rankAdjustmentHome.toFixed(3)} (ELO) × ${formAdjustmentHome.toFixed(2)} (form) + ${HOME_ADVANTAGE_BONUS} (dom) = ${homeXG.toFixed(2)} xG`);
+            console.log(`   Away: ${awayXG_base.toFixed(2)} (base) × ${rankAdjustmentAway.toFixed(3)} (ELO) × ${formAdjustmentAway.toFixed(2)} (form) = ${awayXG.toFixed(2)} xG`);
             
             return {
                 homeXG: homeXG,
@@ -2106,9 +2124,9 @@ Vérifie:
                 
                 console.log(`\n🔄 === CALCULATING DETAIL FOR MATCH: ${match.teams.home.name} vs ${match.teams.away.name} ===`);
                 
-                // Get last 10 matches
-                const homeMatches = await getTeamLastMatches(homeId, leagueId);
-                const awayMatches = await getTeamLastMatches(awayId, leagueId);
+                // Get last 10 matches (evolutionary with Regression to Mean)
+                const homeMatches = await getTeamLastMatches(homeId, leagueId, 10);
+                const awayMatches = await getTeamLastMatches(awayId, leagueId, 10);
                 
                 // Filter to keep only matches with results
                 const homeMatchesWithResults = getMatchesWithResults(homeMatches);
