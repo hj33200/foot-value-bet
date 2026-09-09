@@ -665,6 +665,13 @@
             'RC Strasbourg': 21.500, 'Strasbourg': 21.500,
             'Stade Brest': 16.750, 'Brest': 16.750,
             'OGC Nice': 20.0, 'Nice': 20.0, 'OGCN': 20.0,
+            'AJ Auxerre': 11.0, 'Auxerre': 11.0,  // ✅ ADDED: Ligue 1 club
+            'RC Lens': 17.0, 'Lens': 17.0,  // ✅ ADDED
+            'FC Nantes': 18.0, 'Nantes': 18.0, 'FCN': 18.0,  // ✅ ADDED
+            'Toulouse FC': 14.0, 'Toulouse': 14.0, 'TFC': 14.0,  // ✅ ADDED
+            'Stade de Reims': 10.5, 'Reims': 10.5, 'SDR': 10.5,  // ✅ ADDED
+            'Le Havre AC': 9.0, 'Le Havre': 9.0, 'HAC': 9.0,  // ✅ ADDED
+            'Montpellier HSC': 12.0, 'Montpellier': 12.0, 'MHSC': 12.0,  // ✅ ADDED
             
             // Premier League (England)
             'Manchester City': 131.0, 'Man City': 131.0, 'City': 131.0,
@@ -1145,21 +1152,21 @@
         
         // Pre-calculate ELO for all opponents in a matches array (with full performance data)
         // Returns { teamId: elo } cache object
-        async function buildOpponentEloCache(matches, leagueId) {
+        async function buildOpponentEloCache(matches, leagueId, teamId = null) {
             console.log(`\n🔄 === Building Opponent ELO Cache (${matches.length} matches) ===`);
             const eloMap = {};
             const uniqueOpponents = {};
             
-            // Extract unique opponents
+            // Extract unique opponents (EXCLUDE the team itself)
             for (const match of matches) {
                 if (!match || !match.teams) continue;
                 
-                // Add home team
-                if (match.teams.home && match.teams.home.id) {
+                // Add HOME team (but not if it's the team we're analyzing)
+                if (match.teams.home && match.teams.home.id && match.teams.home.id !== teamId) {
                     uniqueOpponents[match.teams.home.id] = match.teams.home;
                 }
-                // Add away team
-                if (match.teams.away && match.teams.away.id) {
+                // Add AWAY team (but not if it's the team we're analyzing)
+                if (match.teams.away && match.teams.away.id && match.teams.away.id !== teamId) {
                     uniqueOpponents[match.teams.away.id] = match.teams.away;
                 }
             }
@@ -2128,8 +2135,8 @@ Vérifie:
             
             // Pre-calculate opponent ELO caches (with full performance data)
             console.log(`\n🔄 Pre-calculating opponent ELO caches...`);
-            homeOpponentEloMap = await buildOpponentEloCache(homeMatchesWithResults, match.league.id);
-            awayOpponentEloMap = await buildOpponentEloCache(awayMatchesWithResults, match.league.id);
+            homeOpponentEloMap = await buildOpponentEloCache(homeMatchesWithResults, match.league.id, homeId);  // ✅ Passer homeId pour exclure
+            awayOpponentEloMap = await buildOpponentEloCache(awayMatchesWithResults, match.league.id, awayId);  // ✅ Passer awayId pour exclure
             
             // Format last matches
             const formatMatches = (matches, teamId) => {
