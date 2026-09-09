@@ -1216,44 +1216,56 @@
         
         function calculateExpectedGoals(homeStats, awayStats, homeRank, awayRank, 
                                         homeMatches, awayMatches, homeId, awayId, homeElo, awayElo, homeForm, awayForm,
-                                        homeOpponentEloMap = {}, awayOpponentEloMap = {}) {
-            console.log(`\n⚽ === EXPECTED GOALS (v2: ELO-based + Form-weighted + Home Advantage) ===`);
+                                        homeOpponentEloMap = {}, awayOpponentEloMap = {}, homeSOS = 1600, awaySOS = 1600) {
+            console.log(`\n⚽ === EXPECTED GOALS (v3: ELO-based + Form-weighted + SOS-adjusted + Home Advantage) ===`);
             
-            // 1️⃣ BASE: Moyenne de buts marqués et encaissés
-            const homeAvgGF = homeStats.gf / Math.max(homeStats.matches, 1);
-            const awayAvgGF = awayStats.gf / Math.max(awayStats.matches, 1);
-            const homeDefense = awayStats.ga / Math.max(awayStats.matches, 1);
-            const awayDefense = homeStats.ga / Math.max(homeStats.matches, 1);
+            // 1️⃣ BASE (BRUT): Moyenne de buts marqués et encaissés
+            const homeAvgGF_raw = homeStats.gf / Math.max(homeStats.matches, 1);
+            const awayAvgGF_raw = awayStats.gf / Math.max(awayStats.matches, 1);
+            const homeDefense_raw = awayStats.ga / Math.max(awayStats.matches, 1);
+            const awayDefense_raw = homeStats.ga / Math.max(homeStats.matches, 1);
             
-            console.log(`   Base attacking: Home ${homeAvgGF.toFixed(2)}, Away ${awayAvgGF.toFixed(2)}`);
-            console.log(`   Base defending: Home allows ${homeDefense.toFixed(2)}, Away allows ${awayDefense.toFixed(2)}`);
+            console.log(`   📊 Base attacking (raw): Home ${homeAvgGF_raw.toFixed(2)}, Away ${awayAvgGF_raw.toFixed(2)}`);
+            console.log(`   📊 Base defending (raw): Home allows ${homeDefense_raw.toFixed(2)}, Away allows ${awayDefense_raw.toFixed(2)}`);
             
-            // 2️⃣ ELO ADJUSTMENT (NOT rank-based) - MORE SCIENTIFIC
+            // 2️⃣ SOS ADJUSTMENT: Pondérer par la force des adversaires affrontés
+            const homeAvgGF = homeAvgGF_raw * (homeSOS / 1600);           // ✅ Ajusté attaque
+            const awayAvgGF = awayAvgGF_raw * (awaySOS / 1600);           // ✅ Ajusté attaque
+            const homeDefense = homeDefense_raw * (awaySOS / 1600);       // ✅ Ajusté défense (par away SOS!)
+            const awayDefense = awayDefense_raw * (homeSOS / 1600);       // ✅ Ajusté défense (par home SOS!)
+            
+            console.log(`\n   📈 SOS Adjustment (strength of opponents):`);
+            console.log(`   Home attack: ${homeAvgGF_raw.toFixed(2)} × (${homeSOS.toFixed(0)}/1600) = ${homeAvgGF.toFixed(2)}`);
+            console.log(`   Away attack: ${awayAvgGF_raw.toFixed(2)} × (${awaySOS.toFixed(0)}/1600) = ${awayAvgGF.toFixed(2)}`);
+            console.log(`   Home defense: ${homeDefense_raw.toFixed(2)} × (${awaySOS.toFixed(0)}/1600) = ${homeDefense.toFixed(2)} (Away SOS)`);
+            console.log(`   Away defense: ${awayDefense_raw.toFixed(2)} × (${homeSOS.toFixed(0)}/1600) = ${awayDefense.toFixed(2)} (Home SOS)`);
+            
+            // 3️⃣ ELO ADJUSTMENT (NOT rank-based) - MORE SCIENTIFIC
             const rankAdjustmentHome = homeElo / 1600;  // Direct ELO mapping
             const rankAdjustmentAway = awayElo / 1600;  // Direct ELO mapping
             
-            console.log(`   ELO adjustment: Home ${rankAdjustmentHome.toFixed(3)} (ELO ${homeElo.toFixed(0)}), Away ${rankAdjustmentAway.toFixed(3)} (ELO ${awayElo.toFixed(0)})`);
+            console.log(`\n   🎯 ELO adjustment: Home ${rankAdjustmentHome.toFixed(3)} (ELO ${homeElo.toFixed(0)}), Away ${rankAdjustmentAway.toFixed(3)} (ELO ${awayElo.toFixed(0)})`);
             
-            // 3️⃣ FORM FACTOR (weighted by opponent ELO)
+            // 4️⃣ FORM FACTOR (weighted by opponent ELO)
             const formAdjustmentHome = calcFormFactor_Weighted(homeForm, homeMatches, homeId, homeElo, homeOpponentEloMap);
             const formAdjustmentAway = calcFormFactor_Weighted(awayForm, awayMatches, awayId, awayElo, awayOpponentEloMap);
             
-            console.log(`   Form adjustment: Home ${formAdjustmentHome.toFixed(2)}, Away ${formAdjustmentAway.toFixed(2)}`);
+            console.log(`   📉 Form adjustment: Home ${formAdjustmentHome.toFixed(2)}, Away ${formAdjustmentAway.toFixed(2)}`);
             
-            // 4️⃣ BASE xG (attack + defense average)
+            // 5️⃣ BASE xG (attack + defense average) - NOW SOS-ADJUSTED
             const homeXG_base = (homeAvgGF + homeDefense) / 2;
             const awayXG_base = (awayAvgGF + awayDefense) / 2;
             
-            // 5️⃣ HOME ADVANTAGE (empirical +0.45 goals)
+            // 6️⃣ HOME ADVANTAGE (empirical +0.45 goals)
             const HOME_ADVANTAGE_BONUS = 0.45;
             
-            // 6️⃣ FINAL xG with all adjustments
+            // 7️⃣ FINAL xG with all adjustments
             const homeXG = homeXG_base * rankAdjustmentHome * formAdjustmentHome + HOME_ADVANTAGE_BONUS;
             const awayXG = awayXG_base * rankAdjustmentAway * formAdjustmentAway;
             
-            console.log(`\n   FINAL xG:`);
-            console.log(`   Home: ${homeXG_base.toFixed(2)} (base) × ${rankAdjustmentHome.toFixed(3)} (ELO) × ${formAdjustmentHome.toFixed(2)} (form) + ${HOME_ADVANTAGE_BONUS} (dom) = ${homeXG.toFixed(2)} xG`);
-            console.log(`   Away: ${awayXG_base.toFixed(2)} (base) × ${rankAdjustmentAway.toFixed(3)} (ELO) × ${formAdjustmentAway.toFixed(2)} (form) = ${awayXG.toFixed(2)} xG`);
+            console.log(`\n   ⚽ FINAL xG (SOS-adjusted + ELO + Form + Home Advantage):`);
+            console.log(`   Home: ${homeXG_base.toFixed(2)} (base SOS-adj) × ${rankAdjustmentHome.toFixed(3)} (ELO) × ${formAdjustmentHome.toFixed(2)} (form) + ${HOME_ADVANTAGE_BONUS} (dom) = ${homeXG.toFixed(2)} xG`);
+            console.log(`   Away: ${awayXG_base.toFixed(2)} (base SOS-adj) × ${rankAdjustmentAway.toFixed(3)} (ELO) × ${formAdjustmentAway.toFixed(2)} (form) = ${awayXG.toFixed(2)} xG`);
             
             return {
                 homeXG: homeXG,
@@ -2189,8 +2201,10 @@ Vérifie:
                         homeId, awayId,
                         homeElo, awayElo,
                         homeForm, awayForm,
-                        homeOpponentEloMap,  // ✨ NEW: Opponent ELO cache (with full performance)
-                        awayOpponentEloMap   // ✨ NEW: Opponent ELO cache (with full performance)
+                        homeOpponentEloMap,  // ✨ Opponent ELO cache
+                        awayOpponentEloMap,  // ✨ Opponent ELO cache
+                        homeSOS,             // ✅ NEW: Strength of Schedule for home
+                        awaySOS              // ✅ NEW: Strength of Schedule for away
                     );
                     
                     // Calculer probabilités Poisson
