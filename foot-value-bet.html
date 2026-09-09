@@ -888,10 +888,12 @@
             const last10 = matches.slice(-10);
             let totalOpponentElo = 0;
             let count = 0;
+            let teamName = "Unknown";
             
             last10.forEach(match => {
                 const isHome = match.teams.home.id === teamId;
                 const opponent = isHome ? match.teams.away : match.teams.home;
+                teamName = isHome ? match.teams.home.name : match.teams.away.name;
                 
                 // Utiliser le VRAI rang FIFA de l'adversaire!
                 const opponentRank = getRankingByTeamName(opponent.name);
@@ -901,7 +903,7 @@
             });
             
             const sosElo = count > 0 ? totalOpponentElo / count : 1600;
-            console.log(`   📊 SOS pour équipe ${teamId}: ${sosElo.toFixed(0)} (${count} matchs)`);
+            console.log(`\n   📊 SOS pour équipe ${teamName} (ID=${teamId}): ${sosElo.toFixed(0)} (${count} matchs)`);
             
             // Log détaillé des adversaires
             if (count > 0) {
@@ -911,9 +913,9 @@
                     const opponent = isHome ? match.teams.away : match.teams.home;
                     const rank = getRankingByTeamName(opponent.name);
                     const elo = rankingToElo(rank);
-                    opponents.push(`${opponent.name}(#${rank}:${elo.toFixed(0)})`);
+                    opponents.push(`${opponent.name}(R#${rank}→E${elo.toFixed(0)})`);
                 });
-                console.log(`      Adversaires: ${opponents.join(', ')}`);
+                console.log(`      ↓ Adversaires: ${opponents.join(', ')}`);
             }
             
             return sosElo;
