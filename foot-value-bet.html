@@ -2145,8 +2145,14 @@ Vérifie:
                 awayForm = calculateForm(awayMatchesWithResults, awayId);
                 
                 // Calculate Strength of Schedule
+                console.log(`\n   🔍 CALCUL SOS POUR LES DEUX ÉQUIPES:`);
+                console.log(`   Home ID: ${homeId}, matches: ${homeMatchesWithResults.length}`);
+                console.log(`   Away ID: ${awayId}, matches: ${awayMatchesWithResults.length}`);
+                
                 const homeSOS = calculateSOS(homeMatchesWithResults, homeId);
                 const awaySOS = calculateSOS(awayMatchesWithResults, awayId);
+                
+                console.log(`   ✅ SOS calculés: Home=${homeSOS.toFixed(0)}, Away=${awaySOS.toFixed(0)}`);
                 
                 // Get real FIFA rankings
                 const homeRank = getRankingByTeamName(match.teams.home.name);
