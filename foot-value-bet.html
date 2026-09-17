@@ -1343,7 +1343,7 @@
                 console.log(`   📊 ${bookmakers.length} bookmakers trouvés`);
                 
                 for (const bmPriority of bookmakersPriority) {
-                    const bookmaker = bookmakers.find(b => b.name === bmPriority);
+                    const bookmaker = bookmakers.find(b => b.name.includes(bmPriority));
                     
                     if (!bookmaker) {
                         console.log(`   ⚠️ ${bmPriority}: Non trouvé`);
