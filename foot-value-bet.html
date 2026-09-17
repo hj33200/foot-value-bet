@@ -882,7 +882,8 @@
         }
         
         // Calculate average opponent ELO (Strength of Schedule) from last 10 matches
-        function calculateSOS(matches, teamId) {
+        // ✅ NOW ASYNC to fetch opponent stats for accurate ELO calculation
+        async function calculateSOS(matches, teamId, leagueId) {
             if (!matches || matches.length === 0) return 1600;
             
             // Limiter à 10 matchs (les 10 DERNIERS)
@@ -891,33 +892,50 @@
             let count = 0;
             let teamName = "Unknown";
             
-            last10.forEach(match => {
+            for (const match of last10) {
                 const isHome = match.teams.home.id === teamId;
                 const opponent = isHome ? match.teams.away : match.teams.home;
                 teamName = isHome ? match.teams.home.name : match.teams.away.name;
                 
-                // Utiliser le VRAI rang FIFA de l'adversaire!
-                const opponentRank = getRankingByTeamName(opponent.name);
-                const opponentElo = rankingToElo(opponentRank);
-                totalOpponentElo += opponentElo;
+                try {
+                    // ✅ NEW: Fetch opponent's recent matches for accurate ELO
+                    const opponentMatches = await getTeamLastMatches(opponent.id, leagueId, 10);
+                    const opponentMatchesFiltered = getMatchesWithResults(opponentMatches);
+                    
+                    if (opponentMatchesFiltered.length === 0) {
+                        // Fallback to ranking-based ELO
+                        const opponentRank = getRankingByTeamName(opponent.name);
+                        const opponentElo = rankingToElo(opponentRank);
+                        totalOpponentElo += opponentElo;
+                    } else {
+                        // ✅ NEW: Use full ELO calculation like Form Factor
+                        const opponentStats = calculateTeamStats(opponentMatchesFiltered, opponent.id);
+                        const opponentForm = calculateForm(opponentMatchesFiltered, opponent.id);
+                        const opponentRank = getRankingByTeamName(opponent.name);
+                        const opponentSOS = 1600; // Use base SOS for recursion prevention
+                        
+                        const opponentElo = getEloWithSOS(
+                            opponent.id, 
+                            opponent.name, 
+                            opponentForm, 
+                            opponentStats.gf, 
+                            opponentStats.ga, 
+                            opponentStats.matches, 
+                            opponentRank,
+                            opponentSOS
+                        );
+                        totalOpponentElo += opponentElo;
+                    }
+                } catch (e) {
+                    console.warn(`      ⚠️ Erreur opponent ELO ${opponent.name}:`, e);
+                    const opponentRank = getRankingByTeamName(opponent.name);
+                    totalOpponentElo += rankingToElo(opponentRank);
+                }
                 count++;
-            });
+            }
             
             const sosElo = count > 0 ? totalOpponentElo / count : 1600;
-            console.log(`\n   📊 SOS pour équipe ${teamName} (ID=${teamId}): ${sosElo.toFixed(0)} (${count} matchs)`);
-            
-            // Log détaillé des adversaires
-            if (count > 0) {
-                const opponents = [];
-                last10.forEach(match => {
-                    const isHome = match.teams.home.id === teamId;
-                    const opponent = isHome ? match.teams.away : match.teams.home;
-                    const rank = getRankingByTeamName(opponent.name);
-                    const elo = rankingToElo(rank);
-                    opponents.push(`${opponent.name}(R#${rank}→E${elo.toFixed(0)})`);
-                });
-                console.log(`      ↓ Adversaires: ${opponents.join(', ')}`);
-            }
+            console.log(`\n   📊 SOS pour équipe ${teamName} (ID=${teamId}): ${sosElo.toFixed(0)} (${count} matchs, ELO calculés comme Form Factor)`);
             
             return sosElo;
         }
@@ -1193,7 +1211,7 @@
                     const opponentStats = calculateTeamStats(opponentMatchesFiltered, parseInt(opponentId));
                     const opponentForm = calculateForm(opponentMatchesFiltered, parseInt(opponentId));
                     const opponentRank = getRankingByTeamName(opponent.name);
-                    const opponentSOS = calculateSOS(opponentMatchesFiltered, parseInt(opponentId));
+                    const opponentSOS = await calculateSOS(opponentMatchesFiltered, parseInt(opponentId), leagueId);
                     
                     // Get full ELO with performance
                     const opponentElo = getEloWithSOS(parseInt(opponentId), opponent.name, opponentForm, opponentStats.gf, opponentStats.ga, opponentStats.matches, opponentRank, opponentSOS);
@@ -2149,8 +2167,8 @@ Vérifie:
                 console.log(`   Home ID: ${homeId}, matches: ${homeMatchesWithResults.length}`);
                 console.log(`   Away ID: ${awayId}, matches: ${awayMatchesWithResults.length}`);
                 
-                const homeSOS = calculateSOS(homeMatchesWithResults, homeId);
-                const awaySOS = calculateSOS(awayMatchesWithResults, awayId);
+                const homeSOS = await calculateSOS(homeMatchesWithResults, homeId, match.league.id);
+                const awaySOS = await calculateSOS(awayMatchesWithResults, awayId, match.league.id);
                 
                 console.log(`   ✅ SOS calculés: Home=${homeSOS.toFixed(0)}, Away=${awaySOS.toFixed(0)}`);
                 
