@@ -1503,7 +1503,7 @@
             try {
                 console.log(`\n💔 === FETCHING INJURIES FROM API-FOOTBALL (Team ID: ${teamId}) ===`);
                 
-                const url = `/api/proxy?endpoint=injuries?season=${season}&team=${teamId}`;
+                const url = `https://foot-value-bet.vercel.app/api/proxy?endpoint=injuries?season=${season}&team=${teamId}`;
                 
                 const response = await fetch(url);
                 if (!response.ok) {
