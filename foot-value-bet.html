@@ -1498,127 +1498,81 @@
             return impact;
         }
         
-        // Global cache for team dossiers
-        let teamsDosiersCache = {};
-        
-        // 🤖 FETCH TEAM INFO FROM CLAUDE (via Vercel proxy)
-        async function fetchTeamInfoFromClaudeProxy(teamName, season = '2026-2027') {
+        // 💔 FETCH INJURIES FROM API-FOOTBALL
+        async function fetchInjuriesFromAPIFootball(teamId, season = 2026) {
             try {
-                console.log(`🤖 Fetching ${teamName} from Claude proxy...`);
+                console.log(`\n💔 === FETCHING INJURIES FROM API-FOOTBALL (Team ID: ${teamId}) ===`);
                 
-                // Check cache first
-                if (teamsDosiersCache[teamName]) {
-                    console.log(`✅ Using cached data for ${teamName}`);
-                    return teamsDosiersCache[teamName];
-                }
-                
-                const url = `https://foot-value-bet.vercel.app/api/claude-dossier?teamName=${encodeURIComponent(teamName)}&season=${encodeURIComponent(season)}`;
+                const url = `/api/proxy?endpoint=injuries?season=${season}&team=${teamId}`;
                 
                 const response = await fetch(url);
-                
                 if (!response.ok) {
-                    console.warn(`⚠️ Proxy error: ${response.status}`);
-                    return null;
+                    console.warn(`⚠️ API error: ${response.status}`);
+                    return [];
                 }
                 
-                const result = await response.json();
+                const data = await response.json();
                 
-                if (result.success && result.data) {
-                    teamsDosiersCache[teamName] = result.data;
-                    console.log(`✅ Info received for ${teamName}`);
-                    return result.data;
+                if (!data.response || !Array.isArray(data.response)) {
+                    console.log(`   ⚠️ Pas de blessures trouvées`);
+                    return [];
                 }
                 
-                return null;
+                console.log(`   ✅ ${data.response.length} blessures trouvées`);
+                return data.response;
                 
             } catch (error) {
-                console.error(`❌ Error fetching ${teamName}:`, error);
-                return null;
+                console.error(`❌ Erreur fetch injuries:`, error);
+                return [];
             }
         }
         
-        // 🔄 AUTO-FILL TEAM DOSSIER FROM CLAUDE
-        async function autoFillTeamDossierFromClaude(teamId, teamName) {
+        // 🔄 AUTO-FILL TEAM DOSSIER FROM API-FOOTBALL
+        async function autoFillTeamDossierFromAPIFootball(teamId, teamName) {
             try {
                 console.log(`\n🔄 === AUTO-FILLING DOSSIER: ${teamName} (ID=${teamId}) ===`);
                 
                 const dossier = loadTeamDossier(teamId);
                 
-                // Fetch infos depuis Claude proxy
-                const teamInfo = await fetchTeamInfoFromClaudeProxy(teamName);
+                // Fetch injuries depuis API-Football
+                const injuries = await fetchInjuriesFromAPIFootball(teamId, 2026);
                 
-                if (!teamInfo) {
-                    console.log(`   ⚠️ Impossible de récupérer infos ${teamName}`);
+                if (!injuries || injuries.length === 0) {
+                    console.log(`   ⚠️ Aucune blessure trouvée pour ${teamName}`);
+                    saveTeamDossier(teamId, dossier);
                     return dossier;
                 }
                 
-                // Ajouter les blessures
-                if (teamInfo.injuries && Array.isArray(teamInfo.injuries)) {
-                    teamInfo.injuries.forEach(inj => {
-                        const existing = dossier.injuries.find(i => i.player === inj.player);
-                        if (!existing) {
-                            const impact = inj.position === 'Striker' ? -15 : 
-                                          inj.position === 'Goalkeeper' ? -10 : -5;
-                            
-                            dossier.injuries.push({
-                                player: inj.player,
-                                position: inj.position,
-                                date: new Date().toISOString().split('T')[0],
-                                returnDate: inj.returnDate || 'TBD',
-                                impact: impact
-                            });
-                            console.log(`      ✅ ${inj.player} (${inj.position}) - Impact: ${impact}%`);
-                        }
-                    });
-                }
-                
-                // Ajouter les conflits
-                if (teamInfo.conflicts && Array.isArray(teamInfo.conflicts)) {
-                    teamInfo.conflicts.forEach(conf => {
-                        const existing = dossier.conflicts.find(c => c.who === conf.who);
-                        if (!existing) {
-                            dossier.conflicts.push({
-                                who: conf.who,
-                                details: conf.details,
-                                date: conf.date,
-                                risk: conf.risk
-                            });
-                            console.log(`      🔥 ${conf.who} (${conf.risk})`);
-                        }
-                    });
-                }
-                
-                // Ajouter les suspensions
-                if (teamInfo.suspensions && Array.isArray(teamInfo.suspensions)) {
-                    teamInfo.suspensions.forEach(susp => {
-                        const existing = dossier.injuries.find(i => i.player === susp.player);
-                        if (!existing) {
-                            dossier.injuries.push({
-                                player: `${susp.player} (SUSPENDU)`,
-                                position: 'Suspended',
-                                date: new Date().toISOString().split('T')[0],
-                                returnDate: `${susp.games} match(s)`,
-                                impact: -10
-                            });
-                            console.log(`      🚫 ${susp.player} suspendu ${susp.games} match(s)`);
-                        }
-                    });
-                }
-                
-                // Mettre à jour ambiance
-                if (teamInfo.ambiance) {
-                    dossier.ambiance = {
-                        morale: teamInfo.ambiance.morale || dossier.ambiance.morale,
-                        cohesion: teamInfo.ambiance.cohesion || dossier.ambiance.cohesion,
-                        preparation: 'OK',
-                        notes: teamInfo.ambiance.notes || dossier.ambiance.notes
-                    };
-                    console.log(`      😟 Ambiance: ${teamInfo.ambiance.morale}`);
-                }
+                // Parser les blessures
+                injuries.forEach(inj => {
+                    if (!inj.player || !inj.player.name) return;
+                    
+                    const playerName = inj.player.name;
+                    const existing = dossier.injuries.find(i => i.player === playerName);
+                    
+                    if (!existing) {
+                        const position = inj.player.position || 'Unknown';
+                        const impact = position === 'Attacker' ? -15 : 
+                                      position === 'Goalkeeper' ? -10 : -5;
+                        
+                        const returnDate = inj.fixture && inj.fixture.date ? 
+                            inj.fixture.date.split('T')[0] : 'TBD';
+                        
+                        dossier.injuries.push({
+                            player: playerName,
+                            position: position,
+                            date: new Date().toISOString().split('T')[0],
+                            returnDate: returnDate,
+                            impact: impact
+                        });
+                        
+                        console.log(`      ✅ ${playerName} (${position}) - Retour: ${returnDate}`);
+                    }
+                });
                 
                 // Sauvegarder
                 saveTeamDossier(teamId, dossier);
-                console.log(`   ✅ Dossier ${teamName} mis à jour automatiquement via Claude`);
+                console.log(`   ✅ Dossier ${teamName} mis à jour avec ${injuries.length} blessure(s) depuis API-Football`);
                 
                 return dossier;
                 
@@ -2399,10 +2353,10 @@ Vérifie:
                 homeForm = calculateForm(homeMatchesWithResults, homeId);
                 awayForm = calculateForm(awayMatchesWithResults, awayId);
                 
-                // 🔄 AUTO-FILL DOSSIERS DEPUIS CLAUDE (via Vercel proxy)
-                console.log(`\n🔄 === AUTO-FILLING TEAM DOSSIERS VIA CLAUDE ===`);
-                await autoFillTeamDossierFromClaude(homeId, match.teams.home.name);
-                await autoFillTeamDossierFromClaude(awayId, match.teams.away.name);
+                // 🔄 AUTO-FILL DOSSIERS DEPUIS API-FOOTBALL
+                console.log(`\n🔄 === AUTO-FILLING TEAM DOSSIERS VIA API-FOOTBALL ===`);
+                await autoFillTeamDossierFromAPIFootball(homeId, match.teams.home.name);
+                await autoFillTeamDossierFromAPIFootball(awayId, match.teams.away.name);
                 
                 // Calculate Strength of Schedule
                 console.log(`\n   🔍 CALCUL SOS POUR LES DEUX ÉQUIPES:`);
