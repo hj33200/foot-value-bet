@@ -1391,6 +1391,113 @@
             }
         }
         
+        // ============================================
+        // 📝 TEAM DOSSIER MANAGEMENT
+        // ============================================
+        
+        function loadTeamDossier(teamId) {
+            try {
+                const stored = localStorage.getItem(`foot_dossier_${teamId}`);
+                return stored ? JSON.parse(stored) : getDefaultDossier();
+            } catch (e) {
+                console.warn(`⚠️ Erreur localStorage team ${teamId}:`, e);
+                return getDefaultDossier();
+            }
+        }
+        
+        function getDefaultDossier() {
+            return {
+                conflicts: [],
+                injuries: [],
+                ambiance: { morale: 'Bon', cohesion: 'Bonne', preparation: 'OK', notes: '' },
+                extrafoot: [],
+                lastUpdated: null
+            };
+        }
+        
+        function saveTeamDossier(teamId, dossier) {
+            try {
+                dossier.lastUpdated = new Date().toISOString();
+                localStorage.setItem(`foot_dossier_${teamId}`, JSON.stringify(dossier));
+                console.log(`✅ Dossier équipe ${teamId} sauvegardé`);
+                return true;
+            } catch (e) {
+                console.error(`❌ Erreur save dossier ${teamId}:`, e);
+                return false;
+            }
+        }
+        
+        function displayTeamDossier(teamId, teamName) {
+            const dossier = loadTeamDossier(teamId);
+            let html = `<div class="team-dossier" style="border: 2px solid var(--primary); border-radius: 8px; padding: 15px; margin: 15px 0; background: rgba(212, 175, 55, 0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; color: var(--primary);">📝 Dossier: ${teamName}</h3>
+                    <button onclick="showEditDossierModal(${teamId}, '${teamName}')" style="padding: 8px 15px; background: var(--primary); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">✏️ Éditer</button>
+                </div>`;
+            
+            if (dossier.conflicts.length > 0) {
+                html += `<div style="margin-bottom: 12px;"><h4 style="color: #ff6b6b; margin: 8px 0;">🔥 Conflits</h4>`;
+                dossier.conflicts.forEach(c => {
+                    html += `<div style="padding: 8px; background: rgba(255, 107, 107, 0.1); border-left: 3px solid #ff6b6b; margin: 5px 0; border-radius: 3px;"><strong>${c.who}</strong> ${c.date ? `(${c.date})` : ''}<br><small>${c.details}</small>${c.risk ? `<br><small style="color: #ff6b6b;">⚠️ Risque: ${c.risk}</small>` : ''}</div>`;
+                });
+                html += `</div>`;
+            }
+            
+            if (dossier.injuries.length > 0) {
+                html += `<div style="margin-bottom: 12px;"><h4 style="color: #ffa500; margin: 8px 0;">💔 Blessures/Absences</h4>`;
+                dossier.injuries.forEach(inj => {
+                    html += `<div style="padding: 8px; background: rgba(255, 165, 0, 0.1); border-left: 3px solid #ffa500; margin: 5px 0; border-radius: 3px;"><strong>${inj.player}</strong> (${inj.position})<br><small>Depuis: ${inj.date} → Retour: ${inj.returnDate || 'TBD'}</small>${inj.impact ? `<br><small style="color: #ffa500;">Impact xG: ${inj.impact > 0 ? '+' : ''}${inj.impact}%</small>` : ''}</div>`;
+                });
+                html += `</div>`;
+            }
+            
+            if (dossier.ambiance.notes || dossier.ambiance.morale !== 'Bon') {
+                html += `<div style="margin-bottom: 12px;"><h4 style="color: #6c5ce7; margin: 8px 0;">😟 Ambiance Équipe</h4><div style="padding: 8px; background: rgba(108, 92, 231, 0.1); border-left: 3px solid #6c5ce7; border-radius: 3px;">• Moral: <strong>${dossier.ambiance.morale}</strong><br>• Cohésion: <strong>${dossier.ambiance.cohesion}</strong><br>• Préparation: <strong>${dossier.ambiance.preparation}</strong>${dossier.ambiance.notes ? `<br><small>${dossier.ambiance.notes}</small>` : ''}</div></div>`;
+            }
+            
+            if (dossier.extrafoot.length > 0) {
+                html += `<div style="margin-bottom: 12px;"><h4 style="color: #d63031; margin: 8px 0;">💰 Problèmes Extrafoot</h4>`;
+                dossier.extrafoot.forEach(pb => {
+                    html += `<div style="padding: 8px; background: rgba(214, 48, 49, 0.1); border-left: 3px solid #d63031; margin: 5px 0; border-radius: 3px;"><strong>${pb.category}</strong>: ${pb.issue}${pb.impact ? `<br><small style="color: #d63031;">Impact: ${pb.impact > 0 ? '+' : ''}${pb.impact}%</small>` : ''}</div>`;
+                });
+                html += `</div>`;
+            }
+            
+            if (dossier.lastUpdated) {
+                html += `<div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 10px; text-align: right;">Mis à jour: ${new Date(dossier.lastUpdated).toLocaleString('fr-FR')}</div>`;
+            }
+            
+            html += `</div>`;
+            return html;
+        }
+        
+        function showEditDossierModal(teamId, teamName) {
+            alert('📝 Édition du dossier: ' + teamName + ' (Fonctionnalité complète en développement)');
+        }
+        
+        function closeDossierModal(teamId) {
+            const modal = document.getElementById(`dossier-modal-${teamId}`);
+            if (modal) modal.remove();
+        }
+        
+        function calculateDossierImpact(teamId) {
+            const dossier = loadTeamDossier(teamId);
+            let impact = 0;
+            dossier.conflicts.forEach(c => {
+                if (c.risk === 'high') impact -= 3;
+                else if (c.risk === 'medium') impact -= 1;
+            });
+            dossier.injuries.forEach(inj => {
+                impact += (inj.impact || -10);
+            });
+            if (dossier.ambiance.morale === 'Mauvais') impact -= 5;
+            else if (dossier.ambiance.morale === 'Excellent') impact += 3;
+            dossier.extrafoot.forEach(pb => {
+                impact += (pb.impact || -5);
+            });
+            return impact;
+        }
+        
         // Calculate implied probability from odds
         function calculateImpliedProba(odds) {
             if (!odds || odds['1'] === undefined || odds.X === undefined || odds['2'] === undefined) {
