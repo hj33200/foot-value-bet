@@ -1527,12 +1527,42 @@
             }
         }
         
+        // 🧹 NETTOYER ANCIEN DOSSIERS (localStorage)
+        function cleanOldDossiers() {
+            // Supprimer tous les dossiers pour forcer la réinitialisation
+            const teams = new Set();
+            
+            // Parcourir tout localStorage et supprimer les clés contenant "dossier"
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.includes('dossier_')) {
+                    console.log(`🧹 Suppression: ${key}`);
+                    localStorage.removeItem(key);
+                }
+            }
+            
+            console.log(`✅ localStorage nettoyé`);
+        }
+        
+        // Nettoyer au démarrage
+        window.addEventListener('load', () => {
+            console.log(`🌍 Page loaded - nettoyage localStorage`);
+            cleanOldDossiers();
+        });
+        
         // 🔄 AUTO-FILL TEAM DOSSIER FROM API-FOOTBALL
         async function autoFillTeamDossierFromAPIFootball(teamId, teamName) {
             try {
                 console.log(`\n🔄 === AUTO-FILLING DOSSIER: ${teamName} (ID=${teamId}) ===`);
                 
-                const dossier = loadTeamDossier(teamId);
+                // 🧹 RÉINITIALISER LE DOSSIER COMPLÈTEMENT
+                let dossier = {
+                    conflicts: [],
+                    injuries: [],
+                    ambiance: { morale: 'TBD', cohesion: 'TBD', preparation: 'OK', notes: '' },
+                    extrafoot: [],
+                    lastUpdated: new Date().toISOString()
+                };
                 
                 // Fetch injuries depuis API-Football
                 const injuries = await fetchInjuriesFromAPIFootball(teamId, 2026);
@@ -1578,7 +1608,13 @@
                 
             } catch (error) {
                 console.error(`❌ Erreur autoFill ${teamName}:`, error);
-                return loadTeamDossier(teamId);
+                return {
+                    conflicts: [],
+                    injuries: [],
+                    ambiance: { morale: 'TBD', cohesion: 'TBD', preparation: 'OK', notes: '' },
+                    extrafoot: [],
+                    lastUpdated: new Date().toISOString()
+                };
             }
         }
         
