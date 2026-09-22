@@ -1446,7 +1446,7 @@
             if (dossier.injuries.length > 0) {
                 html += `<div style="margin-bottom: 12px;"><h4 style="color: #ffa500; margin: 8px 0;">💔 Blessures/Absences</h4>`;
                 dossier.injuries.forEach(inj => {
-                    html += `<div style="padding: 8px; background: rgba(255, 165, 0, 0.1); border-left: 3px solid #ffa500; margin: 5px 0; border-radius: 3px;"><strong>${inj.player}</strong> (${inj.position}) - ${inj.reason}${inj.impact ? `<br><small style="color: #ffa500;">Impact xG: ${inj.impact > 0 ? '+' : ''}${inj.impact}%</small>` : ''}</div>`;
+                    html += `<div style="padding: 8px; background: rgba(255, 165, 0, 0.1); border-left: 3px solid #ffa500; margin: 5px 0; border-radius: 3px;"><strong>${inj.player}</strong> (${inj.position}) - ${inj.reason}</div>`;
                 });
                 html += `</div>`;
             }
@@ -1458,7 +1458,7 @@
             if (dossier.extrafoot.length > 0) {
                 html += `<div style="margin-bottom: 12px;"><h4 style="color: #d63031; margin: 8px 0;">💰 Problèmes Extrafoot</h4>`;
                 dossier.extrafoot.forEach(pb => {
-                    html += `<div style="padding: 8px; background: rgba(214, 48, 49, 0.1); border-left: 3px solid #d63031; margin: 5px 0; border-radius: 3px;"><strong>${pb.category}</strong>: ${pb.issue}${pb.impact ? `<br><small style="color: #d63031;">Impact: ${pb.impact > 0 ? '+' : ''}${pb.impact}%</small>` : ''}</div>`;
+                    html += `<div style="padding: 8px; background: rgba(214, 48, 49, 0.1); border-left: 3px solid #d63031; margin: 5px 0; border-radius: 3px;"><strong>${pb.category}</strong>: ${pb.issue}</div>`;
                 });
                 html += `</div>`;
             }
@@ -1487,14 +1487,9 @@
                 if (c.risk === 'high') impact -= 3;
                 else if (c.risk === 'medium') impact -= 1;
             });
-            dossier.injuries.forEach(inj => {
-                impact += (inj.impact || -10);
-            });
+
             if (dossier.ambiance.morale === 'Mauvais') impact -= 5;
             else if (dossier.ambiance.morale === 'Excellent') impact += 3;
-            dossier.extrafoot.forEach(pb => {
-                impact += (pb.impact || -5);
-            });
             return impact;
         }
         
@@ -1602,8 +1597,6 @@
                     }
                     
                     const position = inj.player.position || 'Unknown';
-                    const impact = position === 'Attacker' ? -15 : 
-                                  position === 'Goalkeeper' ? -10 : -5;
                     
                     // 🔍 DEBUG: Afficher la structure (premières blessures)
                     if (idx < 1) {
@@ -1623,8 +1616,7 @@
                         position: position,
                         reason: reason,
                         date: 'Indisponible',
-                        returnDate: null,
-                        impact: impact
+                        returnDate: null
                     });
                     
                     console.log(`      ✅ ${playerName} (${position}) - ${reason}`);
