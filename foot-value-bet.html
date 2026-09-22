@@ -1519,6 +1519,12 @@
                 }
                 
                 console.log(`   ✅ ${data.response.length} blessures trouvées`);
+                
+                // 🔍 DEBUG: Afficher les 3 premières blessures complètes
+                if (data.response.length > 0) {
+                    console.log(`   📋 SAMPLE DATA (première blessure):`, JSON.stringify(data.response[0], null, 2));
+                }
+                
                 return data.response;
                 
             } catch (error) {
@@ -1574,7 +1580,7 @@
                 }
                 
                 // Parser les blessures
-                injuries.forEach(inj => {
+                injuries.forEach((inj, idx) => {
                     if (!inj.player || !inj.player.name) return;
                     
                     const playerName = inj.player.name;
@@ -1585,8 +1591,22 @@
                         const impact = position === 'Attacker' ? -15 : 
                                       position === 'Goalkeeper' ? -10 : -5;
                         
-                        const returnDate = inj.fixture && inj.fixture.date ? 
+                        // 🔍 DEBUG: Afficher la structure fixture
+                        if (idx === 0) {
+                            console.log(`   🔍 DEBUG - Injury structure:`, JSON.stringify(inj, null, 2));
+                        }
+                        
+                        let returnDate = inj.fixture && inj.fixture.date ? 
                             inj.fixture.date.split('T')[0] : 'TBD';
+                        
+                        // 🧹 FILTRER les dates obsolètes (dans le passé)
+                        if (returnDate !== 'TBD') {
+                            const today = new Date().toISOString().split('T')[0];
+                            if (returnDate < today) {
+                                console.log(`      ⏭️ ${playerName} - Retour passé (${returnDate}), ignoré`);
+                                return; // Skip cette blessure
+                            }
+                        }
                         
                         dossier.injuries.push({
                             player: playerName,
