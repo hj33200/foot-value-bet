@@ -1586,40 +1586,60 @@
                     if (!inj.player || !inj.player.name) return;
                     
                     const playerName = inj.player.name;
+                    const injuryType = inj.player.type || 'Unknown';
+                    const reason = inj.player.reason || 'Unknown';
                     const existing = dossier.injuries.find(i => i.player === playerName);
                     
-                    if (!existing) {
-                        const position = inj.player.position || 'Unknown';
-                        const impact = position === 'Attacker' ? -15 : 
-                                      position === 'Goalkeeper' ? -10 : -5;
-                        
-                        // 🔍 DEBUG: Afficher la structure fixture
-                        if (idx === 0) {
-                            console.log(`   🔍 DEBUG - Injury structure:`, JSON.stringify(inj, null, 2));
-                        }
-                        
-                        let returnDate = inj.fixture && inj.fixture.date ? 
-                            inj.fixture.date.split('T')[0] : 'TBD';
-                        
-                        // 🧹 FILTRER les dates obsolètes (dans le passé)
-                        if (returnDate !== 'TBD') {
-                            const today = new Date().toISOString().split('T')[0];
-                            if (returnDate < today) {
-                                console.log(`      ⏭️ ${playerName} - Retour passé (${returnDate}), ignoré`);
-                                return; // Skip cette blessure
-                            }
-                        }
-                        
-                        dossier.injuries.push({
-                            player: playerName,
-                            position: position,
-                            date: new Date().toISOString().split('T')[0],
-                            returnDate: returnDate,
-                            impact: impact
-                        });
-                        
-                        console.log(`      ✅ ${playerName} (${position}) - Retour: ${returnDate}`);
+                    if (existing) return; // Skip si déjà présent
+                    
+                    // 🧹 FILTRER: Accepter SEULEMENT Injury et Red Card
+                    if (reason !== 'Injury' && reason !== 'Red Card' && reason !== 'Suspended') {
+                        if (idx < 3) console.log(`      ⏭️ ${playerName} - Reason: ${reason} (ignoré - pas pertinent)`);
+                        return;
                     }
+                    
+                    const position = inj.player.position || 'Unknown';
+                    const impact = position === 'Attacker' ? -15 : 
+                                  position === 'Goalkeeper' ? -10 : -5;
+                    
+                    // 🔍 DEBUG: Afficher la structure (premières blessures)
+                    if (idx < 1) {
+                        console.log(`   🔍 DEBUG - Injury structure:`, JSON.stringify(inj, null, 2));
+                    }
+                    
+                    let returnDate = 'TBD';
+                    
+                    // 🧹 Calculer depuis AUJOURD'HUI (fixture dates sont passées!)
+                    const today = new Date();
+                    
+                    if (reason === 'Red Card') {
+                        // Suspension: 3 jours
+                        const returnD = new Date(today);
+                        returnD.setDate(returnD.getDate() + 3);
+                        returnDate = returnD.toISOString().split('T')[0];
+                        console.log(`      🚫 ${playerName} (${reason}) - Suspension 3j, retour: ${returnDate}`);
+                    } else if (reason === 'Injury') {
+                        // Blessure: 2-3 semaines (14 jours)
+                        const returnD = new Date(today);
+                        returnD.setDate(returnD.getDate() + 14);
+                        returnDate = returnD.toISOString().split('T')[0];
+                        console.log(`      💔 ${playerName} (${reason}) - Blessure 2-3 sem., retour: ${returnDate}`);
+                    } else if (inj.fixture && inj.fixture.date) {
+                        returnDate = inj.fixture.date.split('T')[0];
+                    }
+                    
+                    // ✅ DATES TOUJOURS FUTURES (calculées depuis aujourd'hui)
+                    // Plus besoin de filtrer les dates passées!
+                    
+                    dossier.injuries.push({
+                        player: playerName,
+                        position: position,
+                        date: new Date().toISOString().split('T')[0],
+                        returnDate: returnDate,
+                        impact: impact
+                    });
+                    
+                    console.log(`      ✅ ${playerName} (${position}) - Type: ${reason}, Retour: ${returnDate}`);
                 });
                 
                 // Sauvegarder
@@ -2411,10 +2431,15 @@ Vérifie:
                 homeForm = calculateForm(homeMatchesWithResults, homeId);
                 awayForm = calculateForm(awayMatchesWithResults, awayId);
                 
+                console.log(`\n🔄 === [AVANT AUTOFILL] ===`);
+                
                 // 🔄 AUTO-FILL DOSSIERS DEPUIS API-FOOTBALL
-                console.log(`\n🔄 === AUTO-FILLING TEAM DOSSIERS VIA API-FOOTBALL ===`);
+                console.log(`\n🔄 === [LOG 1] AUTO-FILLING TEAM DOSSIERS VIA API-FOOTBALL ===`);
+                console.log(`🔄 === [LOG 2] Appel autoFill pour homeId=${homeId}, name=${match.teams.home.name} ===`);
                 await autoFillTeamDossierFromAPIFootball(homeId, match.teams.home.name);
+                console.log(`🔄 === [LOG 3] Appel autoFill pour awayId=${awayId}, name=${match.teams.away.name} ===`);
                 await autoFillTeamDossierFromAPIFootball(awayId, match.teams.away.name);
+                console.log(`🔄 === [LOG 4] autoFill terminé ===`);
                 
                 // Calculate Strength of Schedule
                 console.log(`\n   🔍 CALCUL SOS POUR LES DEUX ÉQUIPES:`);
