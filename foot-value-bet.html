@@ -1558,9 +1558,8 @@
         
         // 🔄 AUTO-FILL TEAM DOSSIER FROM API-FOOTBALL
         async function autoFillTeamDossierFromAPIFootball(teamId, teamName) {
+            console.log(`\n🔄 === [FUNC CALLED] AUTO-FILLING DOSSIER: ${teamName} (ID=${teamId}) ===`);
             try {
-                console.log(`\n🔄 === AUTO-FILLING DOSSIER: ${teamName} (ID=${teamId}) ===`);
-                
                 // 🧹 RÉINITIALISER LE DOSSIER COMPLÈTEMENT
                 let dossier = {
                     conflicts: [],
@@ -1570,8 +1569,10 @@
                     lastUpdated: new Date().toISOString()
                 };
                 
+                console.log(`\n💔 [FETCHING] Appel API-Football...`);
                 // Fetch injuries depuis API-Football
                 const injuries = await fetchInjuriesFromAPIFootball(teamId, 2026);
+                console.log(`💔 [FETCHED] Résultat: ${injuries ? injuries.length : 0} blessures`);
                 
                 if (!injuries || injuries.length === 0) {
                     console.log(`   ⚠️ Aucune blessure trouvée pour ${teamName}`);
@@ -1579,6 +1580,7 @@
                     return dossier;
                 }
                 
+                console.log(`\n🔄 [PARSING] Traitement de ${injuries.length} blessure(s)...`);
                 // Parser les blessures
                 injuries.forEach((inj, idx) => {
                     if (!inj.player || !inj.player.name) return;
@@ -1622,12 +1624,12 @@
                 
                 // Sauvegarder
                 saveTeamDossier(teamId, dossier);
-                console.log(`   ✅ Dossier ${teamName} mis à jour avec ${injuries.length} blessure(s) depuis API-Football`);
+                console.log(`\n✅ [SAVED] Dossier ${teamName} mis à jour avec ${dossier.injuries.length} blessure(s)`);
                 
                 return dossier;
                 
             } catch (error) {
-                console.error(`❌ Erreur autoFill ${teamName}:`, error);
+                console.error(`❌ [ERROR] Erreur autoFill ${teamName}:`, error);
                 return {
                     conflicts: [],
                     injuries: [],
