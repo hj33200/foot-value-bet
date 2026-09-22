@@ -1592,8 +1592,11 @@
                     
                     if (existing) return; // Skip si déjà présent
                     
-                    // 🧹 FILTRER: Accepter SEULEMENT Injury et Red Card
-                    if (reason !== 'Injury' && reason !== 'Red Card' && reason !== 'Suspended') {
+                    // 🧹 FILTRER: Accepter SEULEMENT Injury, Red Card, Suspended
+                    const isInjury = reason.includes('Injury'); // "Knee Injury", "Leg Injury", etc
+                    const isRedCard = reason === 'Red Card' || reason === 'Suspended';
+                    
+                    if (!isInjury && !isRedCard) {
                         if (idx < 3) console.log(`      ⏭️ ${playerName} - Reason: ${reason} (ignoré - pas pertinent)`);
                         return;
                     }
@@ -1612,14 +1615,14 @@
                     // 🧹 Calculer depuis AUJOURD'HUI (fixture dates sont passées!)
                     const today = new Date();
                     
-                    if (reason === 'Red Card') {
+                    if (reason === 'Red Card' || reason === 'Suspended') {
                         // Suspension: 3 jours
                         const returnD = new Date(today);
                         returnD.setDate(returnD.getDate() + 3);
                         returnDate = returnD.toISOString().split('T')[0];
                         console.log(`      🚫 ${playerName} (${reason}) - Suspension 3j, retour: ${returnDate}`);
-                    } else if (reason === 'Injury') {
-                        // Blessure: 2-3 semaines (14 jours)
+                    } else if (isInjury) {
+                        // Toute blessure (Knee Injury, Leg Injury, etc): 2-3 semaines (14 jours)
                         const returnD = new Date(today);
                         returnD.setDate(returnD.getDate() + 14);
                         returnDate = returnD.toISOString().split('T')[0];
