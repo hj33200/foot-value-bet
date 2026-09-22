@@ -1446,7 +1446,7 @@
             if (dossier.injuries.length > 0) {
                 html += `<div style="margin-bottom: 12px;"><h4 style="color: #ffa500; margin: 8px 0;">💔 Blessures/Absences</h4>`;
                 dossier.injuries.forEach(inj => {
-                    html += `<div style="padding: 8px; background: rgba(255, 165, 0, 0.1); border-left: 3px solid #ffa500; margin: 5px 0; border-radius: 3px;"><strong>${inj.player}</strong> (${inj.position})<br><small>Depuis: ${inj.date} → Retour: ${inj.returnDate || 'TBD'}</small>${inj.impact ? `<br><small style="color: #ffa500;">Impact xG: ${inj.impact > 0 ? '+' : ''}${inj.impact}%</small>` : ''}</div>`;
+                    html += `<div style="padding: 8px; background: rgba(255, 165, 0, 0.1); border-left: 3px solid #ffa500; margin: 5px 0; border-radius: 3px;"><strong>${inj.player}</strong> (${inj.position}) - ${inj.reason}${inj.impact ? `<br><small style="color: #ffa500;">Impact xG: ${inj.impact > 0 ? '+' : ''}${inj.impact}%</small>` : ''}</div>`;
                 });
                 html += `</div>`;
             }
@@ -1610,26 +1610,10 @@
                         console.log(`   🔍 DEBUG - Injury structure:`, JSON.stringify(inj, null, 2));
                     }
                     
-                    let returnDate = 'TBD';
+                    let returnDate = 'Indisponible';
                     
-                    // 🧹 Calculer depuis AUJOURD'HUI (fixture dates sont passées!)
-                    const today = new Date();
-                    
-                    if (reason === 'Red Card' || reason === 'Suspended') {
-                        // Suspension: 3 jours
-                        const returnD = new Date(today);
-                        returnD.setDate(returnD.getDate() + 3);
-                        returnDate = returnD.toISOString().split('T')[0];
-                        console.log(`      🚫 ${playerName} (${reason}) - Suspension 3j, retour: ${returnDate}`);
-                    } else if (isInjury) {
-                        // Toute blessure (Knee Injury, Leg Injury, etc): 2-3 semaines (14 jours)
-                        const returnD = new Date(today);
-                        returnD.setDate(returnD.getDate() + 14);
-                        returnDate = returnD.toISOString().split('T')[0];
-                        console.log(`      💔 ${playerName} (${reason}) - Blessure 2-3 sem., retour: ${returnDate}`);
-                    } else if (inj.fixture && inj.fixture.date) {
-                        returnDate = inj.fixture.date.split('T')[0];
-                    }
+                    // Afficher le type de blessure exact (pas de date calculée)
+                    console.log(`      💔 ${playerName} - ${reason}`);
                     
                     // ✅ DATES TOUJOURS FUTURES (calculées depuis aujourd'hui)
                     // Plus besoin de filtrer les dates passées!
@@ -1637,12 +1621,13 @@
                     dossier.injuries.push({
                         player: playerName,
                         position: position,
-                        date: new Date().toISOString().split('T')[0],
-                        returnDate: returnDate,
+                        reason: reason,
+                        date: 'Indisponible',
+                        returnDate: null,
                         impact: impact
                     });
                     
-                    console.log(`      ✅ ${playerName} (${position}) - Type: ${reason}, Retour: ${returnDate}`);
+                    console.log(`      ✅ ${playerName} (${position}) - ${reason}`);
                 });
                 
                 // Sauvegarder
